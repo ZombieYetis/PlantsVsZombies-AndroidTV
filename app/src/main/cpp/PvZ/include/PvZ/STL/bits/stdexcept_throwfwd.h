@@ -33,7 +33,7 @@ namespace pvzstl::detail {
 [[noreturn, gnu::cold]] void throw_invalid_argument(const char *msg);
 [[noreturn, gnu::cold]] void throw_length_error(const char *msg);
 [[noreturn, gnu::cold]] void throw_out_of_range(const char *msg);
-[[noreturn, gnu::cold, gnu::format(printf, 1, 2)]] void throw_out_of_range_fmt(const char *msg, ...);
+[[noreturn, gnu::cold, gnu::format(printf, 1, 2)]] void throw_out_of_range_fmt(const char *fmt, ...);
 [[noreturn, gnu::cold]] void throw_range_error(const char *msg);
 [[noreturn, gnu::cold]] void throw_overflow_error(const char *msg);
 [[noreturn, gnu::cold]] void throw_underflow_error(const char *msg);

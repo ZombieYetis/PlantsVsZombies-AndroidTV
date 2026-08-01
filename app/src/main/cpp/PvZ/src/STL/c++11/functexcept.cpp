@@ -18,9 +18,16 @@
  */
 
 #include "PvZ/STL/bits/c++config.h"
-#include "PvZ/STL/bits/stdexcept_throwfwd.h"
+#include "PvZ/STL/bits/stdexcept_throw.h"
 
+#include <cstdarg>
+
+#include <memory>
 #include <stdexcept>
+
+namespace pvzstl_cxx {
+int snprintf_lite(char *buf, std::size_t bufsize, const char *fmt, std::va_list ap);
+}
 
 void pvzstl::detail::throw_logic_error(const char *msg) {
     PVZSTL_THROW_OR_ABORT(std::logic_error(msg));
@@ -42,8 +49,22 @@ void pvzstl::detail::throw_out_of_range(const char *msg) {
     PVZSTL_THROW_OR_ABORT(std::out_of_range(msg));
 }
 
-void pvzstl::detail::throw_out_of_range_fmt(const char *msg, ...) {
+void pvzstl::detail::throw_out_of_range_fmt(const char *fmt, ...) {
+#if __cpp_exceptions
+    const std::size_t len = std::strlen(fmt);
+    // We expect at most 2 numbers, and 1 short string. The additional
+    // 512 bytes should provide more than enough space for expansion.
+    const std::size_t alloca_size = len + 512;
+    const auto s = std::make_unique_for_overwrite<char[]>(alloca_size);
+    std::va_list ap;
+
+    va_start(ap, fmt);
+    pvzstl_cxx::snprintf_lite(s.get(), alloca_size, fmt, ap);
+    throw std::out_of_range(s.get());
+    va_end(ap); // Not reached.
+#else
     throw_out_of_range(msg);
+#endif
 }
 
 void pvzstl::detail::throw_range_error(const char *msg) {

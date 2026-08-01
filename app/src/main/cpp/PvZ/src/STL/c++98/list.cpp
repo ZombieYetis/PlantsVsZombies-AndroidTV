@@ -17,7 +17,7 @@
  * PlantsVsZombies-AndroidTV.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "PvZ/STL/bits/stl_list.h"
+#include "PvZ/STL/list.h"
 
 void pvzstl::detail::list_node_base::swap(list_node_base &x, list_node_base &y) noexcept {
     if (x.m_next != &x) {
