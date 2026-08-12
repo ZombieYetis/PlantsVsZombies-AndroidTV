@@ -19,7 +19,10 @@
 
 #include "PvZ/Lawn/LawnApp.h"
 #include "Homura/Assert.h"
+#include "Homura/JniUtils.h"
 #include "Homura/Logger.h"
+#include "PvZ/Android/Native/BridgeApp.h"
+#include "PvZ/Android/Native/NativeApp.h"
 #include "PvZ/GlobalVariable.h"
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/Board/Challenge.h"
@@ -49,6 +52,8 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <cstdio>
+#include <ctime>
 #include <algorithm>
 #include <limits>
 #include <ranges>
@@ -58,6 +63,41 @@ using namespace Sexy;
 namespace {
 constexpr int kNetPingIntervalTicks = 100; // ~1s
 constexpr int kNetPingTimeoutTicks = 1200; // ~12s
+
+pvzstl::string BuildDefaultPlayerName() {
+    std::string androidId;
+    Native::BridgeApp *bridgeApp = Native::BridgeApp::getSingleton();
+    if (bridgeApp != nullptr && bridgeApp->mNativeApp != nullptr) {
+        JNIEnv *env = bridgeApp->getJNIEnv();
+        jobject activity = bridgeApp->mNativeApp->getActivity();
+        if (env != nullptr && activity != nullptr) {
+            jclass activityClass = env->GetObjectClass(activity);
+            jmethodID getAndroidId = env->GetMethodID(activityClass, "getAndroidId", "()Ljava/lang/String;");
+            if (getAndroidId != nullptr) {
+                auto value = static_cast<jstring>(env->CallObjectMethod(activity, getAndroidId));
+                if (!env->ExceptionCheck() && value != nullptr) {
+                    androidId = homura::JStringToString(env, value);
+                    env->DeleteLocalRef(value);
+                }
+            }
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
+            }
+            env->DeleteLocalRef(activityClass);
+        }
+    }
+
+    // FNV-1a keeps the name compact without exposing the Android ID itself.
+    uint32_t deviceHash = 2166136261U;
+    for (unsigned char ch : androidId) {
+        deviceHash = (deviceHash ^ ch) * 16777619U;
+    }
+
+    const auto timestampSuffix = static_cast<unsigned int>(std::time(nullptr) % 1000);
+    char defaultName[13]{};
+    std::snprintf(defaultName, sizeof(defaultName), "Player%03u%03u", timestampSuffix, deviceHash % 1000U);
+    return defaultName;
+}
 
 void ResetNetDelayState() {
     gNetPingSendCounter = 0;
@@ -1064,7 +1104,7 @@ void LawnApp::Init() {
 
     mProfileMgr->Load();
     if (mProfileMgr->GetAnyProfile() == nullptr) {
-        pvzstl::string defaultName = "Player";
+        pvzstl::string defaultName = BuildDefaultPlayerName();
         mProfileMgr->AddProfile(defaultName);
         mProfileMgr->Save();
         mPlayerInfo = mProfileMgr->GetProfile(defaultName);

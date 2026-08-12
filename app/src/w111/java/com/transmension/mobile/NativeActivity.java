@@ -35,6 +35,7 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -423,7 +424,8 @@ public class NativeActivity extends Activity {
     }
 
     public String getAndroidId() {
-        return "ABC";
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        return androidId != null ? androidId : "";
     }
 
     public int getDeviceId() {
