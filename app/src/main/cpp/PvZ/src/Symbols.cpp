@@ -360,6 +360,7 @@ bool LoadGameMain() {
     LawnApp_KillVSResultsScreenAddr = libGameMain.GetSymbol("_ZN7LawnApp19KillVSResultsScreenEv");
     LawnApp_LoadingCompletedAddr = libGameMain.GetSymbol("_ZN7LawnApp16LoadingCompletedEv");
     LawnApp_TryLoadGameAddr = libGameMain.GetSymbol("_ZN7LawnApp11TryLoadGameEv");
+    LawnApp_WriteCurrentUserConfigAddr = libGameMain.GetSymbol("_ZN7LawnApp22WriteCurrentUserConfigEv");
     LawnApp_HideHelpBarWidgetAddr = libGameMain.GetSymbol("_ZN7LawnApp17HideHelpBarWidgetEv");
     LawnApp_ShowHelpTextScreenAddr = libGameMain.GetSymbol("_ZN7LawnApp18ShowHelpTextScreenEi");
     LawnApp_GetPottedPlantByIndexAddr = libGameMain.GetSymbol("_ZN7LawnApp21GetPottedPlantByIndexEi");
@@ -934,6 +935,7 @@ bool LoadGameMain() {
     AlmanacDialog_Delete2Addr = libGameMain.GetSymbol("_ZN13AlmanacDialogD2Ev");
     AlmanacDialog_DrawPlantsAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog10DrawPlantsEPN4Sexy8GraphicsE");
     AlmanacDialog_DrawZombiesAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog11DrawZombiesEPN4Sexy8GraphicsE");
+    AlmanacDialog_SetupLayoutZombiesAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog18SetupLayoutZombiesEPN4Sexy8GraphicsE");
     AlmanacDialog_GetSeedPositionAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog15GetSeedPositionE8SeedTypeRiS1_");
     AlmanacDialog_GetZombieTypeAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog13GetZombieTypeEi");
     AlmanacDialog_GetZombiePositionAddr = libGameMain.GetSymbol("_ZN13AlmanacDialog17GetZombiePositionE10ZombieTypeRiS1_");

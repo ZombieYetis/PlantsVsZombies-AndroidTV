@@ -106,6 +106,7 @@ public:
     }
 
     void SetPage(AlmanacPage thePage);
+    void Update();
     void AddedToManager(Sexy::WidgetManager *theWidgetManager);
     void RemovedFromManager(Sexy::WidgetManager *theWidgetManager);
     void ButtonDepress(int theId);
@@ -115,6 +116,7 @@ public:
     bool ZombieIsShown(ZombieType theZombieType);
     bool ZombieHasSilhouette(ZombieType theZombieType) const;
     void SetupLayoutPlants(Sexy::Graphics *g);
+    void SetupLayoutZombies(Sexy::Graphics *g);
 
     void MouseDown(int x, int y, int theClickCount);
     void MouseDrag(int x, int y);
@@ -142,6 +144,12 @@ inline void (*old_AlmanacDialog_Delete2)(AlmanacDialog *almanacDialog);
 
 inline void (*old_AlmanacDialog_DrawPlants)(AlmanacDialog *almanacDialog, Sexy::Graphics *graphics);
 
+inline void (*old_AlmanacDialog_Update)(AlmanacDialog *almanacDialog);
+
+
 inline void (*old_AlmanacDialog_SetupLayoutPlants)(AlmanacDialog *almanacDialog, Sexy::Graphics *graphics);
+
+inline void (*old_AlmanacDialog_SetupLayoutZombies)(AlmanacDialog *almanacDialog, Sexy::Graphics *graphics);
+
 
 #endif // PVZ_LAWN_WIDGET_ALMANAC_DIALOG_H

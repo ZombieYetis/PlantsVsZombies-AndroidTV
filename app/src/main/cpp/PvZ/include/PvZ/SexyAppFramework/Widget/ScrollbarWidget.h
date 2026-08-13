@@ -33,25 +33,25 @@ public:
     Widget *mDownButton;    // 66
     bool mInvisIfNoScroll;  // 268
     int mId;                // 68
-    double mValue;          // 69 ~ 70
-    double mMaxValue;       // 71 ~ 72
-    double mPageSize;       // 73 ~ 74
-    bool mHorizontal;       // 300
-    int mButtonLength;      // 76
-    bool mPressedOnThumb;   // 77
-    int mMouseDownThumbPos; // 78
-    int mMouseDownX;        // 79
-    int mMouseDownY;        // 80
-    int mUpdateMode;        // 81
-    int mUpdateAcc;         // 82
-    int mButtonAcc;         // 83
-    int mLastMouseX;        // 84
-    int mLastMouseY;        // 85
-    int *mScrollListener;   // 86
-    Image *mThumbImage;     // 87
-    Image *mBarImage;       // 88
-    Image *mPagingImage;    // 89
-    // 大小90个整数
+    int unkField;           // 69 (0x114, 实际布局存在, 用途未知)
+    double mValue;          // 70 ~ 71 (0x118)
+    double mMaxValue;       // 72 ~ 73 (0x120)
+    double mPageSize;       // 74 ~ 75 (0x128)
+    bool mHorizontal;       // 76 (0x130)
+    bool mPressedOnThumb;   // 0x131 (MouseDown STRB 实证)
+    int mMouseDownThumbPos; // 0x134 (MouseDown STR 实证)
+    int mMouseDownX;        // 0x138 (MouseDown STR 实证)
+    int mMouseDownY;        // 0x13C (MouseDown STR 实证)
+    int mUpdateMode;        // 0x140 (MouseDown STR/Update CMP 实证)
+    int mUpdateAcc;         // 0x144 (Update 计数器实证)
+    int mButtonAcc;         // 0x148 (ButtonPress/ButtonDownTick 实证)
+    int mLastMouseX;        // 0x14C (MouseDown STR 实证)
+    int mLastMouseY;        // 0x150 (MouseDown STR 实证)
+    int *mScrollListener;   // 0x154 (SetValue 实证)
+    Image *mThumbImage;     // 0x158 (构造清零实证)
+    Image *mBarImage;       // 0x15C (构造清零实证)
+    Image *mPagingImage;    // 0x160 (构造清零实证)
+    // 大小: 0x164/4 = 89 个整数
 
     void SetMaxValue(double theValue) {
         reinterpret_cast<void (*)(Sexy::ScrollbarWidget *, double)>(Sexy_ScrollbarWidget_SetMaxValueAddr)(this, theValue);

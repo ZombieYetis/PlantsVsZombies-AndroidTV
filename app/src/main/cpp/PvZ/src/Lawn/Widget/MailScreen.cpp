@@ -87,6 +87,10 @@ void MailScreen::ButtonDepress(int theId) {
     MailScreen *aRealMailScreen = (MailScreen *)gLawnApp->GetDialog(Dialogs::DIALOG_MAIL);
     if (theId == 1002) {
         aRealMailScreen->KeyDown(Sexy::KEYCODE_RETURN);
+        // MARK AS READ 后立即写用户配置存档
+        if (LawnApp_WriteCurrentUserConfigAddr != nullptr) {
+            reinterpret_cast<void (*)(LawnApp *)>(LawnApp_WriteCurrentUserConfigAddr)(gLawnApp);
+        }
     } else if (theId == 1001) {
         aRealMailScreen->KeyDown(Sexy::KEYCODE_GAMEPAD_X);
         bool isAtInBox = aRealMailScreen->mPage == 0;
