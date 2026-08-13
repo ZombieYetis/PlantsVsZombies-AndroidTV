@@ -422,6 +422,9 @@ public:
     void DoCheatDialog() {
         reinterpret_cast<void (*)(LawnApp *)>(LawnApp_DoCheatDialogAddr)(this);
     }
+    void WriteCurrentUserConfig() {
+        reinterpret_cast<void (*)(LawnApp *)>(LawnApp_WriteCurrentUserConfigAddr)(this);
+    }
     StoreScreen *ShowStoreScreen() {
         return reinterpret_cast<StoreScreen *(*)(LawnApp *)>(LawnApp_ShowStoreScreenAddr)(this);
     }

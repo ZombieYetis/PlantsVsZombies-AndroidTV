@@ -1595,7 +1595,8 @@ void LawnApp::LoadingCompleted() {
     mTitleScreen = nullptr;
     if (mPlayerInfo) {
         GetVTable()->SetMusicVolume(this, mPlayerInfo->mMusicVolume);
-        GetVTable()->SetSfxVolume(this, mPlayerInfo->mSoundVolume);
+        // 音效音量修复: 真实音量 = 存档值 * 0.65, 以前按存档值直设会导致设置后重启，音效自动变大
+        GetVTable()->SetSfxVolume(this, mPlayerInfo->mSoundVolume * 0.65);
     }
     ShowGameSelector();
     mSoundSystem->RehookupSoundWithMusicVolume();

@@ -302,6 +302,7 @@ void InitHookFunction() {
     homura::HookFunc(AlmanacDialog_DrawPlantsAddr, &AlmanacDialog::DrawPlants, &old_AlmanacDialog_DrawPlants);
     homura::HookFunc(AlmanacDialog_DrawZombiesAddr, &AlmanacDialog::DrawZombies, nullptr);
     homura::HookFunc(AlmanacDialog_SetupLayoutPlantsAddr, &AlmanacDialog::SetupLayoutPlants, &old_AlmanacDialog_SetupLayoutPlants);
+    homura::HookFunc(AlmanacDialog_SetupLayoutZombiesAddr, &AlmanacDialog::SetupLayoutZombies, &old_AlmanacDialog_SetupLayoutZombies);
 
 
     homura::HookFunc(SeedChooserScreen_SeedChooserScreenAddr, &SeedChooserScreen::_constructor, nullptr);
@@ -778,6 +779,8 @@ void InitVTableHookFunction() {
     // VTableHookFunction(vTableForHelpTextScreenAddr, 83, (void *) HelpTextScreen_MouseDrag,(void **) &old_HelpTextScreen_MouseDrag);
     homura::HookVirtualFunc(vTableForHelpTextScreenAddr, 136, &HelpTextScreen::ButtonDepress, &old_HelpTextScreen_ButtonDepress);
 
+    homura::HookVirtualFunc(vTableForAlmanacDialogAddr, 33, &AlmanacDialog::Update, &old_AlmanacDialog_Update);
+    homura::HookVirtualFunc(vTableForAlmanacDialogAddr, 81, &AlmanacDialog::MouseUp, nullptr);
     homura::HookVirtualFunc(vTableForAlmanacDialogAddr, 83, &AlmanacDialog::MouseDrag, &old_AlmanacDialog_MouseDrag);
 
     homura::HookVirtualFunc(vTableForHouseChooserDialogAddr, 73, &HouseChooserDialog::KeyDown, &old_HouseChooserDialog_KeyDown);

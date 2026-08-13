@@ -33,6 +33,7 @@
 
 #include <cstddef>
 
+#include <algorithm>
 #include <numbers>
 
 using namespace Sexy;
@@ -151,8 +152,14 @@ void AlmanacDialog::MouseDrag(int x, int y) {
     // 滚动图鉴文字
 
     if (gTouchDownInTextRect && gAlmanacDialogTouchDownY != y) {
-        (*(void (**)(Sexy::Widget *, uint32_t, double))(*(uint32_t *)mScrollTextView + 500))(
-            (Widget *)mScrollTextView, *(uint32_t *)(*(uint32_t *)mScrollTextView + 500), *((double *)mScrollTextView + 35) + 0.6 * (gAlmanacDialogTouchDownY - y));
+        // 触摸拖拽标志 (this+932, unk4[2]): GameMain AlmanacDialog::Update 读它,
+        // 非 0 时进入输入处理块 (摇杆/触摸位移 SetValue(±1)), 处理完清零;
+        // AxisMoved 摇杆位移≥0.2 时置 1, 回中清 0
+        *(unsigned char *)&unk4[2] = 1;
+        // 拖拽产生的滚动值钳制到 [0, mMaxValue], 防止拖出边界后 mValue 越界
+        double aMaxValue = mScrollTextView->mMaxValue > 0.0 ? mScrollTextView->mMaxValue : 100.0;
+        double aNewValue = std::clamp(mScrollTextView->mValue + 0.6 * (gAlmanacDialogTouchDownY - y), 0.0, aMaxValue);
+        (*(void (**)(Sexy::Widget *, uint32_t, double))(*(uint32_t *)mScrollTextView + 500))((Widget *)mScrollTextView, *(uint32_t *)(*(uint32_t *)mScrollTextView + 500), aNewValue);
         gAlmanacDialogTouchDownY = y;
     }
 }
@@ -160,6 +167,17 @@ void AlmanacDialog::MouseDrag(int x, int y) {
 void AlmanacDialog::MouseUp(int x, int y, int theClickCount) {
     // 空函数替换，修复点击图鉴Index界面中任何位置都会跳转植物图鉴的问题
     gTouchDownInTextRect = false;
+    *(unsigned char *)&unk4[2] = 0;
+}
+
+void AlmanacDialog::Update() {
+    // 取消 TV 原版的 Description 自动滚动 (Update 中 SetValue(mValue+1))
+    // 无触摸拖拽(unk4[2]=0)时恢复 mValue, 同时保留手动滚动
+    double aSavedValue = mScrollTextView != nullptr ? mScrollTextView->mValue : 0.0;
+    old_AlmanacDialog_Update(this);
+    if (mScrollTextView != nullptr && !*(unsigned char *)&unk4[2]) {
+        mScrollTextView->mValue = aSavedValue;
+    }
 }
 
 void AlmanacDialog::ButtonDepress(int theId) {
@@ -278,6 +296,18 @@ void AlmanacDialog::DrawPlants(Sexy::Graphics *g) {
     // return old_AlmanacDialog_DrawPlants(almanacDialog,g);
     // 为泳池背景加入PoolEffect。此函数改变了原版绘制顺序，将背景图放在泳池的后面绘制
 
+    // 加入和 DrawZombies 对称的防护，虽然之前植物图鉴无 bug。但这样更保险。
+    // 滚动条 mValue 钳制到 [0, mMaxValue]: 滚动偏移 = mValue*0.01*rectY, 防越界值导致描述移出屏幕
+    if (mScrollTextView != nullptr) {
+        double aMaxValue = mScrollTextView->mMaxValue > 0.0 ? mScrollTextView->mMaxValue : 100.0;
+        mScrollTextView->mValue = std::clamp(mScrollTextView->mValue, 0.0, aMaxValue);
+    }
+    // 布局完成但描述为空，则重新布局生成文本
+    if (mSetupFinished && mDescriptionString->empty()) {
+        mSetupFinished = false;
+        SetupLayoutPlants(g);
+    }
+
     if (Plant::IsAquatic(mSelectedSeed)) {
         if (Plant::IsNocturnal(mSelectedSeed)) {
             g->DrawImage(Sexy::IMAGE_ALMANAC_GROUNDNIGHTPOOL, ALMANAC_RECT_PLANT_X, ALMANAC_RECT_PLANT_Y + 10);
@@ -363,7 +393,7 @@ void AlmanacDialog::DrawPlants(Sexy::Graphics *g) {
     float v23 = g->mTransY + 2.0f - v22;
     *(float *)unk2 = -v22;
     g->mTransY = v23;
-    TodDrawStringWrappedHelper(g, *mDescriptionString, mDescriptionRect, Sexy::FONT_BRIANNETOD16, Color(143, 67, 27, 255), DrawStringJustification::DS_ALIGN_LEFT, true, true);
+    unk2[1] = TodDrawStringWrappedHelper(g, *mDescriptionString, mDescriptionRect, Sexy::FONT_BRIANNETOD16, Color(143, 67, 27, 255), DrawStringJustification::DS_ALIGN_LEFT, true, true);
     g->PopState();
 }
 
@@ -407,6 +437,17 @@ bool AlmanacDialog::ZombieIsShown(ZombieType theZombieType) {
 }
 
 void AlmanacDialog::DrawZombies(Graphics *g) {
+    // 滚动条 mValue 钳制到 [0, mMaxValue]: 滚动偏移 = mValue*0.01*rectY, 防越界值导致描述移出屏幕
+    if (mScrollTextView != nullptr) {
+        double aMaxValue = mScrollTextView->mMaxValue > 0.0 ? mScrollTextView->mMaxValue : 100.0;
+        mScrollTextView->mValue = std::clamp(mScrollTextView->mValue, 0.0, aMaxValue);
+    }
+    // 布局完成但描述为空，则重新布局生成文本
+    if (mSetupFinished && mDescriptionString->empty()) {
+        mSetupFinished = false;
+        SetupLayoutZombies(g);
+    }
+
     g->DrawImage(Sexy::IMAGE_ALMANAC_ZOMBIEBACK, LawnApp::FULLSCREEN_RECT.mX, -60);
     int aHeaderOffsetY = Sexy::FONT_DWARVENTODCRAFT24->GetHeight() / 2;
     TodDrawString(g, "[SUBURBAN_ALMANAC_ZOMBIES]", BOARD_WIDTH / 2, aHeaderOffsetY + 42, Sexy::FONT_DWARVENTODCRAFT24, Color(0, 196, 0), DS_ALIGN_CENTER);
@@ -627,12 +668,24 @@ void AlmanacDialog::DrawZombies(Graphics *g) {
 void AlmanacDialog::SetupLayoutPlants(Sexy::Graphics *g) {
     // 修复介绍文字过长时的显示不全
     old_AlmanacDialog_SetupLayoutPlants(this, g);
-
+    // 之前 SetMaxValue 为 100/115 时，某些英文版 Description 的最后一行有下伸部的字母 (y/g/p) 会被裁掉一半
+    // 所以在原有基础上各 +5 留出余量: 短文本 105；长文本 120
     if (unk2[1] > 398) {
         // 文字过长
         unk2[1] *= 1.15f;
-        mScrollTextView->SetMaxValue(115);
+        mScrollTextView->SetMaxValue(120);
     } else {
-        mScrollTextView->SetMaxValue(100);
+        mScrollTextView->SetMaxValue(105);
+    }
+}
+
+void AlmanacDialog::SetupLayoutZombies(Sexy::Graphics *g) {
+    old_AlmanacDialog_SetupLayoutZombies(this, g);
+    // 与 SetupLayoutPlants 相同的滚动范围处理
+    if (unk2[1] > 398) {
+        unk2[1] *= 1.15f;
+        mScrollTextView->SetMaxValue(120);
+    } else {
+        mScrollTextView->SetMaxValue(105);
     }
 }
