@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "PvZ/STL/string.h"
 #include <concepts>
 #include <netinet/in.h>
 #include <string>
@@ -403,6 +404,9 @@ inline int gTcpPort = 0;
 inline int gLastBroadcastTime = 0;
 inline sockaddr_in gBroadcastAddr;
 inline std::string gIfname;
+
+// 使用联机模块筛选出的本机 IPv4，生成最后两段各三位的六位玩家编号。
+pvzstl::string GetLocalIpPlayerCode();
 
 inline char gSecondPlayerName[32];
 inline char gServerHostName[32];

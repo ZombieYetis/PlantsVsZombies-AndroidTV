@@ -39,6 +39,7 @@
 #include "PvZ/Lawn/Widget/VSResultsMenu.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/Lawn/Widget/WaitForSecondPlayerDialog.h"
+#include "PvZ/NetPlay.h"
 #include "PvZ/ReplaySystem.h"
 #include "PvZ/STL/string.h"
 #include "PvZ/SexyAppFramework/Buffer.h"
@@ -1104,7 +1105,8 @@ void LawnApp::Init() {
 
     mProfileMgr->Load();
     if (mProfileMgr->GetAnyProfile() == nullptr) {
-        pvzstl::string defaultName = BuildDefaultPlayerName();
+        pvzstl::string ipCode = GetLocalIpPlayerCode();
+        pvzstl::string defaultName = StrFormat("Player%s", ipCode.c_str());
         mProfileMgr->AddProfile(defaultName);
         mProfileMgr->Save();
         mPlayerInfo = mProfileMgr->GetProfile(defaultName);

@@ -36,6 +36,7 @@
 #include <sys/endian.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <cstdio>
 #include <algorithm>
 
 #include <ifaddrs.h>
@@ -247,6 +248,12 @@ static bool CollectAllBroadcastTargets(std::vector<BroadcastTarget> &out_targets
     }
 
     return !out_targets.empty();
+}
+
+static pvzstl::string MakeRandomPlayerCode() {
+    char code[7]{};
+    snprintf(code, sizeof(code), "%06d", 100000 + Sexy::Rand(900000));
+    return code;
 }
 
 static bool ParseMode3IpPort(std::string_view inputRaw, std::string &outIp, int &outPort) {
@@ -618,6 +625,25 @@ static void Mode3UpdateTargetLatencyProbes(WaitForSecondPlayerDialog *dialog) {
     }
 }
 } // namespace
+
+pvzstl::string GetLocalIpPlayerCode() {
+    std::vector<BroadcastTarget> targets;
+    if (!CollectAllBroadcastTargets(targets) || targets.empty() || targets.front().ifname == "fallback") {
+        return MakeRandomPlayerCode();
+    }
+
+    in_addr address{};
+    if (inet_pton(AF_INET, targets.front().local_ip.c_str(), &address) != 1) {
+        return MakeRandomPlayerCode();
+    }
+
+    const uint32_t hostAddress = ntohl(address.s_addr);
+    const unsigned int thirdOctet = (hostAddress >> 8U) & 0xFFU;
+    const unsigned int fourthOctet = hostAddress & 0xFFU;
+    char code[7]{};
+    snprintf(code, sizeof(code), "%03u%03u", thirdOctet, fourthOctet);
+    return code;
+}
 
 bool WaitForSecondPlayerDialog::ServerHostRoomLocked() const {
     return mUIMode == UIMode::MODE3_SERVER && mServerConnected && mServerHosting && (mServerHostHasGuest || mServerSpectating);
