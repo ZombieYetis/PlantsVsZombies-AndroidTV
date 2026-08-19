@@ -36,12 +36,20 @@
 #include "PvZ/NetPlay.h"
 #include "PvZ/SexyAppFramework/Graphics/Font.h"
 #include "PvZ/SexyAppFramework/Misc/MTRand.h"
+#include "PvZ/SexyAppFramework/SexyAppBase.h"
 #include "PvZ/Symbols.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
+#include "VSActionAIDraftPolicy.h"
 
 #include <unistd.h>
 
 #include <climits>
+#include <cstddef>
+#include <algorithm>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <vector>
 
 using namespace Sexy;
 
@@ -51,6 +59,8 @@ constexpr uint32_t kSeedChooserDragSyncIntervalMs = 50;
 constexpr uintptr_t kSeedChooserButtonListenerVtableOffset = 0x20C;
 SeedType gLastDragSyncSeedType[2][2] = {{SeedType::SEED_NONE, SeedType::SEED_NONE}, {SeedType::SEED_NONE, SeedType::SEED_NONE}};
 uint32_t gLastDragSyncTickMs[2][2] = {{0, 0}, {0, 0}};
+
+bool HasBuiltinAIOpponentLobbedPressure(SeedChooserScreen *screen);
 
 bool IsLocalChooserInputAllowed(SeedChooserScreen *screen) {
     if (!screen->mApp->IsVSMode()) {
@@ -115,6 +125,1284 @@ void NormalizeLocalPoint(SeedChooserScreen *screen, int &x, int &y) {
 
 int GetZombieIndexBySeedType(SeedType theSeedType) {
     return theSeedType >= SeedType::SEED_ZOMBIE_GRAVESTONE ? SeedType(theSeedType - SeedType::SEED_ZOMBIE_GRAVESTONE) : SeedType::SEED_NONE;
+}
+
+bool IsLocalBuiltinAIChooser(const SeedChooserScreen *screen) {
+    return screen != nullptr && screen->mApp != nullptr && screen->mApp->IsVSMode() && !gTcpConnected && gTcpClientSocket < 0 && !gIsReplayMode && !gIsServerModeSpectator;
+}
+
+bool IsChooserFilled(const SeedChooserScreen *screen) {
+    return screen != nullptr && screen->mSeedBank1 != nullptr && screen->mSeedsInFlight == 0 && screen->mSeedsInBank >= screen->mSeedBank1->mNumPackets;
+}
+
+constexpr int kBuiltinAIBaseDeckSize = 6;
+constexpr int kBuiltinAIMaxDeckSize = 7;
+
+struct BuiltinAIPlantProfile {
+    int id = -1;
+    SeedType dayDeck[kBuiltinAIMaxDeckSize]{};
+    SeedType nightDeck[kBuiltinAIMaxDeckSize]{};
+    int weight = 0;
+    SeedType mainCarry = SeedType::SEED_NONE;
+
+    const SeedType *Deck(bool isNight) const {
+        return isNight ? nightDeck : dayDeck;
+    }
+};
+
+// Each record keeps both map variants, selection weight, and declared carry
+// together. A new replay profile cannot silently inherit adjacent metadata.
+static constexpr std::array<BuiltinAIPlantProfile, 43> kBuiltinAIPlantProfiles = {{
+    {0,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_SUNSHROOM},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     5,
+     SEED_PEASHOOTER},
+    {1,
+     {SEED_SUNFLOWER, SEED_REPEATER, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     {SEED_SUNSHROOM, SEED_REPEATER, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     5,
+     SEED_REPEATER},
+    {2,
+     {SEED_SUNFLOWER, SEED_SNOWPEA, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_JALAPENO},
+     {SEED_SUNSHROOM, SEED_SNOWPEA, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_JALAPENO},
+     4,
+     SEED_SNOWPEA},
+    {3,
+     {SEED_SUNFLOWER, SEED_SCAREDYSHROOM, SEED_INSTANT_COFFEE, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB},
+     {SEED_SUNSHROOM, SEED_SCAREDYSHROOM, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     3,
+     SEED_SCAREDYSHROOM},
+    {4,
+     {SEED_SUNFLOWER, SEED_MELONPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_WALLNUT},
+     {SEED_SUNSHROOM, SEED_MELONPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_WALLNUT},
+     3,
+     SEED_MELONPULT},
+    {5,
+     {SEED_SUNFLOWER, SEED_BLOOMERANG, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_CELERY_STALKER},
+     {SEED_SUNSHROOM, SEED_BLOOMERANG, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_CELERY_STALKER},
+     2,
+     SEED_BLOOMERANG},
+    {6,
+     {SEED_SUNFLOWER, SEED_CABBAGEPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_JALAPENO},
+     {SEED_SUNSHROOM, SEED_CABBAGEPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_JALAPENO},
+     2,
+     SEED_CABBAGEPULT},
+    {7,
+     {SEED_SUNFLOWER, SEED_SPORESHROOM, SEED_INSTANT_COFFEE, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB},
+     {SEED_SUNSHROOM, SEED_SPORESHROOM, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     2,
+     SEED_SPORESHROOM},
+    {8,
+     {SEED_SUNFLOWER, SEED_KERNELPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     {SEED_SUNSHROOM, SEED_KERNELPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_ICEBERG_LETTUCE},
+     1,
+     SEED_KERNELPULT},
+    {9,
+     {SEED_SUNFLOWER, SEED_STARFRUIT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_PUMPKINSHELL},
+     {SEED_SUNSHROOM, SEED_STARFRUIT, SEED_POTATOMINE, SEED_SQUASH, SEED_CHERRYBOMB, SEED_PUMPKINSHELL},
+     2,
+     SEED_STARFRUIT},
+    {10,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_DOOMSHROOM, SEED_CHILLY_PEPPER, SEED_HYPNOSHROOM, SEED_INSTANT_COFFEE},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_DOOMSHROOM, SEED_CHILLY_PEPPER, SEED_HYPNOSHROOM, SEED_POTATOMINE},
+     3,
+     SEED_PEASHOOTER},
+    {11,
+     {SEED_SUNFLOWER, SEED_SPORESHROOM, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_WALLNUT, SEED_SPIKEWEED},
+     {SEED_SUNSHROOM, SEED_SPORESHROOM, SEED_PUFFSHROOM, SEED_WALLNUT, SEED_SPIKEWEED, SEED_POTATOMINE},
+     2,
+     SEED_SPORESHROOM},
+    {12,
+     {SEED_SUNFLOWER, SEED_FUMESHROOM, SEED_INSTANT_COFFEE, SEED_WALLNUT, SEED_IMP_PEAR, SEED_DOOMSHROOM},
+     {SEED_SUNSHROOM, SEED_FUMESHROOM, SEED_WALLNUT, SEED_IMP_PEAR, SEED_POTATOMINE, SEED_SQUASH},
+     1,
+     SEED_FUMESHROOM},
+    {13,
+     {SEED_SUNFLOWER, SEED_SNOWPEA, SEED_BONK_CHOY, SEED_WALLNUT, SEED_SQUASH, SEED_IMP_PEAR},
+     {SEED_SUNSHROOM, SEED_SNOWPEA, SEED_BONK_CHOY, SEED_WALLNUT, SEED_SQUASH, SEED_IMP_PEAR},
+     2,
+     SEED_SNOWPEA},
+    {14,
+     {SEED_SUNFLOWER, SEED_STARFRUIT, SEED_GARLIC, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_POTATOMINE},
+     {SEED_SUNSHROOM, SEED_STARFRUIT, SEED_GARLIC, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_POTATOMINE},
+     1,
+     SEED_STARFRUIT},
+    {15,
+     {SEED_SUNFLOWER, SEED_REPEATER, SEED_WALLNUT, SEED_IMP_PEAR, SEED_SQUASH, SEED_SUNSHROOM},
+     {SEED_SUNSHROOM, SEED_REPEATER, SEED_WALLNUT, SEED_IMP_PEAR, SEED_SQUASH, SEED_POTATOMINE},
+     2,
+     SEED_REPEATER},
+    {16,
+     {SEED_SUNFLOWER, SEED_KERNELPULT, SEED_CELERY_STALKER, SEED_POTATOMINE, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_JALAPENO},
+     {SEED_SUNSHROOM, SEED_KERNELPULT, SEED_CELERY_STALKER, SEED_POTATOMINE, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_JALAPENO},
+     1,
+     SEED_KERNELPULT},
+    {17,
+     {SEED_SUNFLOWER, SEED_MELONPULT, SEED_POTATOMINE, SEED_SQUASH, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_JALAPENO},
+     {SEED_SUNSHROOM, SEED_MELONPULT, SEED_SCAREDYSHROOM, SEED_POTATOMINE, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_JALAPENO},
+     2,
+     SEED_MELONPULT},
+    {18,
+     {SEED_SUNFLOWER, SEED_SCAREDYSHROOM, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_DOOMSHROOM, SEED_SPIKEWEED},
+     {SEED_SUNSHROOM, SEED_SCAREDYSHROOM, SEED_PUFFSHROOM, SEED_DOOMSHROOM, SEED_SPIKEWEED, SEED_WALLNUT},
+     1,
+     SEED_SCAREDYSHROOM},
+    {19,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_SUNSHROOM, SEED_ICEBERG_LETTUCE},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_ICEBERG_LETTUCE, SEED_POTATOMINE, SEED_WALLNUT},
+     1,
+     SEED_PEASHOOTER},
+    {20,
+     {SEED_SUNFLOWER, SEED_CACTUS, SEED_SPIKEWEED, SEED_POTATOMINE, SEED_WALLNUT, SEED_SQUASH},
+     {SEED_SUNSHROOM, SEED_CACTUS, SEED_SPIKEWEED, SEED_POTATOMINE, SEED_WALLNUT, SEED_SQUASH},
+     1,
+     SEED_CACTUS},
+    {21,
+     {SEED_SUNFLOWER, SEED_THREEPEATER, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_WALLNUT, SEED_CHILLY_PEPPER},
+     {SEED_SUNSHROOM, SEED_THREEPEATER, SEED_PUFFSHROOM, SEED_WALLNUT, SEED_CHILLY_PEPPER, SEED_POTATOMINE},
+     1,
+     SEED_THREEPEATER},
+    {22,
+     {SEED_SUNFLOWER, SEED_SNOWPEA, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_POTATOMINE, SEED_ICEBERG_LETTUCE},
+     {SEED_SUNSHROOM, SEED_SNOWPEA, SEED_PUFFSHROOM, SEED_POTATOMINE, SEED_ICEBERG_LETTUCE, SEED_WALLNUT},
+     1,
+     SEED_SNOWPEA},
+    {23,
+     {SEED_SUNFLOWER, SEED_REPEATER, SEED_CELERY_STALKER, SEED_JALAPENO, SEED_POTATOMINE, SEED_WALLNUT},
+     {SEED_SUNSHROOM, SEED_REPEATER, SEED_CELERY_STALKER, SEED_JALAPENO, SEED_POTATOMINE, SEED_WALLNUT},
+     2,
+     SEED_REPEATER},
+    {24,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_ICEBERG_LETTUCE, SEED_WALLNUT},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_ICEBERG_LETTUCE, SEED_POTATOMINE, SEED_WALLNUT},
+     2,
+     SEED_PEASHOOTER},
+    {25,
+     {SEED_SUNFLOWER, SEED_FUMESHROOM, SEED_DOOMSHROOM, SEED_INSTANT_COFFEE, SEED_CHILLY_PEPPER, SEED_WALLNUT},
+     {SEED_SUNSHROOM, SEED_FUMESHROOM, SEED_DOOMSHROOM, SEED_CHILLY_PEPPER, SEED_POTATOMINE, SEED_WALLNUT},
+     2,
+     SEED_FUMESHROOM},
+    {26,
+     {SEED_SUNFLOWER, SEED_SNOWPEA, SEED_BONK_CHOY, SEED_SQUASH, SEED_WALLNUT, SEED_CHILLY_PEPPER},
+     {SEED_SUNSHROOM, SEED_SNOWPEA, SEED_BONK_CHOY, SEED_SQUASH, SEED_WALLNUT, SEED_CHILLY_PEPPER},
+     2,
+     SEED_SNOWPEA},
+    {27,
+     {SEED_SUNFLOWER, SEED_STARFRUIT, SEED_CHOMPER, SEED_CHERRYBOMB, SEED_WALLNUT, SEED_POTATOMINE},
+     {SEED_SUNSHROOM, SEED_STARFRUIT, SEED_CHOMPER, SEED_CHERRYBOMB, SEED_WALLNUT, SEED_POTATOMINE},
+     1,
+     SEED_STARFRUIT},
+    {28,
+     {SEED_SUNFLOWER, SEED_BLOOMERANG, SEED_DOOMSHROOM, SEED_HYPNOSHROOM, SEED_INSTANT_COFFEE, SEED_CHERRYBOMB, SEED_WALLNUT},
+     {SEED_SUNSHROOM, SEED_BLOOMERANG, SEED_DOOMSHROOM, SEED_HYPNOSHROOM, SEED_CHERRYBOMB, SEED_POTATOMINE, SEED_WALLNUT},
+     1,
+     SEED_BLOOMERANG},
+    {29,
+     {SEED_SUNFLOWER, SEED_SPORESHROOM, SEED_PUMPKINSHELL, SEED_SQUASH, SEED_INSTANT_COFFEE, SEED_CHERRYBOMB},
+     {SEED_SUNSHROOM, SEED_SPORESHROOM, SEED_PUMPKINSHELL, SEED_SQUASH, SEED_CHERRYBOMB, SEED_POTATOMINE},
+     1,
+     SEED_SPORESHROOM},
+    {30,
+     {SEED_SUNFLOWER, SEED_SNOWPEA, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_ICEBERG_LETTUCE, SEED_MAGNETSHROOM, SEED_POTATOMINE},
+     {SEED_SUNSHROOM, SEED_SNOWPEA, SEED_PUFFSHROOM, SEED_ICEBERG_LETTUCE, SEED_POTATOMINE, SEED_MAGNETSHROOM},
+     1,
+     SEED_SNOWPEA},
+    {31,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_ICEBERG_LETTUCE, SEED_SUNSHROOM},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_PUFFSHROOM, SEED_ICEBERG_LETTUCE, SEED_POTATOMINE, SEED_WALLNUT},
+     2,
+     SEED_PEASHOOTER},
+    {32,
+     {SEED_SUNFLOWER, SEED_REPEATER, SEED_CELERY_STALKER, SEED_JALAPENO, SEED_WALLNUT, SEED_SUNSHROOM},
+     {SEED_SUNSHROOM, SEED_REPEATER, SEED_CELERY_STALKER, SEED_JALAPENO, SEED_WALLNUT, SEED_POTATOMINE},
+     2,
+     SEED_REPEATER},
+    {33,
+     {SEED_SUNFLOWER, SEED_POTATOMINE, SEED_PUFFSHROOM, SEED_SNOWPEA, SEED_INSTANT_COFFEE, SEED_ICEBERG_LETTUCE},
+     {SEED_SUNSHROOM, SEED_POTATOMINE, SEED_PUFFSHROOM, SEED_SNOWPEA, SEED_ICEBERG_LETTUCE, SEED_WALLNUT},
+     2,
+     SEED_SNOWPEA},
+    {34,
+     {SEED_SUNFLOWER, SEED_SPORESHROOM, SEED_PUFFSHROOM, SEED_SCAREDYSHROOM, SEED_INSTANT_COFFEE, SEED_DOOMSHROOM},
+     {SEED_SUNSHROOM, SEED_SPORESHROOM, SEED_PUFFSHROOM, SEED_SCAREDYSHROOM, SEED_DOOMSHROOM, SEED_WALLNUT},
+     2,
+     SEED_SPORESHROOM},
+    {35,
+     {SEED_SUNFLOWER, SEED_MELONPULT, SEED_POTATOMINE, SEED_WALLNUT, SEED_CHILLY_PEPPER, SEED_SQUASH},
+     {SEED_SUNSHROOM, SEED_MELONPULT, SEED_POTATOMINE, SEED_WALLNUT, SEED_CHILLY_PEPPER, SEED_SQUASH},
+     2,
+     SEED_MELONPULT},
+    {36,
+     {SEED_SUNFLOWER, SEED_REPEATER, SEED_SUNSHROOM, SEED_WALLNUT, SEED_SQUASH, SEED_CHILLY_PEPPER},
+     {SEED_SUNSHROOM, SEED_REPEATER, SEED_WALLNUT, SEED_SQUASH, SEED_CHILLY_PEPPER, SEED_POTATOMINE},
+     3,
+     SEED_REPEATER},
+    {37,
+     {SEED_SUNFLOWER, SEED_STARFRUIT, SEED_PUFFSHROOM, SEED_INSTANT_COFFEE, SEED_WALLNUT, SEED_CHERRYBOMB},
+     {SEED_SUNSHROOM, SEED_STARFRUIT, SEED_PUFFSHROOM, SEED_WALLNUT, SEED_CHERRYBOMB, SEED_POTATOMINE},
+     1,
+     SEED_STARFRUIT},
+    {38, {SEED_BLOOMERANG, SEED_PEASHOOTER, SEED_SQUASH, SEED_SPIKEWEED, SEED_PUMPKINSHELL}, {SEED_BLOOMERANG, SEED_PEASHOOTER, SEED_SQUASH, SEED_SPIKEWEED, SEED_PUMPKINSHELL}, 1, SEED_BLOOMERANG},
+    {39, {SEED_REPEATER, SEED_CHOMPER, SEED_CHILLY_PEPPER, SEED_WALLNUT, SEED_SUNSHROOM}, {SEED_REPEATER, SEED_CHOMPER, SEED_CHILLY_PEPPER, SEED_WALLNUT, SEED_SUNSHROOM}, 1, SEED_REPEATER},
+    {40,
+     {SEED_SUNFLOWER, SEED_BLOOMERANG, SEED_WALLNUT, SEED_SQUASH, SEED_SUNSHROOM, SEED_GARLIC},
+     {SEED_SUNSHROOM, SEED_BLOOMERANG, SEED_WALLNUT, SEED_SQUASH, SEED_POTATOMINE, SEED_GARLIC},
+     2,
+     SEED_BLOOMERANG},
+    {41,
+     {SEED_SUNFLOWER, SEED_SCAREDYSHROOM, SEED_INSTANT_COFFEE, SEED_ICEBERG_LETTUCE, SEED_BONK_CHOY, SEED_HYPNOSHROOM},
+     {SEED_SUNSHROOM, SEED_SCAREDYSHROOM, SEED_ICEBERG_LETTUCE, SEED_BONK_CHOY, SEED_HYPNOSHROOM, SEED_WALLNUT},
+     1,
+     SEED_SCAREDYSHROOM},
+    {42,
+     {SEED_SUNFLOWER, SEED_PEASHOOTER, SEED_ICEBERG_LETTUCE, SEED_PUMPKINSHELL, SEED_CHERRYBOMB, SEED_JALAPENO},
+     {SEED_SUNSHROOM, SEED_PEASHOOTER, SEED_ICEBERG_LETTUCE, SEED_PUMPKINSHELL, SEED_CHERRYBOMB, SEED_JALAPENO},
+     2,
+     SEED_PEASHOOTER},
+}};
+
+const BuiltinAIPlantProfile *GetBuiltinAIPlantProfile(int profile) {
+    return profile >= 0 && profile < static_cast<int>(kBuiltinAIPlantProfiles.size()) ? &kBuiltinAIPlantProfiles[static_cast<std::size_t>(profile)] : nullptr;
+}
+
+static constexpr SeedType kBuiltinAIZombieDecks[][kBuiltinAIMaxDeckSize] = {
+    {SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_SCREEN_DOOR, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_GIGA_FOOTBALL, SEED_ZOMBIE_GRAVESTONE},
+    {SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_IMP, SEED_ZOMBONI, SEED_ZOMBIE_SCREEN_DOOR, SEED_ZOMBIE_MOUND, SEED_ZOMBIE_TRASHCAN},
+    {SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_IMP, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_GRAVESTONE},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_CATAPULT, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_BUNGEE},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBIE_IMP, SEED_ZOMBIE_SUNDAY_EDITION, SEED_ZOMBIE_GARGANTUAR},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_GIGA_GARGANTUAR, SEED_ZOMBIE_CATAPULT},
+    {SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_FLAG, SEED_ZOMBIE_SQUASH_HEAD, SEED_ZOMBIE_SCREEN_DOOR, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_GIGA_GARGANTUAR},
+    {SEED_ZOMBIE_IMP, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_BUNGEE, SEED_ZOMBIE_SCREEN_DOOR, SEED_ZOMBIE_CATAPULT, SEED_ZOMBIE_GARGANTUAR},
+    {SEED_ZOMBIE_SQUASH_HEAD, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_SCREEN_DOOR, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_GIGA_FOOTBALL, SEED_ZOMBIE_SUPER_FAN_IMP},
+    {SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_TALLNUT_HEAD, SEED_ZOMBIE_MOUND},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_GIGA_GARGANTUAR, SEED_ZOMBIE_DOGWALKER, SEED_ZOMBIE_FOOTBALL},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_CATAPULT, SEED_ZOMBIE_BUNGEE, SEED_ZOMBIE_GARGANTUAR},
+    // Replay fast-pressure template. The battle scorer still fans these
+    // probes across economy lanes and rejects its metal screens versus pults.
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBONI, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_DOGWALKER},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_MOUND, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_IMP, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBONI},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_LADDER, SEED_ZOMBIE_GIGA_POLEVAULTER, SEED_ZOMBIE_NORMAL},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_DIGGER, SEED_ZOMBIE_GIGA_GARGANTUAR, SEED_ZOMBIE_TRAFFIC_CONE},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_IMP, SEED_ZOMBONI, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_GIGA_POLEVAULTER},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_TRASHCAN},
+    // Recent recordings use these as distinct grave-economy profiles:
+    // pail/imp/sled multi-lane pressure, pea-head/zomboni with a giant
+    // finisher, and a cone/pail/polevaulter breakthrough plan.
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_IMP, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_SUNDAY_EDITION, SEED_ZOMBIE_SCREEN_DOOR},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBONI, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_TRASHCAN},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBONI, SEED_ZOMBIE_IMP, SEED_ZOMBIE_GIGA_POLEVAULTER},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_DOGWALKER, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_IMP, SEED_ZOMBIE_SUNDAY_EDITION},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_DOGWALKER, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_GIGA_FOOTBALL},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_LADDER, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_GIGA_POLEVAULTER, SEED_ZOMBIE_NORMAL},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_IMP, SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_SUNDAY_EDITION, SEED_ZOMBIE_GARGANTUAR},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_PEA_HEAD},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_IMP, SEED_ZOMBONI, SEED_ZOMBIE_GARGANTUAR},
+    // These three are exact replay profiles. Their battle logic still
+    // requires lane spread, legal targets and Ash awareness before using
+    // their early heavy release or their Bobsled transition.
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_LADDER, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_GIGA_POLEVAULTER},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_DIGGER, SEED_ZOMBIE_GIGA_GARGANTUAR},
+    {SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_SUPER_FAN_IMP, SEED_ZOMBIE_GIGA_FOOTBALL, SEED_ZOMBIE_GIGA_POLEVAULTER, SEED_ZOMBIE_DOGWALKER},
+    // Ladder/Football recordings use the Imp probe first, then convert a
+    // developed Wall-nut lane with Ladder and a heavy runner. The scorer
+    // still rejects the ladder when no nut target exists and keeps Door away
+    // from lobbed plants.
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_IMP, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_LADDER, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_SCREEN_DOOR},
+    // The Pea-head/Flag recording is a ranged, multi-lane plan. The
+    // gravestone remains available as the built-in zombie economy card;
+    // keep the six recorded combat choices intact instead of replacing the
+    // Flag or Bungee with another generic grave screen.
+    {SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_FOOTBALL, SEED_ZOMBIE_BUNGEE, SEED_ZOMBIE_FLAG},
+    // Five-card Ban-residual fast attack and giant-finisher profiles.
+    {SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_PEA_HEAD, SEED_ZOMBIE_TRASHCAN, SEED_ZOMBIE_ZOMBLOB, SEED_ZOMBIE_GIGA_GARGANTUAR},
+    {SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_IMP, SEED_ZOMBIE_GARGANTUAR, SEED_ZOMBIE_FOOTBALL},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_TRAFFIC_CONE, SEED_ZOMBIE_SUNDAY_EDITION, SEED_ZOMBIE_BOBSLED, SEED_ZOMBIE_POLEVAULTER, SEED_ZOMBIE_TALLNUT_HEAD},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_NORMAL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_IMP, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_GIGA_GARGANTUAR},
+    {SEED_ZOMBIE_GRAVESTONE, SEED_ZOMBIE_PAIL, SEED_ZOMBIE_NEWSPAPER, SEED_ZOMBIE_LADDER, SEED_ZOMBONI, SEED_ZOMBIE_JACK_IN_THE_BOX},
+};
+
+std::size_t GetBuiltinAIPlanSize(const SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mSeedBank1 == nullptr || screen->mSeedBank1->mNumPackets <= 0) {
+        return kBuiltinAIBaseDeckSize;
+    }
+    return static_cast<std::size_t>(screen->mSeedBank1->mNumPackets >= kBuiltinAIMaxDeckSize ? kBuiltinAIMaxDeckSize : screen->mSeedBank1->mNumPackets);
+}
+
+using BuiltinAIDeckPlans = vsai::draft::BuiltinAIDraftSession;
+
+BuiltinAIDeckPlans &BuiltinAIPlans() {
+    return vsai::draft::GetBuiltinAIDraftSession();
+}
+
+int PickBuiltinAIPlantProfile() {
+    // The strongest replay-compatible templates use a tier-one carry and
+    // the Potato/Squash/Cherry answer package. Lower-tier carries still
+    // occur, but do not drown out those reliable opening plans.
+    int totalWeight = 0;
+    for (const BuiltinAIPlantProfile &profile : kBuiltinAIPlantProfiles) {
+        totalWeight += profile.weight;
+    }
+    int ticket = Sexy::Rand(totalWeight);
+    for (const BuiltinAIPlantProfile &profile : kBuiltinAIPlantProfiles) {
+        ticket -= profile.weight;
+        if (ticket < 0) {
+            return profile.id;
+        }
+    }
+    return kBuiltinAIPlantProfiles.back().id;
+}
+
+void EnsureBuiltinAIDeckPlans(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mApp == nullptr) {
+        return;
+    }
+
+    BuiltinAIDeckPlans &plans = BuiltinAIPlans();
+    if (plans.app == screen->mApp && plans.plantProfile >= 0 && plans.zombieProfile >= 0) {
+        return;
+    }
+
+    plans.app = screen->mApp;
+    plans.plantProfile = PickBuiltinAIPlantProfile();
+    plans.zombieProfile = Sexy::Rand(static_cast<int>(std::size(kBuiltinAIZombieDecks)));
+    // Replay templates are the default human-like opening. Keep a smaller
+    // constrained-random path so local AI matches do not repeat a recorded
+    // line every game; both paths still pass through the same legality and
+    // matchup filters below.
+    plans.usePlantTemplate = Sexy::Rand(100) < 80;
+    plans.useZombieTemplate = Sexy::Rand(100) < 80;
+    vsai::draft::BuiltinAIDraftHistory &history = vsai::draft::GetBuiltinAIDraftHistory();
+    // A new chooser is a new match plan. Avoid repeating the same archetype
+    // when the engine's deterministic RNG starts consecutive local matches
+    // from the same seed.
+    if (kBuiltinAIPlantProfiles.size() > 1 && plans.plantProfile == history.lastPlantProfile) {
+        plans.plantProfile = PickBuiltinAIPlantProfile();
+        if (plans.plantProfile == history.lastPlantProfile) {
+            plans.plantProfile = (plans.plantProfile + 1) % static_cast<int>(kBuiltinAIPlantProfiles.size());
+        }
+    }
+    if (std::size(kBuiltinAIZombieDecks) > 1 && plans.zombieProfile == history.lastZombieProfile) {
+        plans.zombieProfile = (plans.zombieProfile + 1 + Sexy::Rand(static_cast<int>(std::size(kBuiltinAIZombieDecks) - 1))) % static_cast<int>(std::size(kBuiltinAIZombieDecks));
+    }
+    history.lastPlantProfile = plans.plantProfile;
+    history.lastZombieProfile = plans.zombieProfile;
+}
+
+bool UsesBuiltinAITemplate(SeedChooserScreen *screen) {
+    EnsureBuiltinAIDeckPlans(screen);
+    if (VSSetupAddonWidget::msAITemplateDeckDisabledMode) {
+        return false;
+    }
+    return screen != nullptr && (screen->mIsZombieChooser ? BuiltinAIPlans().useZombieTemplate : BuiltinAIPlans().usePlantTemplate);
+}
+
+int BuiltinAIPlantMainPickSlot(SeedChooserScreen *screen) {
+    if (screen == nullptr) {
+        return kBuiltinAIBaseDeckSize;
+    }
+    if (BuiltinAIPlans().plantMainPickSlot < 0) {
+        const int planSize = static_cast<int>(GetBuiltinAIPlanSize(screen));
+        // Preserve one final packet for a response/support card. This keeps
+        // the carry timing varied without ever revealing the main C as the
+        // last pick in either six- or seven-slot VS selection.
+        const int earliestSlot = std::min(3, std::max(1, planSize - 1));
+        const int latestSlot = std::max(earliestSlot, planSize - 1);
+        BuiltinAIPlans().plantMainPickSlot = earliestSlot + Sexy::Rand(std::max(1, latestSlot - earliestSlot + 1));
+    }
+    return BuiltinAIPlans().plantMainPickSlot;
+}
+
+const SeedType *GetBuiltinAIDeckPriority(SeedChooserScreen *screen) {
+    EnsureBuiltinAIDeckPlans(screen);
+    if (screen->mIsZombieChooser) {
+        return kBuiltinAIZombieDecks[BuiltinAIPlans().zombieProfile];
+    }
+    const BuiltinAIPlantProfile *profile = GetBuiltinAIPlantProfile(BuiltinAIPlans().plantProfile);
+    return profile == nullptr ? nullptr : profile->Deck(screen->mBoard != nullptr && screen->mBoard->StageIsNight());
+}
+
+void TryAutoStartBuiltinVSMatch(SeedChooserScreen *screen) {
+    if (!IsLocalBuiltinAIChooser(screen) || screen->mApp == nullptr || screen->mApp->mSeedChooserScreen == nullptr || screen->mApp->mZombieChooserScreen == nullptr
+        || (!VSSetupAddonWidget::msPlantAIMode && !VSSetupAddonWidget::msZombieAIMode)) {
+        return;
+    }
+
+    SeedChooserScreen *plantChooser = screen->mApp->mSeedChooserScreen;
+    SeedChooserScreen *zombieChooser = screen->mApp->mZombieChooserScreen;
+    if (plantChooser->mBanningPhase || zombieChooser->mBanningPhase || !IsChooserFilled(plantChooser) || !IsChooserFilled(zombieChooser)) {
+        return;
+    }
+
+    // The VS start button is intentionally hidden. Close the two chooser widgets
+    // only after both banks have landed, otherwise the second bank can be lost.
+    static bool closing = false;
+    if (closing) {
+        return;
+    }
+    closing = true;
+    if (plantChooser != screen) {
+        plantChooser->CloseSeedChooser();
+    }
+    if (zombieChooser != screen) {
+        zombieChooser->CloseSeedChooser();
+    }
+    screen->CloseSeedChooser();
+    closing = false;
+}
+
+bool HasBuiltinAIOpponentBalloon(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser || screen->mApp == nullptr || screen->mApp->mZombieChooserScreen == nullptr) {
+        return false;
+    }
+
+    SeedChooserScreen *zombieScreen = screen->mApp->mZombieChooserScreen;
+    const int storageCount = zombieScreen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (zombieScreen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK && zombieScreen->GetZombieSeedType(seedIndex) == SeedType::SEED_ZOMBIE_BALLOON) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool HasBuiltinAIPlantSeed(SeedChooserScreen *screen, SeedType seedType);
+
+bool IsBuiltinAICandidate(SeedChooserScreen *screen, SeedType seedType) {
+    if (seedType == SeedType::SEED_NONE || seedType == SeedType::SEED_IMITATER) {
+        return false;
+    }
+    // Upgrade plants are not legal VS cards, including during the opponent's
+    // Ban phase. Keep this before both priority and generic-card fallbacks.
+    if (!screen->mIsZombieChooser && Plant::IsUpgrade(seedType)) {
+        return false;
+    }
+    // Gravebuster and Sweet Potato are intentionally not part of the built-in
+    // plant AI deck. Both are narrow tactical cards, but there is no replay-
+    // backed Sweet Potato routing plan yet, so generic selection only turns
+    // it into weak filler. They remain valid Ban targets.
+    if (!screen->mBanningPhase && !screen->mIsZombieChooser && (seedType == SeedType::SEED_GRAVEBUSTER || seedType == SeedType::SEED_SWEET_POTATO)) {
+        return false;
+    }
+    if (!screen->mBanningPhase && !screen->mIsZombieChooser && (seedType == SeedType::SEED_TALLNUT || (seedType == SeedType::SEED_BLOVER && !HasBuiltinAIOpponentBalloon(screen)))) {
+        return false;
+    }
+    if (!screen->mShowExtendedSeeds && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE))) {
+        return false;
+    }
+
+    // A Door/Newspaper/Trashcan is a direct-fire screen. It is a bad deck
+    // choice against a plant-side pult carry, even before battle scoring.
+    if (!screen->mBanningPhase && screen->mIsZombieChooser && HasBuiltinAIOpponentLobbedPressure(screen)
+        && (seedType == SeedType::SEED_ZOMBIE_SCREEN_DOOR || seedType == SeedType::SEED_ZOMBIE_NEWSPAPER || seedType == SeedType::SEED_ZOMBIE_TRASHCAN)) {
+        return false;
+    }
+
+    // Sun-shroom is a cheap front-line pad. Squash Head and Football
+    // both give that pad an efficient trade, so do not draft either after
+    // the plant side has already committed to Sun-shroom.
+    if (!screen->mBanningPhase && screen->mIsZombieChooser && (seedType == SeedType::SEED_ZOMBIE_SQUASH_HEAD || seedType == SeedType::SEED_ZOMBIE_FOOTBALL) && screen->mApp != nullptr
+        && HasBuiltinAIPlantSeed(screen->mApp->mSeedChooserScreen, SeedType::SEED_SUNSHROOM)) {
+        return false;
+    }
+
+    // Spikeweed and Spikerock hard-counter the Zomboni path. Once the plant
+    // player has committed either card, do not let a replay template spend a
+    // zombie slot on a vehicle that its opponent already answers directly.
+    if (!screen->mBanningPhase && screen->mIsZombieChooser && seedType == SeedType::SEED_ZOMBONI && screen->mApp != nullptr && screen->mApp->mSeedChooserScreen != nullptr) {
+        SeedChooserScreen *plantScreen = screen->mApp->mSeedChooserScreen;
+        const int plantStorageCount = plantScreen->GetSeedStorageCount();
+        for (int seedIndex = 0; seedIndex < plantStorageCount; ++seedIndex) {
+            if (plantScreen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_BANK) {
+                continue;
+            }
+            const SeedType plantSeed = plantScreen->GetPlantSeedType(seedIndex);
+            if (plantSeed == SeedType::SEED_SPIKEWEED || plantSeed == SeedType::SEED_SPIKEROCK) {
+                return false;
+            }
+        }
+    }
+
+    const int seedIndex = screen->GetSeedPacketIndex(seedType);
+    if (seedIndex < 0 || seedIndex >= screen->GetSeedStorageCount() || !screen->HasPacket(seedType, screen->mIsZombieChooser)) {
+        return false;
+    }
+    if (screen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_CHOOSER || screen->SeedNotAllowedToPick(seedType)) {
+        return false;
+    }
+
+    const int bannedSeedIndex = static_cast<int>(seedType);
+    return !screen->mBanningPhase || (bannedSeedIndex >= 0 && bannedSeedIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED && screen->mBannedSeed[bannedSeedIndex].mSeedState != BannedSeedState::SEED_BANNED);
+}
+
+bool HasBuiltinAIPlantSeed(SeedChooserScreen *screen, SeedType seedType) {
+    if (screen == nullptr || screen->mIsZombieChooser || seedType == SeedType::SEED_NONE) {
+        return false;
+    }
+
+    const int seedIndex = screen->GetSeedPacketIndex(seedType);
+    return seedIndex >= 0 && seedIndex < screen->GetSeedStorageCount() && screen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK;
+}
+
+bool HasBuiltinAIPlantPeaMain(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser) {
+        return false;
+    }
+
+    const int storageCount = screen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (screen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK && vsai::draft::IsPeaMainDamageSeed(screen->GetPlantSeedType(seedIndex))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool HasBuiltinAIPlantWakeableMushroom(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser) {
+        return false;
+    }
+    const int storageCount = screen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (screen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_BANK) {
+            continue;
+        }
+        switch (screen->GetPlantSeedType(seedIndex)) {
+            case SeedType::SEED_PUFFSHROOM:
+            case SeedType::SEED_SCAREDYSHROOM:
+            case SeedType::SEED_FUMESHROOM:
+            case SeedType::SEED_GLOOMSHROOM:
+            case SeedType::SEED_SPORESHROOM:
+            case SeedType::SEED_ICESHROOM:
+            case SeedType::SEED_DOOMSHROOM:
+                return true;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
+bool IsBuiltinAIDaytimeChooser(const SeedChooserScreen *screen) {
+    return screen != nullptr && screen->mBoard != nullptr && !screen->mBoard->StageIsNight();
+}
+
+bool CanReserveBuiltinAICoffee(SeedChooserScreen *screen) {
+    if (screen == nullptr || !IsBuiltinAIDaytimeChooser(screen) || HasBuiltinAIPlantSeed(screen, SeedType::SEED_INSTANT_COFFEE)) {
+        return true;
+    }
+
+    const std::size_t planSize = GetBuiltinAIPlanSize(screen);
+    const std::size_t selectedCount = static_cast<std::size_t>(std::max(0, screen->mSeedsInBank));
+    // A coffee-dependent card occupies this choice. Do not select it unless
+    // one further real packet remains for Coffee in both six- and seven-slot
+    // games. Candidate legality also covers Bans and map restrictions.
+    return selectedCount < planSize && planSize - selectedCount > 1 && IsBuiltinAICandidate(screen, SeedType::SEED_INSTANT_COFFEE);
+}
+
+bool HasBuiltinAIOpponentMetalTargets(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser || screen->mApp == nullptr || screen->mApp->mZombieChooserScreen == nullptr) {
+        return false;
+    }
+
+    SeedChooserScreen *zombieScreen = screen->mApp->mZombieChooserScreen;
+    int targetCount = 0;
+    const int storageCount = zombieScreen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (zombieScreen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK && vsai::draft::IsMagnetTargetZombieSeed(zombieScreen->GetZombieSeedType(seedIndex))) {
+            ++targetCount;
+        }
+    }
+
+    // A single target is too narrow for a six-card VS deck. The shuffle
+    // selector uses the same two-card threshold for Magnet-shroom.
+    return targetCount >= 2;
+}
+
+bool HasBuiltinAIOpponentLobbedPressure(SeedChooserScreen *screen) {
+    if (screen == nullptr || !screen->mIsZombieChooser || screen->mApp == nullptr || screen->mApp->mSeedChooserScreen == nullptr) {
+        return false;
+    }
+
+    const auto IsPultCarry = [](SeedType seedType) {
+        switch (seedType) {
+            case SeedType::SEED_CABBAGEPULT:
+            case SeedType::SEED_KERNELPULT:
+            case SeedType::SEED_MELONPULT:
+            case SeedType::SEED_WINTERMELON:
+            case SeedType::SEED_COBCANNON:
+            case SeedType::SEED_SPORESHROOM:
+                return true;
+            default:
+                return false;
+        }
+    };
+
+    SeedChooserScreen *plantScreen = screen->mApp->mSeedChooserScreen;
+    const int storageCount = plantScreen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (plantScreen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_BANK) {
+            continue;
+        }
+        if (IsPultCarry(plantScreen->GetPlantSeedType(seedIndex))) {
+            return true;
+        }
+    }
+
+    // The two local selectors can fill in either order. When the plant AI
+    // has not yet clicked its main card, inspect its already-chosen replay
+    // template so the zombie picker cannot race ahead into a dead Door plan.
+    if (VSSetupAddonWidget::msPlantAIMode && UsesBuiltinAITemplate(plantScreen)) {
+        const SeedType *plannedDeck = GetBuiltinAIDeckPriority(plantScreen);
+        for (std::size_t index = 0; index < GetBuiltinAIPlanSize(plantScreen); ++index) {
+            if (IsPultCarry(plannedDeck[index])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool HasBuiltinAIPlantMainDamage(SeedChooserScreen *screen);
+bool HasBuiltinAIOpponentZombieSeed(SeedChooserScreen *screen, SeedType seedType);
+
+bool IsBuiltinAIPlantSupportCandidate(SeedChooserScreen *screen, SeedType seedType) {
+    if (screen == nullptr || screen->mIsZombieChooser) {
+        return true;
+    }
+
+    if (seedType == SeedType::SEED_UMBRELLA) {
+        return HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_BUNGEE) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_CATAPULT);
+    }
+
+    if (seedType == SeedType::SEED_CHOMPER) {
+        // Chomper is a close-range answer, not a durable main damage plant.
+        // Keep its low-priority template role behind a real carry so a Ban
+        // residual cannot open with an all-answer deck.
+        return HasBuiltinAIPlantMainDamage(screen);
+    }
+
+    if (seedType == SeedType::SEED_TORCHWOOD) {
+        // Torchwood amplifies peas, not pults or starfruit. Require the pea
+        // main card to be in the bank before allowing the support card. A
+        // Snow Pea loses its slow when sent through Torchwood, so that pair
+        // is a deck-level conflict rather than a valid pea support package.
+        return HasBuiltinAIPlantPeaMain(screen) && !HasBuiltinAIPlantSeed(screen, SeedType::SEED_SNOWPEA);
+    }
+
+    if (seedType == SeedType::SEED_SNOWPEA && HasBuiltinAIPlantSeed(screen, SeedType::SEED_TORCHWOOD)) {
+        return false;
+    }
+
+    if (seedType == SeedType::SEED_INSTANT_COFFEE) {
+        // At night every combat mushroom wakes naturally. In daylight Coffee
+        // is only valid when it completes a playable mushroom package.
+        return IsBuiltinAIDaytimeChooser(screen) && HasBuiltinAIPlantWakeableMushroom(screen);
+    }
+
+    if (IsBuiltinAIDaytimeChooser(screen) && vsai::draft::IsCoffeeDependentPlant(seedType)) {
+        // Never let a six- or seven-slot fallback split a daytime mushroom
+        // from Coffee. This is a deck legality gate, not a scoring preference.
+        if (!CanReserveBuiltinAICoffee(screen)) {
+            return false;
+        }
+    }
+
+    if (seedType == SeedType::SEED_MAGNETSHROOM) {
+        // Magnet-shroom needs Coffee in daytime and is too narrow when the
+        // opponent brings few removable metal targets.
+        return (!IsBuiltinAIDaytimeChooser(screen) || CanReserveBuiltinAICoffee(screen)) && HasBuiltinAIOpponentMetalTargets(screen);
+    }
+
+    if (seedType == SeedType::SEED_ICEBERG_LETTUCE) {
+        // Iceberg is a tempo/support card, not a standalone deck. Select it
+        // only after a real damage plant is already in the bank so a Ban or
+        // shuffled fallback cannot produce a Bonk/Iceberg-only opening.
+        return HasBuiltinAIPlantMainDamage(screen);
+    }
+
+    return true;
+}
+
+bool HasBuiltinAIPlantMainDamage(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser) {
+        return false;
+    }
+    const int storageCount = screen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (screen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK && vsai::draft::IsPlantCarrySeed(screen->GetPlantSeedType(seedIndex))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+SeedType PlannedBuiltinAIPlantMainDamageSeed(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser) {
+        return SeedType::SEED_NONE;
+    }
+    const SeedType *deck = GetBuiltinAIDeckPriority(screen);
+    for (std::size_t index = 0; index < GetBuiltinAIPlanSize(screen); ++index) {
+        if (vsai::draft::IsPlantCarrySeed(deck[index])) {
+            return deck[index];
+        }
+    }
+    return SeedType::SEED_NONE;
+}
+
+static constexpr SeedType kBuiltinAIPlantMainFallbacks[] = {
+    SeedType::SEED_PEASHOOTER,
+    SeedType::SEED_REPEATER,
+    SeedType::SEED_SCAREDYSHROOM,
+    SeedType::SEED_MELONPULT,
+    SeedType::SEED_BLOOMERANG,
+    SeedType::SEED_CABBAGEPULT,
+    SeedType::SEED_SPORESHROOM,
+    SeedType::SEED_KERNELPULT,
+    SeedType::SEED_STARFRUIT,
+    SeedType::SEED_CACTUS,
+};
+
+// Rule-random decks deliberately use the high-confidence carries. The
+// recorded template selector still retains Cabbage-pult and Kernel-pult;
+// this path avoids making either a generic default against an unknown deck.
+static constexpr SeedType kBuiltinAIRulePlantMainFallbacks[] = {
+    SeedType::SEED_PEASHOOTER,
+    SeedType::SEED_REPEATER,
+    SeedType::SEED_SCAREDYSHROOM,
+    SeedType::SEED_MELONPULT,
+    SeedType::SEED_BLOOMERANG,
+    SeedType::SEED_SPORESHROOM,
+    SeedType::SEED_STARFRUIT,
+    SeedType::SEED_CACTUS,
+};
+
+static constexpr SeedType kBuiltinAIPlantPostCarryFallbacks[] = {
+    SeedType::SEED_CHERRYBOMB,
+    SeedType::SEED_JALAPENO,
+    SeedType::SEED_SQUASH,
+    SeedType::SEED_CHILLY_PEPPER,
+    SeedType::SEED_DOOMSHROOM,
+    SeedType::SEED_POTATOMINE,
+    SeedType::SEED_WALLNUT,
+    SeedType::SEED_PUMPKINSHELL,
+    SeedType::SEED_SUNSHROOM,
+    SeedType::SEED_ICEBERG_LETTUCE,
+    SeedType::SEED_SUNFLOWER,
+};
+
+bool HasBuiltinAIOpponentZombieSeed(SeedChooserScreen *screen, SeedType seedType) {
+    if (screen == nullptr || screen->mIsZombieChooser || screen->mApp == nullptr || screen->mApp->mZombieChooserScreen == nullptr) {
+        return false;
+    }
+
+    SeedChooserScreen *zombieScreen = screen->mApp->mZombieChooserScreen;
+    bool hasChosenZombie = false;
+    const int storageCount = zombieScreen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        if (zombieScreen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_BANK) {
+            continue;
+        }
+        hasChosenZombie = true;
+        if (zombieScreen->GetZombieSeedType(seedIndex) == seedType) {
+            return true;
+        }
+    }
+
+    // Local AIs can fill their two choosers in either order. Before the
+    // zombie side clicks its first card, its retained replay template is the
+    // only reliable deck information available to a plant Ban replacement.
+    if (!hasChosenZombie && VSSetupAddonWidget::msZombieAIMode && UsesBuiltinAITemplate(zombieScreen)) {
+        const SeedType *plannedDeck = GetBuiltinAIDeckPriority(zombieScreen);
+        return std::any_of(plannedDeck, plannedDeck + GetBuiltinAIPlanSize(zombieScreen), [seedType](SeedType plannedSeed) { return plannedSeed == seedType; });
+    }
+    return false;
+}
+
+int BuiltinAIPlantCarryMatchupScore(SeedChooserScreen *screen, SeedType seedType) {
+    int score = 0;
+    switch (seedType) {
+        case SeedType::SEED_PEASHOOTER:
+            score = 108;
+            break;
+        case SeedType::SEED_REPEATER:
+            score = 112;
+            break;
+        case SeedType::SEED_SNOWPEA:
+            score = 106;
+            break;
+        case SeedType::SEED_CABBAGEPULT:
+            score = 104;
+            break;
+        case SeedType::SEED_MELONPULT:
+            score = 96;
+            break;
+        case SeedType::SEED_SPORESHROOM:
+            score = 102;
+            break;
+        case SeedType::SEED_BLOOMERANG:
+            score = 92;
+            break;
+        case SeedType::SEED_SCAREDYSHROOM:
+            score = 88;
+            break;
+        case SeedType::SEED_CACTUS:
+            score = 76;
+            break;
+        case SeedType::SEED_KERNELPULT:
+        case SeedType::SEED_STARFRUIT:
+            score = 82;
+            break;
+        default:
+            return std::numeric_limits<int>::min();
+    }
+
+    const bool metalScreen = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_SCREEN_DOOR) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_NEWSPAPER)
+        || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_TRASHCAN);
+    const bool vehicle = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBONI) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_BOBSLED);
+    const bool rangedSiege = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_CATAPULT) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_PEA_HEAD)
+        || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_SUNDAY_EDITION);
+    const bool heavy = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_GARGANTUAR) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_GIGA_GARGANTUAR)
+        || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_GIGA_FOOTBALL);
+    const bool fastPressure = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_DOGWALKER) || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_FOOTBALL)
+        || HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_IMP);
+    const bool balloon = HasBuiltinAIOpponentZombieSeed(screen, SeedType::SEED_ZOMBIE_BALLOON);
+    const bool lobbedCarry = seedType == SeedType::SEED_CABBAGEPULT || seedType == SeedType::SEED_MELONPULT || seedType == SeedType::SEED_SPORESHROOM || seedType == SeedType::SEED_KERNELPULT;
+    const bool peaCarry = seedType == SeedType::SEED_PEASHOOTER || seedType == SeedType::SEED_REPEATER || seedType == SeedType::SEED_SNOWPEA;
+
+    if (metalScreen) {
+        score += lobbedCarry ? 145 : (seedType == SeedType::SEED_BLOOMERANG ? 65 : -35);
+    }
+    if (vehicle) {
+        score += peaCarry ? 70 : (lobbedCarry ? 35 : 0);
+    }
+    if (rangedSiege) {
+        score += lobbedCarry ? 125 : -15;
+    }
+    if (heavy) {
+        score += seedType == SeedType::SEED_MELONPULT ? 150 : (seedType == SeedType::SEED_REPEATER || seedType == SeedType::SEED_SPORESHROOM ? 65 : 0);
+    }
+    if (fastPressure) {
+        score += seedType == SeedType::SEED_SNOWPEA ? 90 : (peaCarry ? 50 : 0);
+    }
+    if (balloon) {
+        score += seedType == SeedType::SEED_CACTUS ? 145 : 0;
+    }
+    return score;
+}
+
+SeedType FindBuiltinAICounterCarry(SeedChooserScreen *screen, bool useTemplateFallbacks = true) {
+    SeedType bestSeed = SeedType::SEED_NONE;
+    int bestScore = std::numeric_limits<int>::min();
+    const std::span<const SeedType> candidates = useTemplateFallbacks ? std::span<const SeedType>(kBuiltinAIPlantMainFallbacks) : std::span<const SeedType>(kBuiltinAIRulePlantMainFallbacks);
+    for (const SeedType seedType : candidates) {
+        if (!IsBuiltinAICandidate(screen, seedType) || !IsBuiltinAIPlantSupportCandidate(screen, seedType)) {
+            continue;
+        }
+        const int score = BuiltinAIPlantCarryMatchupScore(screen, seedType);
+        if (bestSeed == SeedType::SEED_NONE || score > bestScore || (score == bestScore && seedType < bestSeed)) {
+            bestSeed = seedType;
+            bestScore = score;
+        }
+    }
+    return bestSeed;
+}
+
+SeedType FindBuiltinAICandidate(SeedChooserScreen *screen, const SeedType *prioritySeeds, std::size_t priorityCount) {
+    if (priorityCount > 0) {
+        const std::size_t firstPriority = static_cast<std::size_t>(Sexy::Rand(static_cast<int>(priorityCount)));
+        const SeedType candidate =
+            vsai::draft::FindRotatedEligibleSeed(std::span<const SeedType>(prioritySeeds, priorityCount), firstPriority, [screen](SeedType seed) { return IsBuiltinAICandidate(screen, seed); });
+        if (candidate != SeedType::SEED_NONE) {
+            return candidate;
+        }
+    }
+
+    const int storageCount = screen->GetSeedStorageCount();
+    if (storageCount <= 0) {
+        return SeedType::SEED_NONE;
+    }
+    std::vector<SeedType> chooserSeeds;
+    chooserSeeds.reserve(static_cast<std::size_t>(storageCount));
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        chooserSeeds.push_back(screen->mIsZombieChooser ? screen->GetZombieSeedType(seedIndex) : screen->GetPlantSeedType(seedIndex));
+    }
+    return vsai::draft::FindRotatedEligibleSeed(chooserSeeds, static_cast<std::size_t>(Sexy::Rand(storageCount)), [screen](SeedType seed) { return IsBuiltinAICandidate(screen, seed); });
+}
+
+int BuiltinAIZombieRuleMatchupScore(SeedChooserScreen *screen, SeedType seedType) {
+    if (screen == nullptr || !screen->mIsZombieChooser || screen->mApp == nullptr || screen->mApp->mSeedChooserScreen == nullptr) {
+        return std::numeric_limits<int>::min();
+    }
+
+    SeedChooserScreen *plantScreen = screen->mApp->mSeedChooserScreen;
+    const auto HasPlantSeed = [plantScreen](SeedType target) { return HasBuiltinAIPlantSeed(plantScreen, target); };
+    const bool lobbed = HasBuiltinAIOpponentLobbedPressure(screen);
+    const bool peas = HasPlantSeed(SeedType::SEED_PEASHOOTER) || HasPlantSeed(SeedType::SEED_REPEATER) || HasPlantSeed(SeedType::SEED_SNOWPEA) || HasPlantSeed(SeedType::SEED_SCAREDYSHROOM)
+        || HasPlantSeed(SeedType::SEED_THREEPEATER);
+    const bool nuts = HasPlantSeed(SeedType::SEED_WALLNUT) || HasPlantSeed(SeedType::SEED_PUMPKINSHELL);
+    const bool highValue = HasPlantSeed(SeedType::SEED_MELONPULT) || HasPlantSeed(SeedType::SEED_REPEATER) || HasPlantSeed(SeedType::SEED_STARFRUIT) || HasPlantSeed(SeedType::SEED_SPORESHROOM);
+
+    int score = 40 + Sexy::Rand(31);
+    switch (seedType) {
+        case SeedType::SEED_ZOMBIE_NORMAL:
+        case SeedType::SEED_ZOMBIE_TRAFFIC_CONE:
+        case SeedType::SEED_ZOMBIE_IMP:
+            score += 120;
+            break;
+        case SeedType::SEED_ZOMBIE_DOGWALKER:
+            score += 175;
+            break;
+        case SeedType::SEED_ZOMBIE_PAIL:
+            score += 100;
+            break;
+        case SeedType::SEED_ZOMBIE_LADDER:
+        case SeedType::SEED_ZOMBONI:
+            score += nuts ? 165 : 25;
+            break;
+        case SeedType::SEED_ZOMBIE_BUNGEE:
+            score += highValue ? 175 : -120;
+            break;
+        case SeedType::SEED_ZOMBIE_CATAPULT:
+            score += lobbed ? 170 : -80;
+            break;
+        case SeedType::SEED_ZOMBIE_SCREEN_DOOR:
+        case SeedType::SEED_ZOMBIE_NEWSPAPER:
+        case SeedType::SEED_ZOMBIE_TRASHCAN:
+            score += lobbed ? -500 : (peas ? 95 : 30);
+            break;
+        case SeedType::SEED_ZOMBIE_BOBSLED:
+        case SeedType::SEED_ZOMBIE_FOOTBALL:
+        case SeedType::SEED_ZOMBIE_GARGANTUAR:
+            score += 70;
+            break;
+        default:
+            break;
+    }
+    return score;
+}
+
+SeedType FindBuiltinAIRuleZombieCandidate(SeedChooserScreen *screen) {
+    SeedType bestSeed = SeedType::SEED_NONE;
+    int bestScore = std::numeric_limits<int>::min();
+    const int storageCount = screen == nullptr ? 0 : screen->GetSeedStorageCount();
+    for (int index = 0; index < storageCount; ++index) {
+        const SeedType seedType = screen->GetZombieSeedType(index);
+        if (!IsBuiltinAICandidate(screen, seedType)) {
+            continue;
+        }
+        const int score = BuiltinAIZombieRuleMatchupScore(screen, seedType);
+        if (bestSeed == SeedType::SEED_NONE || score > bestScore || (score == bestScore && Sexy::Rand(2) == 0)) {
+            bestSeed = seedType;
+            bestScore = score;
+        }
+    }
+    return bestSeed;
+}
+
+SeedType FindBuiltinAIPlantDeckCandidate(SeedChooserScreen *screen, const SeedType *prioritySeeds, std::size_t priorityCount, bool useTemplate) {
+    bool hasUnpairedDaytimeMushroom = false;
+    if (IsBuiltinAIDaytimeChooser(screen)) {
+        const int storageCount = screen->GetSeedStorageCount();
+        for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+            if (screen->GetChosenSeed(seedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK && vsai::draft::IsCoffeeDependentPlant(screen->GetPlantSeedType(seedIndex))) {
+                hasUnpairedDaytimeMushroom = true;
+                break;
+            }
+        }
+    }
+    if (hasUnpairedDaytimeMushroom && !HasBuiltinAIPlantSeed(screen, SeedType::SEED_INSTANT_COFFEE)) {
+        // This must run before the regular role picker. A mushroom selected
+        // in an earlier slot never waits for a random fallback to remember
+        // Coffee, which fixes both six- and seven-slot selection flows.
+        if (IsBuiltinAICandidate(screen, SeedType::SEED_INSTANT_COFFEE)) {
+            return SeedType::SEED_INSTANT_COFFEE;
+        }
+    }
+    const bool hasSelectedCarry = HasBuiltinAIPlantMainDamage(screen);
+    const SeedType plannedMain = useTemplate ? PlannedBuiltinAIPlantMainDamageSeed(screen) : SeedType::SEED_NONE;
+    const int plannedIndex = plannedMain == SeedType::SEED_NONE ? -1 : screen->GetSeedPacketIndex(plannedMain);
+    const bool plannedMainAvailable = plannedIndex >= 0 && plannedIndex < screen->GetSeedStorageCount()
+        && (screen->GetChosenSeed(plannedIndex).mSeedState == ChosenSeedState::SEED_IN_BANK || (IsBuiltinAICandidate(screen, plannedMain) && IsBuiltinAIPlantSupportCandidate(screen, plannedMain)));
+    // A recorded plan can intentionally add one inexpensive tempo shooter
+    // before its actual carry. That supporting attacker must not make the
+    // selector believe the designated main card has already been chosen.
+    const bool alreadyHasMainDamage = useTemplate && plannedMainAvailable ? HasBuiltinAIPlantSeed(screen, plannedMain) : hasSelectedCarry;
+    const std::size_t selectedCount = static_cast<std::size_t>(std::max(0, screen->mSeedsInBank));
+    const bool templateMainBannedAfterSelection = useTemplate && !plannedMainAvailable && selectedCount > 0;
+    // Normal opening bans reroll the template before this picker runs. If a
+    // map restriction or a late Ban makes the planned carry unavailable,
+    // recover with a matchup carry now; never let Puff/Coffee fill its role.
+    const bool needsCounterMain = templateMainBannedAfterSelection || !useTemplate || !plannedMainAvailable;
+    const SeedType counterMain = !alreadyHasMainDamage && needsCounterMain ? FindBuiltinAICounterCarry(screen, useTemplate) : SeedType::SEED_NONE;
+    const std::size_t planSize = GetBuiltinAIPlanSize(screen);
+    const std::size_t slotsRemaining = selectedCount < planSize ? planSize - selectedCount : 0;
+    // Pick one persistent target slot per match. The main carry is still
+    // protected from the opening two picks, but it can appear at any later
+    // slot rather than being predictably forced into the final packet.
+    const int mainPickSlot = BuiltinAIPlantMainPickSlot(screen);
+    const bool plannedMainNeedsCoffee = IsBuiltinAIDaytimeChooser(screen) && vsai::draft::IsCoffeeDependentPlant(plannedMain) && !HasBuiltinAIPlantSeed(screen, SeedType::SEED_INSTANT_COFFEE);
+    // A daytime mushroom carry may use the random target slot, but Coffee
+    // must remain selectable immediately after it when the dependency is
+    // still missing. This preserves both six- and seven-slot legality.
+    const bool beforeRandomMainSlot = static_cast<int>(selectedCount) + 1 < mainPickSlot;
+    const bool coffeeEscape = plannedMainNeedsCoffee && slotsRemaining <= 2U;
+    const bool deferMainDamage = !alreadyHasMainDamage && beforeRandomMainSlot && !coffeeEscape;
+    const auto IsMainDamageCandidate = [&](SeedType seedType) {
+        if (plannedMain != SeedType::SEED_NONE && plannedMainAvailable) {
+            return seedType == plannedMain;
+        }
+        if (counterMain != SeedType::SEED_NONE) {
+            return seedType == counterMain;
+        }
+        return vsai::draft::IsPlantCarrySeed(seedType) && !vsai::draft::IsPlantTempoMushroom(seedType);
+    };
+    // Blover is a mandatory matchup answer, but it must not displace the
+    // plant deck's only carry during a six-card selection. The main-card
+    // gate below always chooses that carry first; every later slot can then
+    // reserve one card for Balloon Zombie.
+    if (alreadyHasMainDamage && HasBuiltinAIOpponentBalloon(screen) && !HasBuiltinAIPlantSeed(screen, SeedType::SEED_BLOVER) && IsBuiltinAICandidate(screen, SeedType::SEED_BLOVER)) {
+        return SeedType::SEED_BLOVER;
+    }
+    const auto IsAvailableMain = [&](SeedType seedType) { return IsMainDamageCandidate(seedType) && IsBuiltinAICandidate(screen, seedType) && IsBuiltinAIPlantSupportCandidate(screen, seedType); };
+    bool hasAvailableMainDamage = false;
+    for (std::size_t index = 0; index < priorityCount && !hasAvailableMainDamage; ++index) {
+        hasAvailableMainDamage = IsAvailableMain(prioritySeeds[index]);
+    }
+    const std::span<const SeedType> mainFallbacks = useTemplate ? std::span<const SeedType>(kBuiltinAIPlantMainFallbacks) : std::span<const SeedType>(kBuiltinAIRulePlantMainFallbacks);
+    for (const SeedType seedType : mainFallbacks) {
+        hasAvailableMainDamage = hasAvailableMainDamage || IsAvailableMain(seedType);
+    }
+    const bool mustPickMainDamage = !alreadyHasMainDamage && hasAvailableMainDamage && !deferMainDamage;
+    const auto IsPlannedTemplateSecondaryOutput = [&](SeedType seedType) {
+        if (!useTemplate || !vsai::draft::IsPlantCarrySeed(seedType)) {
+            return false;
+        }
+        const SeedType *plannedDeck = GetBuiltinAIDeckPriority(screen);
+        return std::any_of(plannedDeck, plannedDeck + GetBuiltinAIPlanSize(screen), [seedType](SeedType plannedSeed) { return plannedSeed == seedType; });
+    };
+    auto IsCompatible = [&](SeedType seedType) {
+        if (deferMainDamage && vsai::draft::IsPlantCarrySeed(seedType)) {
+            // A recorded template may explicitly include a low-cost secondary
+            // output before the real carry. Generic decks remain one-carry.
+            if (!useTemplate || seedType == plannedMain || !IsPlannedTemplateSecondaryOutput(seedType)) {
+                return false;
+            }
+        }
+        return IsBuiltinAICandidate(screen, seedType)
+            && IsBuiltinAIPlantSupportCandidate(screen, seedType)
+            // A replay template is allowed to preserve its recorded
+            // secondary output, but only when that exact card belongs to its
+            // template. Generic fallback remains single-carry so a Ban
+            // substitution cannot accidentally create two unrelated mains.
+            && (!alreadyHasMainDamage || !vsai::draft::IsPlantCarrySeed(seedType) || IsPlannedTemplateSecondaryOutput(seedType)) && (!mustPickMainDamage || IsMainDamageCandidate(seedType));
+    };
+
+    const auto IsPreferredCompatible = [&](SeedType seedType) {
+        if (!IsCompatible(seedType)) {
+            return false;
+        }
+        if (seedType != SeedType::SEED_ICEBERG_LETTUCE) {
+            return true;
+        }
+        static constexpr SeedType kHigherPriorityAnswers[] = {
+            SeedType::SEED_POTATOMINE,
+            SeedType::SEED_SQUASH,
+            SeedType::SEED_CHERRYBOMB,
+            SeedType::SEED_JALAPENO,
+            SeedType::SEED_CHILLY_PEPPER,
+        };
+        return std::none_of(std::begin(kHigherPriorityAnswers), std::end(kHigherPriorityAnswers), [&](SeedType answer) { return IsCompatible(answer); });
+    };
+
+    if (priorityCount > 0) {
+        const std::size_t firstPriority = static_cast<std::size_t>(Sexy::Rand(static_cast<int>(priorityCount)));
+        const SeedType candidate = vsai::draft::FindRotatedEligibleSeed(std::span<const SeedType>(prioritySeeds, priorityCount), firstPriority, IsPreferredCompatible);
+        if (candidate != SeedType::SEED_NONE) {
+            return candidate;
+        }
+    }
+
+    // If the planned main card was banned, fill that role before economy or
+    // support cards.  This is what keeps Ban substitutions playable instead
+    // of producing a melee-only deck.
+    if (!alreadyHasMainDamage) {
+        const std::size_t firstFallback = useTemplate ? 0 : static_cast<std::size_t>(Sexy::Rand(static_cast<int>(mainFallbacks.size())));
+        const SeedType candidate = vsai::draft::FindRotatedEligibleSeed(mainFallbacks, firstFallback, IsPreferredCompatible);
+        if (candidate != SeedType::SEED_NONE) {
+            return candidate;
+        }
+    }
+
+    if (alreadyHasMainDamage) {
+        for (const SeedType seedType : kBuiltinAIPlantPostCarryFallbacks) {
+            // Doom-shroom is a real daytime counter only after Coffee has
+            // been locked in. Otherwise a final-slot Doom would be left
+            // asleep with no remaining opportunity to select its pairing.
+            if (seedType == SeedType::SEED_DOOMSHROOM && IsBuiltinAIDaytimeChooser(screen) && !HasBuiltinAIPlantSeed(screen, SeedType::SEED_INSTANT_COFFEE)) {
+                continue;
+            }
+            if (IsPreferredCompatible(seedType)) {
+                return seedType;
+            }
+        }
+    }
+
+    // Every legal carry was exhausted. Do not leave the chooser frozen on
+    // SEED_NONE: global Ban combinations can remove every valid main card.
+    // The normal support predicate still preserves Coffee and matchup
+    // legality; this is only a progress fallback for an unwinnable draft.
+    if (!alreadyHasMainDamage) {
+        for (const SeedType seedType : kBuiltinAIPlantPostCarryFallbacks) {
+            if (IsPreferredCompatible(seedType)) {
+                return seedType;
+            }
+        }
+    }
+
+    const int storageCount = screen->GetSeedStorageCount();
+    if (storageCount <= 0) {
+        return SeedType::SEED_NONE;
+    }
+    const int firstSeedIndex = Sexy::Rand(storageCount);
+    for (int offset = 0; offset < storageCount; ++offset) {
+        const int seedIndex = (firstSeedIndex + offset) % storageCount;
+        const SeedType seedType = screen->GetPlantSeedType(seedIndex);
+        if (IsPreferredCompatible(seedType)) {
+            return seedType;
+        }
+    }
+    return SeedType::SEED_NONE;
+}
+
+SeedType FindBuiltinAILegalProgressCandidate(SeedChooserScreen *screen) {
+    if (screen == nullptr) {
+        return SeedType::SEED_NONE;
+    }
+
+    const int storageCount = screen->GetSeedStorageCount();
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        const SeedType seedType = screen->mIsZombieChooser ? screen->GetZombieSeedType(seedIndex) : screen->GetPlantSeedType(seedIndex);
+        if (seedType == SeedType::SEED_NONE || seedType == SeedType::SEED_IMITATER || (!screen->mIsZombieChooser && Plant::IsUpgrade(seedType))
+            || (!screen->mShowExtendedSeeds && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE)))
+            || !screen->HasPacket(seedType, screen->mIsZombieChooser) || screen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_CHOOSER || screen->SeedNotAllowedToPick(seedType)) {
+            continue;
+        }
+        return seedType;
+    }
+    return SeedType::SEED_NONE;
+}
+
+SeedType PlantTemplateMainSeed(SeedChooserScreen *screen, int profile) {
+    const BuiltinAIPlantProfile *templateProfile = GetBuiltinAIPlantProfile(profile);
+    if (screen == nullptr || templateProfile == nullptr) {
+        return SeedType::SEED_NONE;
+    }
+    const SeedType *deck = templateProfile->Deck(screen->mBoard != nullptr && screen->mBoard->StageIsNight());
+    if (templateProfile->mainCarry != SeedType::SEED_NONE && std::find(deck, deck + GetBuiltinAIPlanSize(screen), templateProfile->mainCarry) != deck + GetBuiltinAIPlanSize(screen)) {
+        return templateProfile->mainCarry;
+    }
+    for (std::size_t index = 0; index < GetBuiltinAIPlanSize(screen); ++index) {
+        if (vsai::draft::IsPlantCarrySeed(deck[index])) {
+            return deck[index];
+        }
+    }
+    return SeedType::SEED_NONE;
+}
+
+bool IsBuiltinAIPlantSeedBanned(const SeedChooserScreen *screen, SeedType seedType) {
+    const int index = static_cast<int>(seedType);
+    return screen != nullptr && index >= 0 && index < NUM_SEEDS_IN_CHOOSER_EXTENDED && screen->mBannedSeed[index].mSeedState == BannedSeedState::SEED_BANNED;
+}
+
+void ReplaceBuiltinAIPlantTemplateAfterOpeningBan(SeedChooserScreen *screen) {
+    if (screen == nullptr || screen->mIsZombieChooser || screen->mSeedsInBank != 0 || !UsesBuiltinAITemplate(screen)) {
+        return;
+    }
+
+    const int currentProfile = BuiltinAIPlans().plantProfile;
+    const SeedType bannedMain = PlantTemplateMainSeed(screen, currentProfile);
+    if (!IsBuiltinAIPlantSeedBanned(screen, bannedMain)) {
+        return;
+    }
+
+    int bestProfile = -1;
+    int bestScore = std::numeric_limits<int>::min();
+    for (int offset = 0; offset < static_cast<int>(kBuiltinAIPlantProfiles.size()); ++offset) {
+        const int candidateProfile = offset;
+        const SeedType candidateMain = PlantTemplateMainSeed(screen, candidateProfile);
+        if (candidateProfile == currentProfile || candidateMain == SeedType::SEED_NONE || candidateMain == bannedMain || IsBuiltinAIPlantSeedBanned(screen, candidateMain)
+            || !IsBuiltinAICandidate(screen, candidateMain)) {
+            continue;
+        }
+        const int score = BuiltinAIPlantCarryMatchupScore(screen, candidateMain);
+        if (bestProfile < 0 || score > bestScore || (score == bestScore && candidateProfile < bestProfile)) {
+            bestProfile = candidateProfile;
+            bestScore = score;
+        }
+    }
+    if (bestProfile >= 0) {
+        BuiltinAIPlans().plantProfile = bestProfile;
+        vsai::draft::GetBuiltinAIDraftHistory().lastPlantProfile = bestProfile;
+        BuiltinAIPlans().plantMainPickSlot = -1;
+        return;
+    }
+
+    // If every template main has been removed by global/first-round bans,
+    // retain the existing constrained fallback picker for the whole deck.
+    BuiltinAIPlans().usePlantTemplate = false;
+}
+
+SeedType FindBuiltinAIBanCandidate(SeedChooserScreen *screen, const SeedType *fallbackSeeds, std::size_t fallbackCount) {
+    const int storageCount = screen->GetSeedStorageCount();
+    if (storageCount <= 0) {
+        return SeedType::SEED_NONE;
+    }
+
+    SeedType bestSeed = SeedType::SEED_NONE;
+    int bestScore = std::numeric_limits<int>::min();
+    // After the plant player has committed a carry, denying another carry
+    // does not weaken the chosen deck. Spend later zombie-side Bans on its
+    // answer package instead of removing a card the opponent cannot use.
+    const bool preserveUnusedPlantCarries = screen->mBanningPhase && !screen->mIsZombieChooser && HasBuiltinAIPlantMainDamage(screen);
+    for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
+        const SeedType seedType = screen->mIsZombieChooser ? screen->GetZombieSeedType(seedIndex) : screen->GetPlantSeedType(seedIndex);
+        if (!IsBuiltinAICandidate(screen, seedType)) {
+            continue;
+        }
+        if (preserveUnusedPlantCarries && vsai::draft::IsPlantCarrySeed(seedType)) {
+            continue;
+        }
+
+        int fallbackScore = 0;
+        for (std::size_t index = 0; index < fallbackCount; ++index) {
+            if (fallbackSeeds[index] == seedType) {
+                fallbackScore = 180 - static_cast<int>(index) * 8;
+                break;
+            }
+        }
+        const int baseThreat = vsai::draft::BanBaseThreat(screen->mIsZombieChooser, seedType);
+        // Keep the replay database and matchup-specific priority as additive
+        // evidence. A baseline tier-one threat cannot be eclipsed solely by
+        // sample frequency from a narrow replay set.
+        const int score = baseThreat * 2 + fallbackScore + vsai::draft::BanDatabasePriority(screen->mIsZombieChooser, seedType, static_cast<std::uint32_t>(Sexy::GetTickCount()));
+        if (bestSeed == SeedType::SEED_NONE || score > bestScore || (score == bestScore && seedType < bestSeed)) {
+            bestSeed = seedType;
+            bestScore = score;
+        }
+    }
+    return bestSeed;
+}
+
+int GetBuiltinAIPageForSeed(const SeedChooserScreen *screen, SeedType seedType) {
+    if (!screen->mShowExtendedSeeds) {
+        return 0;
+    }
+    if (screen->mIsZombieChooser) {
+        return seedType > GetZombieFirstPageLastSeedType(screen) ? 1 : 0;
+    }
+    return seedType >= SeedType::SEED_ICEBERG_LETTUCE ? 1 : 0;
 }
 
 } // namespace
@@ -204,6 +1492,13 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
     auto &buttonList = mButtons.Construct();
     mApp = reinterpret_cast<LawnApp *>(Sexy::gSexyAppBase);
     mBoard = mApp->mBoard;
+    if (mApp->IsVSMode() && !theIsZombieChooser) {
+        // A VS match always constructs the plant chooser first.  Clearing the
+        // old plan here gives a fresh random archetype even when a human
+        // performs the opening pick before the local AI gets its turn.
+        vsai::draft::ResetBuiltinAIDraftSession();
+        vsai::draft::ResetBanDatabase();
+    }
 
     if (mBoard->mCutScene->IsSurvivalRepick() && !mApp->IsCoopMode()) {
         GamepadControls *gamePad = mBoard->mGamepadControls[0];
@@ -592,6 +1887,105 @@ void SeedChooserScreen::RebuildHelpbar() {
     old_SeedChooserScreen_RebuildHelpbar(this);
 }
 
+void SeedChooserScreen::UpdateBuiltinAIPick() {
+    if (!IsLocalBuiltinAIChooser(this) || mApp->mVSSetupMenu == nullptr || !CanPickNow() || mSeedsInFlight != 0 || VSSetupAddonWidget::msAIDraftDisabledMode) {
+        return;
+    }
+
+    const VSSide controlledSide = mBanningPhase ? (mIsZombieChooser ? VS_SIDE_PLANT : VS_SIDE_ZOMBIE) : (mIsZombieChooser ? VS_SIDE_ZOMBIE : VS_SIDE_PLANT);
+    const bool aiEnabled = controlledSide == VS_SIDE_PLANT ? VSSetupAddonWidget::msPlantAIMode : VSSetupAddonWidget::msZombieAIMode;
+    if (!aiEnabled || (mBanningPhase && mSeedsInBanned >= mNumBanPackets)) {
+        return;
+    }
+    EnsureBuiltinAIDeckPlans(this);
+
+    int controllerIndex = -1;
+    for (int sideSlot = 0; sideSlot < 2; ++sideSlot) {
+        if (mApp->mVSSetupMenu->mSides[sideSlot] == controlledSide) {
+            controllerIndex = mApp->mVSSetupMenu->mControllerIndex[sideSlot];
+            break;
+        }
+    }
+    if (controllerIndex < 0 || controllerIndex > 1) {
+        return;
+    }
+
+    const SeedType *prioritySeeds = nullptr;
+    std::size_t priorityCount = 0;
+    if (mBanningPhase) {
+        const std::span<const SeedType> priority = mIsZombieChooser ? vsai::draft::PlantBanPriority() : vsai::draft::ZombieBanPriority();
+        prioritySeeds = priority.data();
+        priorityCount = priority.size();
+    } else if (UsesBuiltinAITemplate(this)) {
+        prioritySeeds = GetBuiltinAIDeckPriority(this);
+        priorityCount = GetBuiltinAIPlanSize(this);
+    }
+
+    SeedType selectedSeedType = mBanningPhase ? FindBuiltinAIBanCandidate(this, prioritySeeds, priorityCount)
+                                              : (mIsZombieChooser ? (UsesBuiltinAITemplate(this) ? FindBuiltinAICandidate(this, prioritySeeds, priorityCount) : FindBuiltinAIRuleZombieCandidate(this))
+                                                                  : FindBuiltinAIPlantDeckCandidate(this, prioritySeeds, priorityCount, UsesBuiltinAITemplate(this)));
+    if (!mBanningPhase && !mIsZombieChooser && selectedSeedType == SeedType::SEED_NONE) {
+        // The deck picker has already attempted every role-aware main and
+        // support alternative. A map restriction plus Ban can still make
+        // each of those constraints mutually exclusive. The raw chooser
+        // predicate is the final legal-progress fallback, preventing the
+        // local AI from leaving the last seed slot permanently unpicked.
+        selectedSeedType = FindBuiltinAICandidate(this, nullptr, 0);
+        if (selectedSeedType == SeedType::SEED_NONE) {
+            // All tactical deck constraints were exhausted. This fallback
+            // retains engine and Ban legality while dropping only optional
+            // composition preferences, so a local draft can always finish.
+            selectedSeedType = FindBuiltinAILegalProgressCandidate(this);
+        }
+    }
+    if (!mBanningPhase && mIsZombieChooser) {
+        constexpr SeedType kDogwalker = SeedType::SEED_ZOMBIE_DOGWALKER;
+        const int dogwalkerIndex = GetSeedPacketIndex(kDogwalker);
+        const bool dogwalkerAlreadyChosen = dogwalkerIndex >= 0 && dogwalkerIndex < GetSeedStorageCount() && GetChosenSeed(dogwalkerIndex).mSeedState == ChosenSeedState::SEED_IN_BANK;
+        SeedChooserScreen *plantChooser = mApp->mSeedChooserScreen;
+        const int bannedIndex = static_cast<int>(kDogwalker);
+        const bool dogwalkerBannedByPlant =
+            plantChooser != nullptr && bannedIndex >= 0 && bannedIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED && plantChooser->mBannedSeed[bannedIndex].mSeedState == BannedSeedState::SEED_BANNED;
+        // Plant-side Ban is the only intended way to deny Dogwalker. Do not
+        // let a replay template or its randomized order omit this card.
+        if (!dogwalkerAlreadyChosen && !dogwalkerBannedByPlant && IsBuiltinAICandidate(this, kDogwalker)) {
+            selectedSeedType = kDogwalker;
+        }
+    }
+    if (selectedSeedType == SeedType::SEED_NONE) {
+        return;
+    }
+
+    const int seedIndex = GetSeedPacketIndex(selectedSeedType);
+    const int targetPage = GetBuiltinAIPageForSeed(this, selectedSeedType);
+    if (targetPage != mPageIndex) {
+        SetPageIndex(targetPage);
+    }
+
+    int seedX = 0;
+    int seedY = 0;
+    GetSeedPositionInChooser(seedIndex, seedX, seedY);
+    ChosenSeed &selectedSeed = GetChosenSeed(seedIndex);
+    selectedSeed.mX = seedX;
+    selectedSeed.mY = seedY;
+
+    // Ban processing reads the active selector, so keep both local selectors on the chosen card.
+    mCursorPositionX1 = mCursorPositionX2 = seedX;
+    mCursorPositionY1 = mCursorPositionY2 = seedY;
+    const int pageSeedIndex = targetPage == 0 ? seedIndex : (mIsZombieChooser ? seedIndex - GetZombieFirstPageSeedCount(this) : seedIndex - NUM_SEEDS_IN_CHOOSER);
+    mSeedIndex1 = mSeedIndex2 = pageSeedIndex;
+
+    const int playerIndex = mApp->GamepadToPlayerIndex(controllerIndex);
+    if (playerIndex < 0 || playerIndex > 1) {
+        return;
+    }
+
+    const bool mouseWasVisible = mMouseVisible;
+    mMouseVisible = true;
+    ClickedSeedInChooser_Orgin(selectedSeed, playerIndex);
+    mMouseVisible = mouseWasVisible;
+}
+
 
 void SeedChooserScreen::Update() {
     Sexy::Widget::Update();
@@ -606,6 +2000,8 @@ void SeedChooserScreen::Update() {
         ApplyGlobalBpBans();
         mGlobalBpBansApplied = true;
     }
+
+    UpdateBuiltinAIPick();
 
     mDimCounter = CanPickNow() ? 0 : (mDimCounter + 1);
     mCursorBobPhase = (mCursorBobPhase + 0.01f <= 6.2832f) ? (mCursorBobPhase + 0.01f) : 0.0f;
@@ -655,6 +2051,7 @@ void SeedChooserScreen::Update() {
 
     UpdateViewLawn();
     MarkDirty();
+    TryAutoStartBuiltinVSMatch(this);
 }
 
 
@@ -1189,25 +2586,43 @@ void SeedChooserScreen::ClickedSeedInChooser_Orgin(ChosenSeed &theChosenSeed, in
                 aBannedSeed.mSeedType = theChosenSeed.mSeedType;
 
                 int aSeedBanned = aBannedSeed.mSeedType;
+                if (mSeedsInBanned >= mNumBanPackets || aSeedBanned < 0 || aSeedBanned >= NUM_SEEDS_IN_CHOOSER_EXTENDED || mBannedSeed[aSeedBanned].mSeedState == BannedSeedState::SEED_BANNED) {
+                    return;
+                }
 
                 mBannedSeed[aSeedBanned].mX = theChosenSeed.mX;
                 mBannedSeed[aSeedBanned].mY = theChosenSeed.mY;
                 mBannedSeed[aSeedBanned].mSeedState = BannedSeedState::SEED_BANNED; // 将被选卡设为禁用状态
 
                 mSeedsInBanned++; // 已禁用卡片数量 + 1
-                if (mIsZombieChooser) {
-                    // 如果已禁用数量与需禁用数量一致，结束禁用阶段
-                    if (mSeedsInBanned == mNumBanPackets) {
-                        mApp->mSeedChooserScreen->mBanningPhase = false;
-                        mApp->mZombieChooserScreen->mBanningPhase = false;
-                        OnPlayerPickedSeed(aGamepadIndex);
-                    }
+                // Before the plant player locks any card, every Ban can still
+                // remove the current template carry. Later Ban losses retain
+                // the existing role-based fallback rather than rerolling.
+                if (!mIsZombieChooser && mSeedsInBank == 0) {
+                    ReplaceBuiltinAIPlantTemplateAfterOpeningBan(this);
+                }
+                bool banRoundFinished = false;
+                SeedChooserScreen *plantChooser = mApp->mSeedChooserScreen;
+                SeedChooserScreen *zombieChooser = mApp->mZombieChooserScreen;
+                if (plantChooser != nullptr && zombieChooser != nullptr && plantChooser->mSeedsInBanned >= plantChooser->mNumBanPackets
+                    && zombieChooser->mSeedsInBanned >= zombieChooser->mNumBanPackets) {
+                    // Each chooser tracks the ban round for the opposite
+                    // side. End the round only after both counters agree.
+                    plantChooser->mBanningPhase = false;
+                    zombieChooser->mBanningPhase = false;
+                    banRoundFinished = true;
                 }
 
                 // 记录禁卡
                 netplay::MetricsRecordSeedEvent(mIsZombieChooser, true, int(aSeedBanned));
                 mApp->PlayFoley(FoleyType::FOLEY_FLOOP);
                 OnPlayerPickedSeed(aGamepadIndex);
+                if (banRoundFinished && mIsZombieChooser) {
+                    // Preserve the original BP turn contract: the zombie chooser
+                    // performs the final ban and the extra callback keeps the
+                    // following normal pick on the expected side.
+                    OnPlayerPickedSeed(aGamepadIndex);
+                }
             }
             return;
         }

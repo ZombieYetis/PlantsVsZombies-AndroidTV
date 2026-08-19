@@ -27,6 +27,7 @@
 #include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/ReanimationLawn.h"
+#include "PvZ/Lawn/VSActionSystem.h"
 #include "PvZ/Lawn/Widget/VSSetupAddonWidget.h"
 #include "PvZ/NetPlay.h"
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
@@ -371,6 +372,9 @@ void GridItem::Update() {
                 return;
             }
             mLaunchCounter = RandRangeInt(mLaunchRate - 150, mLaunchRate);
+            if (vsai::HasEnhancedAIProduction(mBoard, vsai::VSSide::Zombies)) {
+                mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(mLaunchCounter);
+            }
             if (gTcpClientSocket >= 0) {
                 U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_GRIDITEM_LAUNCHCOUNTER}, uint16_t(mBoard->mGridItems.DataArrayGetID(this)), uint16_t(mLaunchCounter)};
                 netplay::PutEvent(event);
