@@ -30,6 +30,7 @@
 #include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/ReanimationLawn.h"
+#include "PvZ/Lawn/VSActionSystem.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/Misc.h"
 #include "PvZ/NetPlay.h"
@@ -153,6 +154,10 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
     }
 
     if (mApp->IsVSMode()) {
+        if ((theSeedType == SeedType::SEED_SUNFLOWER || theSeedType == SeedType::SEED_SUNSHROOM) && vsai::HasEnhancedAIProduction(mBoard, vsai::VSSide::Plants)) {
+            mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(mLaunchCounter);
+        }
+
         //        if (mLaunchRate > 0) {
         //            if (MakesSun())
         //                mLaunchCounter = RandRangeInt(300, mLaunchRate / 2);
@@ -2824,6 +2829,9 @@ void Plant::UpdateProductionPlant() {
                 return;
             }
             mLaunchCounter = RandRangeInt(mLaunchRate - 150, mLaunchRate);
+            if ((mSeedType == SeedType::SEED_SUNFLOWER || mSeedType == SeedType::SEED_SUNSHROOM) && vsai::HasEnhancedAIProduction(mBoard, vsai::VSSide::Plants)) {
+                mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(mLaunchCounter);
+            }
             if (gTcpClientSocket >= 0) {
                 U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_LAUNCHCOUNTER}, uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mLaunchCounter)};
                 netplay::PutEvent(event);
@@ -2861,7 +2869,20 @@ void Plant::UpdateProductionPlant() {
         return;
     }
 
+    const bool enhancedProducer = mApp->IsVSMode() && (mSeedType == SeedType::SEED_SUNFLOWER || mSeedType == SeedType::SEED_SUNSHROOM) && vsai::HasEnhancedAIProduction(mBoard, vsai::VSSide::Plants);
+    if (!enhancedProducer) {
+        old_Plant_UpdateProductionPlant(this);
+        return;
+    }
+
+    // Local VS reaches the original producer path, not the custom network
+    // path above. Scale the freshly reset counter after that path produces,
+    // so every Sunflower/Sun-shroom cycle is 0.7x rather than only its first.
+    const int counterBeforeUpdate = mLaunchCounter;
     old_Plant_UpdateProductionPlant(this);
+    if (counterBeforeUpdate <= 1 && mLaunchCounter > 0) {
+        mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(mLaunchCounter);
+    }
 }
 
 void Plant::LaunchPeanut() {

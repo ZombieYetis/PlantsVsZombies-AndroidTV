@@ -223,6 +223,7 @@ public:
     void CrazyDavePickSeeds();
     void OnStartButton();
     void Update();
+    void UpdateBuiltinAIPick();
     void UpdateImitaterButton();
     void UpdateCursor();
     void UpdateAfterPurchase();

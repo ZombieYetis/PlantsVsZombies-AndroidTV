@@ -31,21 +31,33 @@ inline int VS_BUTTON_EXTRA_PACKET_Y = 280;
 inline int VS_BUTTON_EXTENDED_SEEDS_Y = 240;
 inline int VS_BUTTON_BAN_MODE_Y = 320;
 inline int VS_BUTTON_BALANCE_PATCH_Y = 200;
+inline int VS_BUTTON_AI_SETTINGS_Y = 440;
 
 namespace Sexy {
 class ButtonWidget;
 class Widget;
 } // namespace Sexy
 
+class AISettingsWidget;
+
 class VSSetupAddonWidget final : public Sexy::CheckboxListener {
 public:
     enum {
         VSSetupAddonWidget_ExtraPacket = 12,
-        VSSetupAddonWidget_ExtendedSeeds,
-        VSSetupAddonWidget_BanMode,
-        VSSetupAddonWidget_BalancePatch,
-        VSSetupAddonWidget_Back,
-        VSSetupAddonWidget_GlobalBP,
+        VSSetupAddonWidget_ExtendedSeeds = 13,
+        VSSetupAddonWidget_BanMode = 14,
+        VSSetupAddonWidget_BalancePatch = 15,
+        VSSetupAddonWidget_Back = 16,
+        VSSetupAddonWidget_GlobalBP = 17,
+        // Local-only AI preferences are appended so existing setup/network
+        // IDs remain stable for events, saves, and replays.
+        VSSetupAddonWidget_PlantAI = 18,
+        VSSetupAddonWidget_ZombieAI = 19,
+        VSSetupAddonWidget_AIEnhancement = 20,
+        VSSetupAddonWidget_AIDraftDisabled = 21,
+        VSSetupAddonWidget_AITemplateDeckDisabled = 22,
+        VSSetupAddonWidget_AISettings = 23,
+        VSSetupAddonWidget_AISettingsClose = 24,
     };
 
     enum GlobalBpMode {
@@ -57,6 +69,11 @@ public:
     static inline bool msBalancePatchMode = false;
     static inline bool msExtraPacketMode = false;
     static inline bool msExtendedSeedsMode = false;
+    static inline bool msPlantAIMode = false;
+    static inline bool msZombieAIMode = false;
+    static inline bool msAIEnhancementMode = false;
+    static inline bool msAIDraftDisabledMode = false;
+    static inline bool msAITemplateDeckDisabledMode = false;
     static inline GlobalBpMode msGlobalBpMode = GlobalBpMode::GLOBALBP_CLOSED;
     static inline bool msGlobalBpSeedsInitialized = false;
     static inline int msGlobalBpWins[2] = {0, 0};
@@ -71,10 +88,17 @@ public:
     Sexy::Checkbox *mExtendedSeedsCheckbox = nullptr;
     Sexy::Checkbox *mBanModeCheckbox = nullptr;
     Sexy::Checkbox *mBalancePatchCheckbox = nullptr;
+    GameButton *mAISettingsButton = nullptr;
+    AISettingsWidget *mAISettingsWidget = nullptr;
     bool mExtraPacketMode = false;
     bool mExtendedSeedsMode = false;
     bool mBanMode = false;
     bool mBalancePatchMode = false;
+    bool mPlantAIMode = false;
+    bool mZombieAIMode = false;
+    bool mAIEnhancementMode = false;
+    bool mAIDraftDisabledMode = false;
+    bool mAITemplateDeckDisabledMode = false;
     bool mDrawString = true;
 
     VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu);
@@ -87,6 +111,23 @@ public:
     bool GetAddonMode(int theId) const;
     void SetAddonMode(int theId, bool checked, bool saveDetails);
     void UpdateGlobalBpButtonState() const;
+    void OpenAISettings();
+    void CloseAISettings();
+
+    // Builtin AI preferences belong to the local VS overlay and never enter
+    // the network setup event stream.
+    static constexpr bool IsLocalAIOption(int theId) {
+        switch (theId) {
+            case VSSetupAddonWidget_PlantAI:
+            case VSSetupAddonWidget_ZombieAI:
+            case VSSetupAddonWidget_AIEnhancement:
+            case VSSetupAddonWidget_AIDraftDisabled:
+            case VSSetupAddonWidget_AITemplateDeckDisabled:
+                return true;
+            default:
+                return false;
+        }
+    }
 
 private:
     static inline const Sexy::ButtonListener::VTable sButtonListenerVtable{

@@ -200,6 +200,9 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK,
     EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK_NEXT,
 
+    // Local replay only. Never send this event through netplay::PutEvent.
+    EVENT_LOCAL_BOARD_ACTION,
+
     NUM_EVENT_BOARD,
     /************************************************************/
     EVENT_CLIENT_VSRESULT_BUTTON_DEPRESS,

@@ -43,6 +43,7 @@
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
 #include "PvZ/Lawn/System/ReanimationLawn.h"
+#include "PvZ/Lawn/VSActionSystem.h"
 #include "PvZ/Lawn/Widget/ChallengeScreen.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
 #include "PvZ/Lawn/Widget/ReplayControlsWidget.h"
@@ -2056,6 +2057,9 @@ void Board::processClientEvent(const BaseEvent *event) {
 void Board::processServerEvent(const BaseEvent *event) {
     LOG_DEBUG("TYPE:{}", (int)event->type);
     switch (event->type) {
+        case EVENT_LOCAL_BOARD_ACTION:
+            vsai::ExecuteReplayAction(this, *static_cast<const vsai::VSLocalActionReplayEvent *>(event));
+            break;
         case EVENT_BOARD_TOUCH_DOWN_REPLY: {
             auto *event1 = static_cast<const U8U8I16I16_Event *>(event);
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
@@ -3818,6 +3822,7 @@ void Board::Update() {
 
     UpdateButtons();
     old_Board_Update(this);
+    vsai::Update(this);
 }
 
 int Board::GetNumWavesPerFlag() const {
@@ -7537,6 +7542,9 @@ GridItem *Board::AddAGraveStone(int theGridX, int theGridY) {
     aGraveStone->mRenderOrder = MakeRenderOrder(RenderLayer::RENDER_LAYER_GRAVE_STONE, theGridY, 3);
     aGraveStone->mGridX = theGridX;
     aGraveStone->mGridY = theGridY;
+    if (vsai::HasEnhancedAIProduction(this, vsai::VSSide::Zombies)) {
+        aGraveStone->mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(aGraveStone->mLaunchCounter);
+    }
 
     if (mApp->IsVSMode()) {
         aGraveStone->unkBool = true;
@@ -7575,6 +7583,9 @@ GridItem *Board::AddAMound(int theGridX, int theGridY, int theMoundLevel) {
     aMound->mGridItemType = GridItemType::GRIDITEM_MP_BURIAL_MOUND;
     aMound->mGridItemCounter = -Rand(50);
     aMound->mLaunchCounter = RandRangeInt(aMound->mLaunchRate - 150, aMound->mLaunchRate);
+    if (vsai::HasEnhancedAIProduction(this, vsai::VSSide::Zombies)) {
+        aMound->mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(aMound->mLaunchCounter);
+    }
     aMound->mSummonCounter = RandRangeInt(1000, 1500);
     aMound->mRenderOrder = MakeRenderOrder(RenderLayer::RENDER_LAYER_GRAVE_STONE, theGridY, 3);
 
@@ -7959,7 +7970,6 @@ Plant *Board::FindBloomerangPlant(int theGridX, int theGridY) {
     }
     return nullptr;
 }
-
 void Board::DoChillyFwoosh(int theRow, float theX, float theY) {
     const int aRenderOrder = MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, theRow, 1);
 
