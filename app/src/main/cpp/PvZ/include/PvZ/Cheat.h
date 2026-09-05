@@ -453,6 +453,215 @@ namespace zh_Hans {
     static_assert(CheckList(featureList));
 } // namespace zh_Hans
 
+namespace vi_VN {
+    inline constexpr SettingsList settingsList = {
+        "Category_Cài đặt Menu",
+        "-1_Toggle_Lưu cài đặt khi thoát", //-1 is checked on Preferences.java
+        "Category_Tùy chọn khác",
+        "-6_Button_<font color='yellow'>Quay lại Menu Cheat</font>",
+    };
+
+    inline constexpr FeatureList featureList = {
+        "Collapse_Chức năng thường dùng",
+        "1_CollapseAdd_Toggle_Mặt trời vô hạn",
+        "42_CollapseAdd_Toggle_Trồng cây mọi nơi",
+        "2_CollapseAdd_Toggle_Thẻ bài không hồi chiêu",
+        "3_CollapseAdd_Toggle_Nạp đạn ngay lập tức",
+        "4_CollapseAdd_Toggle_Nấm thức tỉnh ngay",
+        "5_CollapseAdd_Toggle_Tạm dừng nâng cao",
+        "8_CollapseAdd_Spinner_<font color='green'>Tốc độ game：_Tắt,1.2x,1.5x,2x,2.5x,3x,5x,10x",
+        "82_CollapseAdd_OnceCheckBox_Hoàn thành màn chơi",
+
+
+        "Collapse_Chức năng gỡ lỗi",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị máu cây trồng:",
+        "21_CollapseAdd_Toggle_Tất cả cây trồng",
+        "22_CollapseAdd_Toggle_Cây có điểm chịu đựng",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị máu zombie:",
+        "23_CollapseAdd_Toggle_Máu cơ thể",
+        "24_CollapseAdd_Toggle_Máu mũ và khiên",
+        "25_CollapseAdd_Toggle_Gargantuar",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị thông tin game:",
+        "26_CollapseAdd_Toggle_Thông tin xuất hiện zombie",
+        "27_CollapseAdd_Toggle_Hộp va chạm",
+
+
+        "Collapse_Chức năng giải trí",
+        "6_CollapseAdd_Toggle_Xóa sương mù",
+        "43_CollapseAdd_Toggle_Bình trong suốt",
+        "45_CollapseAdd_Toggle_Zombie không thể vào nhà",
+        "44_CollapseAdd_Toggle_Wall-nut chắc chắn gây dị ứng zombie",
+        "7_CollapseAdd_Toggle_Không rơi vật phẩm",
+        "48_CollapseAdd_Spinner_<font color='green'>Điều khiển zombie nhảy múa：_Tắt,Giữ tiến về phía trước,Giữ nhảy tại chỗ,Giữ triệu hồi",
+        "46_CollapseAdd_Spinner_<font color='green'>Lùi vạch đích：_Tắt,10,20,30,40,50,60,70,80",
+        "47_CollapseAdd_Spinner_<font color='green'>Kích thước zombie：_Tắt,0.2x,0.4x,0.6x,0.8x,1x,1.2x,1.4x,1.6x,1.8x,2x",
+        "CollapseAdd_RichTextView_<font color='yellow'># Lượng máu tỉ lệ bình phương với kích thước!",
+        "41_CollapseAdd_OnceCheckBox_Hộp thoại mã cheat",
+
+
+        "Collapse_Cài đặt màn chơi",
+        "87_CollapseAdd_Toggle_Tạm dừng xuất hiện zombie",
+        "88_CollapseAdd_Toggle_Không có máy cắt cỏ",
+        "83_CollapseAdd_Toggle_Không có thẻ bắt buộc từ Crazy Dave",
+        "84_CollapseAdd_Toggle_Last Stand vô tận",
+        "89_CollapseAdd_Toggle_Vô hiệu hóa xóa dữ liệu",
+        "90_CollapseAdd_Toggle_Vô hiệu hóa lưu dữ liệu",
+        "81_CollapseAdd_OnceCheckBox_Hộp thoại nhảy màn",
+        "102_CollapseAdd_Spinner_<font color='green'>Thay đổi cảnh：_Tắt,Ban ngày,Ban đêm,Hồ bơi,Sương mù,Mái nhà,Mái nhà đêm,Vườn thiền,Vườn nấm,Bể cá",
+        "CollapseAdd_RichTextView_<font color='green'>Nhảy vòng trong Survival Endless:",
+        "85_CollapseAdd_InputValue_Số vòng mong muốn",
+        "86_CollapseAdd_OnceCheckBox_Nhảy vòng",
+        "CollapseAdd_RichTextView_<font color='yellow'># Chỉ nhảy vòng SAU KHI hoàn thành chọn thẻ!",
+
+
+        "Collapse_Cài đặt ô thẻ bài",
+        "141_CollapseAdd_Spinner_<font color='green'>Bên của ô thẻ：_Ô bên trái,Ô bên phải",
+        "142_CollapseAdd_Spinner_<font color='green'>Vị trí thẻ mục tiêu：_Thứ 1,Thứ 2,Thứ 3,Thứ 4,Thứ 5,Thứ 6,Thứ 7,Thứ 8,Thứ 9,Thứ 10",
+        "143_CollapseAdd_Spinner_<font color='green'>Loại thẻ bài："
+        "_Chưa chọn,Peashooter,Sunflower,Cherry Bomb,Wall-nut,Potato Mine,Snow Pea,Chomper,Repeater,"
+        "Puff-shroom,Sun-shroom,Fume-shroom,Grave Buster,Hypno-shroom,Scaredy-shroom,Ice-shroom,Doom-shroom,"
+        "Lily Pad,Squash,Threepeater,Tangle Kelp,Jalapeno,Spikeweed,Torchwood,Tall-nut,"
+        "Sea-shroom,Plantern,Cactus,Blover,Split Pea,Starfruit,Pumpkin,Magnet-shroom,"
+        "Cabbage-pult,Flower Pot,Kernel-pult,Coffee Bean,Garlic,Umbrella Leaf,Marigold,Melon-pult,"
+        "Gatlingp Pea,Twin Sunflower,Gloom-shroom,Cattail,Winter Melon,Gold Magnet,Spikerock,Cob Cannon,"
+        "Explode-o-nut,Giant Wall-nut,Sprout,Leftpeater,"
+        "Grave Stone,Zombie,Trash Bin Zombie,Conehead Zombie,Pole Vaulting Zombie,Buckethead Zombie,"
+        "Flag Zombie,Newspaper Zombie,Screen Door Zombie,Football Zombie,Dancing Zombie,Zomboni,"
+        "Jack-in-the-box Zombie,Digger Zombie,Pogo Zombie,Bungee Zombie,Ladder Zombie,Catapult Zombie,"
+        "Gargantuar,Zombie Yeti,Zombie Bobsled Team,Snorkel Zombie,Dolphin Rider Zombie,Imp,Ballon Zombie",
+        "144_CollapseAdd_CheckBox_Thẻ bài cây Imitater",
+        "145_CollapseAdd_OnceCheckBox_Thay thế thẻ bài",
+
+
+        "Collapse_Cài đặt đạn",
+        "62_CollapseAdd_Toggle_Gây sát thương mỗi khung hình",
+        "61_CollapseAdd_Toggle_Đạn tuyết bỏ qua Torchwood",
+        "63_CollapseAdd_Spinner_<font color='green'>Chỉnh loại đạn：_Tắt,Đậu,Đậu tuyết,Bắp cải,Dưa hấu,Bào tử,Đậu tuyết lớn,Cầu lửa,Ngôi sao,Gai,Bóng rổ,Hạt ngô,Đạn ngô lớn,Bơ,Đậu zombie",
+        "64_CollapseAdd_Toggle_Đạn ngẫu nhiên",
+        "65_CollapseAdd_Toggle_Chỉ thay đổi đậu thường",
+        "66_CollapseAdd_Toggle_Đậu đổi loại sau khi qua Torchwood",
+        "67_CollapseAdd_CheckBox_Loại trừ đạn ngô lớn",
+        "68_CollapseAdd_CheckBox_Loại trừ đạn ngôi sao",
+
+
+        "Collapse_Cài đặt xuất hiện zombie",
+        "CollapseAdd_RichTextView_<font color='green'>Chọn loại zombie:",
+        "200_CollapseAdd_CheckBox_Zombie thường (chắc chắn xuất hiện)",
+        "202_CollapseAdd_CheckBox_Conehead Zombie",
+        "203_CollapseAdd_CheckBox_Pole Vaulting Zombie",
+        "204_CollapseAdd_CheckBox_Buckethead Zombie",
+        "205_CollapseAdd_CheckBox_Newspaper Zombie",
+        "206_CollapseAdd_CheckBox_Screen Door Zombie",
+        "207_CollapseAdd_CheckBox_Football Zombie",
+        "208_CollapseAdd_CheckBox_Dancing Zombie",
+        "211_CollapseAdd_CheckBox_Snorkel Zombie",
+        "212_CollapseAdd_CheckBox_Zomboni",
+        "214_CollapseAdd_CheckBox_Dolphin Rider Zombie",
+        "215_CollapseAdd_CheckBox_Jack-in-the-box Zombie",
+        "216_CollapseAdd_CheckBox_Ballon Zombie",
+        "217_CollapseAdd_CheckBox_Digger Zombie",
+        "218_CollapseAdd_CheckBox_Pogo Zombie",
+        "219_CollapseAdd_CheckBox_Zombie Yeti",
+        "220_CollapseAdd_CheckBox_Bungee Zombie",
+        "221_CollapseAdd_CheckBox_Ladder Zombie",
+        "222_CollapseAdd_CheckBox_Catapult Zombie",
+        "223_CollapseAdd_CheckBox_Gargantuar",
+        "233_CollapseAdd_CheckBox_Redeye Gargantuar",
+        "226_CollapseAdd_CheckBox_Trash Bin Zombie",
+        "227_CollapseAdd_CheckBox_Pea Head Zombie",
+        "228_CollapseAdd_CheckBox_Wall-nut Head Zombie",
+        "229_CollapseAdd_CheckBox_Jalapeno Head Zombie",
+        "230_CollapseAdd_CheckBox_Gatling Zombie",
+        "231_CollapseAdd_CheckBox_Squash Head Zombie",
+        "232_CollapseAdd_CheckBox_Tall-nut Head Zombie",
+        "234_CollapseAdd_CheckBox_All-Star Zombie",
+        "235_CollapseAdd_CheckBox_Super-Fan Imp Zombie",
+        "241_CollapseAdd_Spinner_<font color='green'>Chọn chế độ xuất hiện：_Tắt,Tự nhiên (game tự chọn zombie),Cực độ (phân bố đều zombie)",
+        "242_CollapseAdd_OnceCheckBox_Thiết lập xuất hiện zombie",
+
+
+        "Collapse_Bố trí chiến trường",
+        "101_CollapseAdd_Toggle_Tự thêm thang khi trồng Pumpkin",
+        "105_CollapseAdd_Spinner_<font color='yellow'>Cột mục tiêu："
+        "_Cột 1,Cột 2,Cột 3,Cột 4,Cột 5,Cột 6,Cột 7,Cột 8,Cột 9,Tất cả các cột,Vị trí zombie xuất hiện",
+        "106_CollapseAdd_Spinner_<font color='yellow'>Hàng mục tiêu：_Hàng 1,Hàng 2,Hàng 3,Hàng 4,Hàng 5,Hàng 6,Tất cả các hàng",
+        "103_CollapseAdd_Spinner_<font color='green'>Loại cây trồng："
+        "_Chưa chọn,Peashooter,Sunflower,Cherry Bomb,Wall-nut,Potato Mine,Snow Pea,Chomper,Repeater,"
+        "Puff-shroom,Sun-shroom,Fume-shroom,Grave Buster,Hypno-shroom,Scaredy-shroom,Ice-shroom,Doom-shroom,"
+        "Lily Pad,Squash,Threepeater,Tangle Kelp,Jalapeno,Spikeweed,Torchwood,Tall-nut,"
+        "Sea-shroom,Plantern,Cactus,Blover,Split Pea,Starfruit,Pumpkin,Magnet-shroom,"
+        "Cabbage-pult,Flower Pot,Kernel-pult,Coffee Bean,Garlic,Umbrella Leaf,Marigold,Melon-pult,"
+        "Gatlingp Pea,Twin Sunflower,Gloom-shroom,Cattail,Winter Melon,Gold Magnet,Spikerock,Cob Cannon,"
+        "Explode-o-nut,Giant Wall-nut,Sprout,Leftpeater",
+        "107_CollapseAdd_CheckBox_Cây Imitater",
+        "108_CollapseAdd_OnceCheckBox_Trồng cây",
+        "104_CollapseAdd_Spinner_<font color='green'>Loại zombie："
+        "_Chưa chọn,Zombie,Flag Zombie,Conehead Zombie,Pole Vaulting Zombie,Buckethead Zombie,"
+        "Newspaper Zombie,Screen Door Zombie,Football Zombie,Dancing Zombie,Backup Dancer,"
+        "Ducky Tube Zombie,Snorkel Zombie,Zomboni,Zombie Bobsled Team,Dolphin Rider Zombie,"
+        "Jack-in-the-box Zombie,Ballon Zombie,Digger Zombie,Pogo Zombie,Zombie Yeti,"
+        "Bungee Zombie,Ladder Zombie,Catapult Zombie,Gargantuar,Imp,Dr. Zomboss,"
+        "Trash Bin Zombie,Pea Head Zombie,Wall-nut Head Zombie,Jalapeno Head Zombie,Gatling Zombie,Squash Head Zombie,Tall-nut Head Zombie,Redeye Gargantuar,"
+        "All-Star Zombie, Super-Fan Imp Zombie",
+        "109_CollapseAdd_OnceCheckBox_Đặt zombie",
+        "CollapseAdd_RichTextView_<font color='green'>Đối tượng khác:",
+        "114_CollapseAdd_OnceCheckBox_Đặt bia mộ",
+        "110_CollapseAdd_OnceCheckBox_Đặt thang",
+        "111_CollapseAdd_OnceCheckBox_Khôi phục tất cả máy cắt cỏ",
+        "CollapseAdd_RichTextView_<font color='yellow'>Xóa bỏ:",
+        "112_CollapseAdd_OnceCheckBox_Xóa tất cả cây trồng",
+        "115_CollapseAdd_OnceCheckBox_Xóa tất cả zombie",
+        "116_CollapseAdd_OnceCheckBox_Xóa tất cả bia mộ",
+        "113_CollapseAdd_OnceCheckBox_Xóa tất cả máy cắt cỏ",
+        "CollapseAdd_RichTextView_<font color='yellow'>Thiết lập trạng thái:",
+        "9_CollapseAdd_OnceCheckBox_Thôi miên tất cả zombie",
+        "10_CollapseAdd_OnceCheckBox_Đóng băng tất cả zombie",
+        "11_CollapseAdd_OnceCheckBox_Kích hoạt tất cả máy cắt cỏ",
+
+
+        "Collapse_Bố trí nhanh",
+        "121_CollapseAdd_Spinner_<font color='green'>Chọn đội hình cho hồ bơi：_Chưa chọn,"
+        "[0]Đồng hồ vô pháo,[1]Tối giản vô pháo,[2]Giả vô thương vô pháo,[3]Tự khắc chế Jack-in-the-box vô pháo,[4]Hỏa diệm vô pháo,"
+        "[5]Phân liệt hỏa diệm vô pháo,[6]Hậu phương vô pháo,[7]Siêu tiền vệ vô pháo,[8]Hoàng tử vô pháo,[9]Đồng hồ cơ học vô pháo,"
+        "[10]Vô biên vô pháo,[11]Đồng hồ thạch anh vô pháo,[12]Không hướng dương vô pháo,[13]Vuông vô Gloom vô pháo,[14]Tăng tốc 56 vô Gloom vô pháo,"
+        "[15]Áp chế nhất pháo,[16]Tiểu nhị pháo,[17]Hỏa diệm nhị pháo,[18]Hạt nhân nhị pháo,[19]Phân liệt nhị pháo,"
+        "[20]Vuông chính nhị pháo,[21]Kinh điển nhị pháo,[22]Tam pháo tốc hành,[23]Thái cực tứ pháo,[24]Toàn kim loại tứ pháo,"
+        "[25]Vuông tứ pháo,[26]Thanh tứ pháo,[27]Thủy lộ vô thực tứ pháo,[28]Phương tứ pháo,[29]Vô biên tứ pháo,"
+        "[30]Song hạt nhân đế tuyến tứ pháo,[31]Kinh điển tứ pháo,[32]Hỏa diệm tứ pháo,[33]Đế tuyến tứ pháo,[34]Truyền thống tứ pháo,"
+        "[35]Bán trường vô thực ngũ pháo,[36]Tán tạc ngũ pháo,[37]Tâm ngũ pháo,[38]Lục lộ vô thực lục pháo,[39]Thủy lộ vô thực lục pháo,"
+        "[40]Thanh đài lục pháo,[41]Thiền phòng hoa mộc thâm,[42]Vô biên lục pháo,[43]Ngô mễ lục pháo,[44]Không tạc lục pháo,"
+        "[45]Siêu hậu trí lục pháo,[46]Phương lục pháo,[47]Điệp vận,[48]Nhất thiêu thang viên,[49]Gián cách vô thực thất pháo,"
+        "[50]Ngọc thố quỳnh quỳnh,[51]Vô bảo hộ bát pháo,[52]Thụ bát pháo,[53]Toàn đối xứng thụ bát pháo,[54]Củ hình bát pháo,"
+        "[55]Vô biên bát pháo,[56]Âm dương bát pháo,[57]Phù bình bát pháo,[58]Hậu trí bát pháo,[59]Tự dưỡng hải đồn,"
+        "[60]Ngô mễ bát pháo,[61]Kinh điển bát pháo,[62]Hoa hải bát pháo,[63]C2 bát pháo,[64]Phân ly bát pháo,"
+        "[65]Toàn đối xứng bát pháo,[66]3C bát pháo,[67]Đăng đài bát pháo,[68]⑨ pháo,[69]Vuông cửu pháo,"
+        "[70]C6i cửu pháo,[71]Tâm cửu pháo,[72]Luân tạc cửu pháo,[73]② pháo,[74]Lục mang tinh thập pháo,[75]Lục giác thập pháo,"
+        "[76]Vuông thập pháo,[77]Tà phương thập pháo,[78]Giản hóa thập pháo,[79]Hậu trí thập pháo,"
+        "[80]Kinh điển thập pháo,[81]Lục tuyến tù thi,[82]Tà thập pháo,[83]Ma phương thập pháo,[84]Hamburger của Dave,"
+        "[85]Cocktail,[86]Nhất thiêu thang viên thập nhị pháo,[87]Ngọc hồ xuân thập nhị pháo,[88]Bán trường thập nhị pháo,[89]Giản hóa thập nhị pháo,"
+        "[90]Kinh điển thập nhị pháo,[91]Hỏa diệm thập nhị pháo,[92]Băng vũ thập nhị pháo (cải tiến),[93]Băng vũ thập nhị pháo (cải tiến x2),[94]Đơn tử thẻ thập nhị pháo,"
+        "[95]Vô biên trụ thập nhị pháo,[96]Vô biên thập nhị pháo,[97]Thủy lộ vô thực thập nhị pháo,[98]Thuần bạch huyền không thập nhị pháo,[99]Hậu hoa viên thập nhị pháo,"
+        "[100]Ngô mễ thập nhị pháo,[101]Lưỡng lộ bạo cuồng,[102]Cửu liệt thập nhị pháo,[103]Thê tằng thập nhị pháo,[104]Quân hải thập nhị pháo,"
+        "[105]Không hầu dẫn,[106]Mai hoa thập tam,[107]Tối hậu chi tác,[108]Băng tâm đăng,[109]Thái cực thập tứ pháo,"
+        "[110]Chân tứ pháo,[111]Thần côn thập tứ pháo,[112]Vô biên thập tứ pháo,[113]Xuyên việt thập tứ pháo,[114]Kim cương thập ngũ pháo,"
+        "[115]Vô biên thập ngũ pháo,[116]Chân nhị pháo,[117]Băng tương đăng,[118]Pháo hoàn thập nhị hoa,[119]Đơn băng thập lục pháo,"
+        "[120]Đối xứng thập lục pháo,[121]Vô biên thập lục pháo,[122]Khỏa bôn thập lục pháo,[123]Song băng thập lục pháo,[124]Siêu tiền trí thập lục pháo,"
+        "[125]Hỏa diệm thập lục pháo,[126]Kinh điển thập lục pháo,[127]Chiết tuyến thập lục pháo,[128]Phế thập bát pháo (cực hạn),[129]Thuần thập bát pháo,"
+        "[130]Chân thập bát pháo,[131]Băng phách thập bát pháo,[132]Vĩ tạc thập bát pháo,[133]Kinh điển thập bát pháo,[134]Thuần nhị thập pháo,"
+        "[135]Không tạc nhị thập pháo,[136]Đinh ba nhị thập pháo,[137]Tân nhị thập pháo,[138]Vô băng qua nhị thập pháo,[139]Tuyệt vọng chi lộ,"
+        "[140]Nhị thập nhất pháo,[141]Tân nhị thập nhị pháo,[142]Nhị thập nhị pháo,[143]Vô băng qua nhị thập nhị pháo,[144]Cửu liệt nhị thập nhị pháo,"
+        "[145]Nhị thập tứ pháo,[146]Điếm tài nhị thập tứ pháo,[147]Đảm thủ (cực hạn)",
+        "122_CollapseAdd_OnceCheckBox_Triển khai đội hình",
+        "CollapseAdd_RichTextView_<font color='green'>Xuất/Nhập đội hình:",
+        "123_CollapseAdd_FormationCopy_Sao chép mã đội hình",
+        "124_CollapseAdd_InputText_Dán mã đội hình",
+        "125_CollapseAdd_OnceCheckBox_Triển khai đội hình",
+        "CollapseAdd_RichTextView_<font color='yellow'># Có thể triển khai đội hình khi đang tạm dừng",
+    };
+
+    static_assert(CheckList(settingsList));
+    static_assert(CheckList(featureList));
+} // namespace vi_VN
 } // namespace cheat
 
 #endif // PVZ_CHEAT_H
