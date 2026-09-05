@@ -453,6 +453,216 @@ namespace zh_Hans {
     static_assert(CheckList(featureList));
 } // namespace zh_Hans
 
+namespace vi_VN {
+    inline constexpr SettingsList settingsList = {
+        "Category_Cài đặt Menu Cheat",
+        "-1_Toggle_Lưu cài đặt khi thoát", //-1 is checked on Preferences.java
+        "Category_Tùy chọn khác",
+        "-6_Button_<font color='yellow'>Quay lại Menu Cheat</font>",
+    };
+
+    inline constexpr FeatureList featureList = {
+        "Collapse_Chức năng thường dùng",
+        "1_CollapseAdd_Toggle_Mặt trời vô hạn",
+        "42_CollapseAdd_Toggle_Trồng cây mọi nơi",
+        "2_CollapseAdd_Toggle_Thẻ không hồi chiêu",
+        "3_CollapseAdd_Toggle_Nạp đạn tức thì",
+        "4_CollapseAdd_Toggle_Nấm thức dậy ngay",
+        "5_CollapseAdd_Toggle_Tạm dừng nâng cao",
+        "8_CollapseAdd_Spinner_<font color='green'>Đặt tốc độ game：_Tắt,1.2x,1.5x,2x,2.5x,3x,5x,10x",
+        "82_CollapseAdd_OnceCheckBox_Hoàn thành màn chơi",
+
+
+        "Collapse_Chức năng gỡ lỗi",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị máu cây:",
+        "21_CollapseAdd_Toggle_Tất cả cây trồng",
+        "22_CollapseAdd_Toggle_Cây loại chịu sát thương",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị máu zombie:",
+        "23_CollapseAdd_Toggle_Máu thân thể",
+        "24_CollapseAdd_Toggle_Máu giáp và khiên",
+        "25_CollapseAdd_Toggle_Gargantuar",
+        "CollapseAdd_RichTextView_<font color='green'>Hiển thị thông tin game:",
+        "26_CollapseAdd_Toggle_Thông tin zombie xuất hiện",
+        "27_CollapseAdd_Toggle_Vẽ hộp va chạm",
+
+
+        "Collapse_Chức năng giải trí",
+        "6_CollapseAdd_Toggle_Xóa sương mù",
+        "43_CollapseAdd_Toggle_Bình trong suốt",
+        "45_CollapseAdd_Toggle_Zombie không thể vào nhà",
+        "44_CollapseAdd_Toggle_Wall-nut chắc chắn gây zombie phình to",
+        "7_CollapseAdd_Toggle_Không rơi đồ",
+        "48_CollapseAdd_Spinner_<font color='green'>Điều khiển zombie nhảy：_Tắt,Tiếp tục tiến lên,Nhảy tại chỗ,Liên tục triệu hồi",
+        "46_CollapseAdd_Spinner_<font color='green'>Đường biên lùi về sau：_Tắt,10,20,30,40,50,60,70,80",
+        "47_CollapseAdd_Spinner_<font color='green'>Đặt kích thước zombie：_Tắt,0.2x,0.4x,0.6x,0.8x,1x,1.2x,1.4x,1.6x,1.8x,2x",
+        "CollapseAdd_RichTextView_<font color='yellow'># Lượng máu tỷ lệ bình phương với kích thước!",
+        "41_CollapseAdd_OnceCheckBox_Hộp thoại mã cheat",
+
+
+        "Collapse_Cài đặt màn chơi",
+        "87_CollapseAdd_Toggle_Tạm dừng spawn zombie",
+        "88_CollapseAdd_Toggle_Không có máy cắt cỏ",
+        "83_CollapseAdd_Toggle_Không thẻ bắt buộc từ Crazy Dave",
+        "84_CollapseAdd_Toggle_Last Stand vô tận",
+        "89_CollapseAdd_Toggle_Vô hiệu xóa dữ liệu lưu",
+        "90_CollapseAdd_Toggle_Vô hiệu lưu dữ liệu",
+        "81_CollapseAdd_OnceCheckBox_Hộp thoại nhảy màn",
+        "102_CollapseAdd_Spinner_<font color='green'>Đổi cảnh game：_Tắt,Ngày,Đêm,Hồ bơi,Sương mù,Mái nhà,Mái nhà đêm,Vườn Zen,Vườn nấm,Bể cá",
+        "CollapseAdd_RichTextView_<font color='green'>Đặt vòng của Survival Endless:",
+        "85_CollapseAdd_InputValue_Số vòng bạn muốn",
+        "86_CollapseAdd_OnceCheckBox_Đặt số vòng",
+        "CollapseAdd_RichTextView_<font color='yellow'># Chỉ đặt số vòng SAU KHI hoàn thành chọn thẻ!",
+
+
+        "Collapse_Cài đặt khe thẻ",
+        "141_CollapseAdd_Spinner_<font color='green'>Bên khe thẻ：_Khe trái,Khe phải",
+        "142_CollapseAdd_Spinner_<font color='green'>Khe thẻ mục tiêu：_Thứ 1,Thứ 2,Thứ 3,Thứ 4,Thứ 5,Thứ 6,Thứ 7,Thứ 8,Thứ 9,Thứ 10",
+        "143_CollapseAdd_Spinner_<font color='green'>Loại thẻ："
+        "_Chưa chọn,Peashooter,Sunflower,Cherry Bomb,Wall-nut,Potato Mine,Snow Pea,Chomper,Repeater,"
+        "Puff-shroom,Sun-shroom,Fume-shroom,Grave Buster,Hypno-shroom,Scaredy-shroom,Ice-shroom,Doom-shroom,"
+        "Lily Pad,Squash,Threepeater,Tangle Kelp,Jalapeno,Spikeweed,Torchwood,Tall-nut,"
+        "Sea-shroom,Plantern,Cactus,Blover,Split Pea,Starfruit,Pumpkin,Magnet-shroom,"
+        "Cabbage-pult,Flower Pot,Kernel-pult,Coffee Bean,Garlic,Umbrella Leaf,Marigold,Melon-pult,"
+        "Gatlingp Pea,Twin Sunflower,Gloom-shroom,Cattail,Winter Melon,Gold Magnet,Spikerock,Cob Cannon,"
+        "Explode-o-nut,Giant Wall-nut,Sprout,Leftpeater,"
+        "Grave Stone,Zombie,Trash Bin Zombie,Conehead Zombie,Pole Vaulting Zombie,Buckethead Zombie,"
+        "Flag Zombie,Newspaper Zombie,Screen Door Zombie,Football Zombie,Dancing Zombie,Zomboni,"
+        "Jack-in-the-box Zombie,Digger Zombie,Pogo Zombie,Bungee Zombie,Ladder Zombie,Catapult Zombie,"
+        "Gargantuar,Zombie Yeti,Zombie Bobsled Team,Snorkel Zombie,Dolphin Rider Zombie,Imp,Ballon Zombie",
+        "144_CollapseAdd_CheckBox_Thẻ cây Imitater",
+        "145_CollapseAdd_OnceCheckBox_Thay thế thẻ",
+
+
+        "Collapse_Cài đặt đạn",
+        "62_CollapseAdd_Toggle_Gây sát thương mỗi khung hình",
+        "61_CollapseAdd_Toggle_Snow Pea bỏ qua Torchwood",
+        "63_CollapseAdd_Spinner_<font color='green'>Sửa loại đạn：_Tắt,Pea,SnowPea,Cabbage,Melon,Puff,WinterMelon,Fireball,Star,Spike,Basketball,Kernel,CobBig,Butter,Zombie Pea",
+        "64_CollapseAdd_Toggle_Đạn ngẫu nhiên",
+        "65_CollapseAdd_Toggle_Chỉ đổi loại đạn Pea",
+        "66_CollapseAdd_Toggle_Pea đổi loại sau khi qua Torchwood",
+        "67_CollapseAdd_CheckBox_Loại ngẫu nhiên loại trừ BigCob",
+        "68_CollapseAdd_CheckBox_Loại ngẫu nhiên loại trừ Star",
+
+
+        "Collapse_Cài đặt spawn",
+        "CollapseAdd_RichTextView_<font color='green'>Chọn loại zombie:",
+        "200_CollapseAdd_CheckBox_Zombie thường(Xuất hiện chắc chắn trong chế độ spawn tự nhiên)",
+        "202_CollapseAdd_CheckBox_Conehead Zombie",
+        "203_CollapseAdd_CheckBox_Pole Vaulting Zombie",
+        "204_CollapseAdd_CheckBox_Buckethead Zombie",
+        "205_CollapseAdd_CheckBox_Newspaper Zombie",
+        "206_CollapseAdd_CheckBox_Screen Door Zombie",
+        "207_CollapseAdd_CheckBox_Football Zombie",
+        "208_CollapseAdd_CheckBox_Dancing Zombie",
+        "211_CollapseAdd_CheckBox_Snorkel Zombie",
+        "212_CollapseAdd_CheckBox_Zomboni",
+        "214_CollapseAdd_CheckBox_Dolphin Rider Zombie",
+        "215_CollapseAdd_CheckBox_Jack-in-the-box Zombie",
+        "216_CollapseAdd_CheckBox_Ballon Zombie",
+        "217_CollapseAdd_CheckBox_Digger Zombie",
+        "218_CollapseAdd_CheckBox_Pogo Zombie",
+        "219_CollapseAdd_CheckBox_Zombie Yeti",
+        "220_CollapseAdd_CheckBox_Bungee Zombie",
+        "221_CollapseAdd_CheckBox_Ladder Zombie",
+        "222_CollapseAdd_CheckBox_Catapult Zombie",
+        "223_CollapseAdd_CheckBox_Gargantuar",
+        "233_CollapseAdd_CheckBox_Redeye Gargantuar",
+        "226_CollapseAdd_CheckBox_Trash Bin Zombie",
+        "227_CollapseAdd_CheckBox_Pea Head Zombie",
+        "228_CollapseAdd_CheckBox_Wall-nut Head Zombie",
+        "229_CollapseAdd_CheckBox_Jalapeno Head Zombie",
+        "230_CollapseAdd_CheckBox_Gatling Zombie",
+        "231_CollapseAdd_CheckBox_Squash Head Zombie",
+        "232_CollapseAdd_CheckBox_Tall-nut Head Zombie",
+        "234_CollapseAdd_CheckBox_All-Star Zombie",
+        "235_CollapseAdd_CheckBox_Super-Fan Imp Zombie",
+        "241_CollapseAdd_Spinner_<font color='green'>Chọn chế độ spawn：_Tắt,Tự nhiên (Zombie trong wave được game tự chọn),Cực độ (Điền đều zombie trong wave)",
+        "242_CollapseAdd_OnceCheckBox_Đặt spawn zombie",
+
+
+        "Collapse_Bố trí chiến trường",
+        "101_CollapseAdd_Toggle_Tự thêm thang khi trồng Pumpkin",
+        "105_CollapseAdd_Spinner_<font color='yellow'>Cột mục tiêu："
+        "_Cột 1,Cột 2,Cột 3,Cột 4,Cột 5,Cột 6,Cột 7,Cột 8,Cột 9,Tất cả các cột,Vị trí zombie sinh ra",
+        "106_CollapseAdd_Spinner_<font color='yellow'>Hàng mục tiêu：_Hàng 1,Hàng 2,Hàng 3,Hàng 4,Hàng 5,Hàng 6,Tất cả các hàng",
+        "103_CollapseAdd_Spinner_<font color='green'>Loại cây："
+        "_Chưa chọn,Peashooter,Sunflower,Cherry Bomb,Wall-nut,Potato Mine,Snow Pea,Chomper,Repeater,"
+        "Puff-shroom,Sun-shroom,Fume-shroom,Grave Buster,Hypno-shroom,Scaredy-shroom,Ice-shroom,Doom-shroom,"
+        "Lily Pad,Squash,Threepeater,Tangle Kelp,Jalapeno,Spikeweed,Torchwood,Tall-nut,"
+        "Sea-shroom,Plantern,Cactus,Blover,Split Pea,Starfruit,Pumpkin,Magnet-shroom,"
+        "Cabbage-pult,Flower Pot,Kernel-pult,Coffee Bean,Garlic,Umbrella Leaf,Marigold,Melon-pult,"
+        "Gatlingp Pea,Twin Sunflower,Gloom-shroom,Cattail,Winter Melon,Gold Magnet,Spikerock,Cob Cannon,"
+        "Explode-o-nut,Giant Wall-nut,Sprout,Leftpeater",
+        "107_CollapseAdd_CheckBox_Cây Imitater",
+        "108_CollapseAdd_OnceCheckBox_Thêm cây",
+        "104_CollapseAdd_Spinner_<font color='green'>Loại zombie："
+        "_Chưa chọn,Zombie,Flag Zombie,Conehead Zombie,Pole Vaulting Zombie,Buckethead Zombie,"
+        "Newspaper Zombie,Screen Door Zombie,Football Zombie,Dancing Zombie,Backup Dancer,"
+        "Ducky Tube Zombie,Snorkel Zombie,Zomboni,Zombie Bobsled Team,Dolphin Rider Zombie,"
+        "Jack-in-the-box Zombie,Ballon Zombie,Digger Zombie,Pogo Zombie,Zombie Yeti,"
+        "Bungee Zombie,Ladder Zombie,Catapult Zombie,Gargantuar,Imp,Dr. Zomboss,"
+        "Trash Bin Zombie,Pea Head Zombie,Wall-nut Head Zombie,Jalapeno Head Zombie,Gatling Zombie,Squash Head Zombie,Tall-nut Head Zombie,Redeye Gargantuar,"
+        "All-Star Zombie, Super-Fan Imp Zombie",
+        "109_CollapseAdd_OnceCheckBox_Thêm zombie",
+        "CollapseAdd_RichTextView_<font color='green'>Đối tượng khác:",
+        "114_CollapseAdd_OnceCheckBox_Thêm mộ đá",
+        "110_CollapseAdd_OnceCheckBox_Thêm thang",
+        "111_CollapseAdd_OnceCheckBox_Khôi phục tất cả máy cắt cỏ",
+        "CollapseAdd_RichTextView_<font color='yellow'>Xóa bỏ:",
+        "112_CollapseAdd_OnceCheckBox_Xóa tất cả cây",
+        "115_CollapseAdd_OnceCheckBox_Xóa tất cả zombie",
+        "116_CollapseAdd_OnceCheckBox_Xóa tất cả mộ đá",
+        "113_CollapseAdd_OnceCheckBox_Xóa tất cả máy cắt cỏ",
+        "CollapseAdd_RichTextView_<font color='yellow'>Đặt trạng thái:",
+        "9_CollapseAdd_OnceCheckBox_Thôi miên tất cả zombie",
+        "10_CollapseAdd_OnceCheckBox_Đóng băng tất cả zombie",
+        "11_CollapseAdd_OnceCheckBox_Kích hoạt tất cả máy cắt cỏ",
+
+
+        "Collapse_Bố trí nhanh",
+        "121_CollapseAdd_Spinner_<font color='green'>Chọn đội hình cho Pool：_Chưa chọn,"
+        "[0]Radio Clock Cobless,[1]Minimalist Cobless,[2]Pseudo-Unharmed Cobless,[3]Automatically Subdue Jack-in-the-box Cobless,[4]Fiery Cobless,"
+        "[5]Split Fiery Cobless,[6]Rear Cobless,[7]Super Forward Cobless,[8]Prince Cobless,[9]Mechanical Clock Cobless,"
+        "[10]Sideless Cobless,[11]Quartz Clock Cobless,[12]Sunflowerless Cobless,[13]Square Gloomless Cobless,[14]56 Row Accelerated Gloomless Cobless,"
+        "[15]1 Cob Suppression,[16]Little ② Cob,[17]Fiery 2 Cob,[18]Nuclear 2 Cob,[19]Split 2 Cob,"
+        "[20]Square 2 Cob,[21]Classic 2 Cob,[22]Speedrun 3 Cob,[23]Tai Chi 4 Cob,[24]Metallic 4 Cob,"
+        "[25]Square 4 Cob,[26]Verdant 4 Cob,[27]Waterless 4 Cob,[28]Diamond 4 Cob,[29]Sideless 4 Cob,"
+        "[30]Nuclear Back 4 Cob,[31]Classic 4 Cob,[32]Fiery 4 Cob,[33]Back 4 Cob,[34]Traditional 4 Cob,"
+        "[35]Half 5 Cob,[36]Scattershot 5 Cob,[37]Heart 5 Cob,[38]Landless 6 Cob,[39]Waterless 6 Cob,"
+        "[40]Verdant 6 Cob,[41]Zen Room Deep in Flowers and Plants,[42]Sideless 6 Cob,[43]Kernel 6 Cob,[44]Air Bomb 6 Cob,"
+        "[45]Super Rear 6 Cob,[46]Square 6 Cob,[47]Butterfly Rhyme,[48]A Spoonful of Sweet Soup Balls,[49]Separated 7 Cob,"
+        "[50]Jade Rabbit,[51]Pumpkinless 8 Cob,[52]Christmas Tree 8 Cob,[53]Centered Christmas Tree 8 Cob,[54]Rectangular 8 Cob,"
+        "[55]Sideless 8 Cob,[56]Yin and Yang 8 Cob,[57]Duckweed 8 Cob,[58]Rear 8 Cob,[59]To Feed a Dolphin,"
+        "[60]Kernel 8 Cob,[61]Classic 8 Cob,[62]Sea of Flowers 8 Cob,[63]C2 8 Cob,[64]Separation 8 Cob,"
+        "[65]Full-Symmetrical 8 Cob,[66]3C 8 Cob,[67]Lampstand 8 Cob,[68]⑨ Cob,[69]Square 9 Cob,"
+        "[70]C6i 9 Cob,[71]Heart 9 Cob,[72]Alternate 9 Cob,[73]② Cob,[74]Hexagram 10 Cob,"
+        "[75]Hexagon 10 Cob,[76]Square 10 Cob,[77]Diamond 10 Cob,[78]Simplified 10 Cob,[79]Rear 10 Cob,"
+        "[80]Classic 10 Cob,[81]To Imprison 6 Zombies,[82]Diagonal 10 Cob,[83]Rubik's Cube 10 Cob,[84]Dave's Hamburger,"
+        "[85]Cocktail,[86]A Spoonful of Sweet Soup Balls 12 Cob,[87]Porcelain Vase 12 Cob,[88]Half 12 Cob,[89]Simplified 12 Cob,"
+        "[90]Classic 12 Cob,[91]Fiery 12 Cob,[92]Ice Rain 12 Cob (remodelled),[93]Ice Rain 12 Cob (remodelled x2),[94]Single Purple Card 12 Cob,"
+        "[95]Sideless Column 12 Cob,[96]Sideless 12 Cob,[97]Waterless 12 Cob,[98]Pure White Card Impending 12 Cob,[99]Backyard 12 Cob,"
+        "[100]Kernel 8 Cob,[101]Two Row Accelerated 12 Cob,[102]Front 12 Cob,[103]Ladder & Gloom-shroom 12 Cob,[104]Jun Hai 12 Cob,"
+        "[105]A Poem for The Harp,[106]Plum Blossom 13 Cob,[107]Last Order,[108]Ice Lantern 14 Cob,[109]Tai Chi 14 Cob,"
+        "[110]Real ④ Cob,[111]God Stick 14 Cob,[112]Sideless 14 Cob,[113]Timeslip 14 Cob,[114]Diamond 15 Cob,"
+        "[115]Sideless 15 Cob,[116]Real ② Cob,[117]Icebox 16 Cob,[118]Cob Ring 12 Sunflower,[119]Single Ice 16 Cob,"
+        "[120]Symmetrical 16 Cob,[121]Sideless 16 Cob,[122]Streaking 16 Cob,[123]Double Ice 16 Cob,[124]Super Forward 16 Cob,"
+        "[125]Fiery 16 Cob,[126]Classic 16 Cob,[127]Zigzag Line 16 Cob,[128]Lung 18 Cob (extreme),[129]Pure 18 Cob,"
+        "[130]Real 18 Cob,[131]Ice Soul 18 Cob,[132]Tail Bomb 18 Cob,[133]Classic 18 Cob,[134]Pure 20 Cob,"
+        "[135]Air Bomb 20 Cob,[136]Rake 20 Cob,[137]New 20 Cob,[138]Winter-melonless 20 Cob,[139]The Road of Despair,"
+        "[140]21 Cob,[141]New 22 Cob,[142]22 Cob,[143]Winter-melonless 22 Cob,[144]Front 22 Cob,"
+        "[145]24 Cob,[146]Cannon Fodder 24 Cob,[147]Scaredy-shroom Protecter (extreme)",
+        "122_CollapseAdd_OnceCheckBox_Triển khai đội hình",
+        "CollapseAdd_RichTextView_<font color='green'>Xuất/Nhập đội hình:",
+        "123_CollapseAdd_FormationCopy_Sao chép mã đội hình",
+        "124_CollapseAdd_InputText_Dán mã đội hình",
+        "125_CollapseAdd_OnceCheckBox_Triển khai đội hình",
+        "CollapseAdd_RichTextView_<font color='yellow'># Bạn có thể triển khai đội hình khi đang tạm dừng",
+    };
+
+    static_assert(CheckList(settingsList));
+    static_assert(CheckList(featureList));
+} // namespace vi_VN
+
 } // namespace cheat
 
 #endif // PVZ_CHEAT_H

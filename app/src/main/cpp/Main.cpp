@@ -487,8 +487,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_android_support_Preferences_Changes(J
 extern "C" JNIEXPORT jobjectArray JNICALL Java_com_android_support_CkHomuraMenu_GetFeatureList(JNIEnv *env, jobject thiz) {
     const std::string language = homura::GetLocaleLanguage(env);
     const auto &featureList =                            //
-        (language == "zh") ? cheat::zh_Hans::featureList //
-                           : cheat::en_US::featureList;  //
+        (language == "vi") ? cheat::vi_VN::featureList   //
+        : (language == "zh") ? cheat::zh_Hans::featureList //
+                             : cheat::en_US::featureList;
 
     const jsize featuresCount = static_cast<jsize>(featureList.size());
     jobjectArray ret = env->NewObjectArray(featuresCount, env->FindClass("java/lang/String"), nullptr);
@@ -501,8 +502,9 @@ extern "C" JNIEXPORT jobjectArray JNICALL Java_com_android_support_CkHomuraMenu_
 extern "C" JNIEXPORT jobjectArray JNICALL Java_com_android_support_CkHomuraMenu_SettingsList(JNIEnv *env, jobject thiz) {
     const std::string language = homura::GetLocaleLanguage(env);
     const auto &settingsList =                            //
-        (language == "zh") ? cheat::zh_Hans::settingsList //
-                           : cheat::en_US::settingsList;  //
+        (language == "vi") ? cheat::vi_VN::settingsList   //
+        : (language == "zh") ? cheat::zh_Hans::settingsList //
+                             : cheat::en_US::settingsList;
 
     const jsize settingsCount = static_cast<jsize>(settingsList.size());
     jobjectArray ret = env->NewObjectArray(settingsCount, env->FindClass("java/lang/String"), nullptr);
