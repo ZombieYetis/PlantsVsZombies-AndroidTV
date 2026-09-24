@@ -2148,10 +2148,10 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
 }
 
 void Plant::Die() {
-    if (IsRemoteClientOrViewer())
-        return;
-
     if (mApp->mGameScene == SCENE_PLAYING) {
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
         if (IsRemoteServer()) {
             U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_DIE}, uint16_t(mBoard->mPlants.DataArrayGetID(this))};
             netplay::PutEvent(event);

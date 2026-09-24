@@ -51,10 +51,10 @@ void GridItem::_constructor() {
 }
 
 void GridItem::GridItemDie() {
-    if (IsRemoteClientOrViewer())
-        return;
-
     if (mApp->mGameScene == SCENE_PLAYING) {
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
         if (IsRemoteServer()) {
             U16_Event event = {{EventType::EVENT_SERVER_BOARD_GRIDITEM_DIE}, uint16_t(mBoard->mGridItems.DataArrayGetID(this))};
             netplay::PutEvent(event);

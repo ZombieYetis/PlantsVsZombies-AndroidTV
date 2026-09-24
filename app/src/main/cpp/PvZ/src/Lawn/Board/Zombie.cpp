@@ -6303,10 +6303,10 @@ void Zombie::DieNoLoot() {
         return;
     }
 
-    if (IsRemoteClientOrViewer())
-        return;
-
     if (mApp->mGameScene == SCENE_PLAYING) {
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
         if (IsRemoteServer()) {
             U16_Event event = {{EventType::EVENT_SERVER_BOARD_ZOMBIE_DIE}, uint16_t(mBoard->mZombies.DataArrayGetID(this))};
             netplay::PutEvent(event);
