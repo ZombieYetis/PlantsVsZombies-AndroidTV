@@ -334,7 +334,7 @@ void GridItem::Update() {
         UpdatePole();
     }
 
-    if (mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
+    if ((mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) && mApp->mGameScene == SCENE_PLAYING) {
         UpdateMPGraveStone();
         return;
     }
@@ -360,7 +360,7 @@ void GridItem::Update() {
 }
 
 void GridItem::UpdateMPGraveStone() {
-    if (!mApp->IsVSMode() || mApp->mGameScene != SCENE_PLAYING) {
+    if (!mApp->IsVSMode()) {
         return;
     }
 
