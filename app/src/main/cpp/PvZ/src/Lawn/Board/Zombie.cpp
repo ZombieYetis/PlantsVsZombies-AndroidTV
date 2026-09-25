@@ -1984,8 +1984,9 @@ void Zombie::UpdateZombieJackson() {
     } else if (mZombiePhase == ZombiePhase::PHASE_DANCER_SNAPPING_FINGERS) {
         Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
         if (aBodyReanim->mLoopCount > 0) {
+            mApp->PlayFoley(FoleyType::FOLEY_DANCER);
             SummonBackupDancers();
-            mBoard->SetDanceMode(true);
+            mBoard->SetJacksonDanceMode(true);
             mZombiePhase = ZombiePhase::PHASE_DANCER_SNAPPING_FINGERS_HOLD;
             mPhaseCounter = 200;
         }
@@ -2130,7 +2131,7 @@ void Zombie::JacksonDie() {
         return;
 
     if (!mBoard->GetAliveJacksonZombie()) {
-        mBoard->SetDanceMode(false);
+        mBoard->SetJacksonDanceMode(false);
         msDeadFollowers.clear();
     }
     mApp->mSoundSystem->StopFoley(FoleyType::FOLEY_DANCER);
@@ -8214,7 +8215,8 @@ void Zombie::StartWalkAnim(int theBlendTime) {
         PlayZombieReanim("anim_walk_nopaper", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
     } else if (mInPool && mZombieHeight != ZombieHeight::HEIGHT_IN_TO_POOL && mZombieHeight != ZombieHeight::HEIGHT_OUT_OF_POOL && aBodyReanim->TrackExists("anim_swim")) {
         PlayZombieReanim("anim_swim", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
-    } else if ((mZombieType == ZombieType::ZOMBIE_NORMAL || mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE || mZombieType == ZombieType::ZOMBIE_PAIL) && mBoard->mDanceMode) {
+    } else if ((mZombieType == ZombieType::ZOMBIE_NORMAL || mZombieType == ZombieType::ZOMBIE_TRAFFIC_CONE || mZombieType == ZombieType::ZOMBIE_PAIL)
+               && (mBoard->mDanceMode || mBoard->mJacksonDanceMode)) {
         PlayZombieReanim("anim_dance", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
     } else if (mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PRE_VAULT) { // 修复撑杆僵尸被蹦极空投落地后动画异常
         PlayZombieReanim("anim_run", ReanimLoopType::REANIM_LOOP, 0, 0.0f);
@@ -8332,7 +8334,7 @@ void Zombie::StartMindControlled_Origin() {
     }
 
     if (mZombieType == ZombieType::ZOMBIE_JACKSON && !mBoard->GetLiveZombieByType(ZombieType::ZOMBIE_JACKSON)) {
-        mBoard->SetDanceMode(false);
+        mBoard->SetJacksonDanceMode(false);
         msDeadFollowers.clear();
     }
 }

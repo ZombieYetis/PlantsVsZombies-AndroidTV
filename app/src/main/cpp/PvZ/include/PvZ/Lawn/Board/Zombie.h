@@ -485,6 +485,9 @@ public:
     int TakeShieldDamage(int theDamage, unsigned int theDamageFlags);
     void AttachShield();
     void PlayZombieReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate);
+    void EnableDanceMode(bool theEnableDance) {
+        reinterpret_cast<void (*)(Zombie *, bool)>(Zombie_EnableDanceModeAddr)(this, theEnableDance);
+    }
     void StartWalkAnim(int theBlendTime);
     void ReanimShowPrefix(const char *theTrackPrefix, int theRenderGroup);
     void ReanimShowTrack(const char *theTrackName, int theRenderGroup);

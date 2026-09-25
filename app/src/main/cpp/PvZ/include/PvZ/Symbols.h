@@ -494,6 +494,7 @@ inline void *Zombie_CanBeFrozenAddr;
 inline void *Zombie_StopEatingAddr;
 inline void *Zombie_DropArmAddr;
 inline void *Zombie_PlayZombieReanimAddr;
+inline void *Zombie_EnableDanceModeAddr;
 inline void *Zombie_SetupReanimLayersAddr;
 inline void *Zombie_SetupShieldReanimsAddr;
 inline void *Zombie_UpdateReanimAddr;

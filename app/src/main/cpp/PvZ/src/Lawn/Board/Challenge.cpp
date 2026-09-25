@@ -96,10 +96,7 @@ void Challenge::_constructor() {
         mSuddenDeathStartTick = -1;
         mPauseStartTick = -1;
         Zombie::msDeadFollowers.clear();
-        if (mBoard->mDanceMode) {
-            mBoard->mDanceMode = false;
-            mApp->mDanceMode = false;
-        }
+        mBoard->mJacksonDanceMode = false;
 
         if (Challenge::msVSShuffleMode) {
             if (!gOpeningEncounter) {

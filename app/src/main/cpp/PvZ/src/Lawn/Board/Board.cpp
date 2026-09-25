@@ -8047,3 +8047,14 @@ void Board::DoChillyFwoosh(int theRow, float theX, float theY) {
     aChiloosh->mLoopType = ReanimLoopType::REANIM_PLAY_ONCE_FULL_LAST_FRAME;
     mFwooshCountDown = 100;
 }
+
+void Board::SetJacksonDanceMode(bool theEnableDance) {
+    mJacksonDanceMode = theEnableDance;
+
+    Zombie *aZombie = nullptr;
+    while (IterateZombies(aZombie)) {
+        if (!aZombie->mDead) {
+            aZombie->EnableDanceMode(theEnableDance);
+        }
+    }
+}

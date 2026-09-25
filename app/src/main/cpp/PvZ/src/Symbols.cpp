@@ -493,6 +493,7 @@ bool LoadGameMain() {
     Zombie_StopEatingAddr = libGameMain.GetSymbol("_ZN6Zombie10StopEatingEv");
     Zombie_DropArmAddr = libGameMain.GetSymbol("_ZN6Zombie7DropArmEj");
     Zombie_PlayZombieReanimAddr = libGameMain.GetSymbol("_ZN6Zombie16PlayZombieReanimEPKc14ReanimLoopTypeif");
+    Zombie_EnableDanceModeAddr = libGameMain.GetSymbol("_ZN6Zombie15EnableDanceModeEb");
     Zombie_SetupReanimLayersAddr = libGameMain.GetSymbol("_ZN6Zombie17SetupReanimLayersEP11Reanimation10ZombieType");
     Zombie_SetupShieldReanimsAddr = libGameMain.GetSymbol("_ZN6Zombie18SetupShieldReanimsE10ZombieTypeP11Reanimation");
     Zombie_UpdateReanimAddr = libGameMain.GetSymbol("_ZN6Zombie12UpdateReanimEv");
