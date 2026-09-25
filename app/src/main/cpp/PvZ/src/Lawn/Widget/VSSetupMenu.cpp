@@ -230,6 +230,12 @@ void VSSetupMenu::DrawOverlay(Graphics *g) {
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
+                case VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft: {
+                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_REMIND_HOST_FMT]");
+                    pvzstl::string opt = TodStringTranslate("[VS_UI_TIMED_DRAFT]");
+                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
+                    break;
+                }
                 case VSSetupAddonWidget::VSSetupAddonWidget_PlantAI: {
                     pvzstl::string fmt = TodStringTranslate("[VS_TIP_REMIND_HOST_FMT]");
                     pvzstl::string opt = TodStringTranslate((!mAddonWidget->mPlantAIMode) ? "[VS_OPT_ENABLE_PLANT_AI]" : "[VS_OPT_DISABLE_PLANT_AI]");
@@ -323,6 +329,12 @@ void VSSetupMenu::DrawOverlay(Graphics *g) {
                 case VSSetupAddonWidget::VSSetupAddonWidget_BalancePatch: {
                     pvzstl::string fmt = TodStringTranslate("[VS_TIP_OPPONENT_WANTS_GET_FMT]");
                     pvzstl::string opt = TodStringTranslate((!mAddonWidget->mBalancePatchMode) ? "[VS_OPT_ENABLE_BALANCE_PATCH]" : "[VS_OPT_DISABLE_BALANCE_PATCH]");
+                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
+                    break;
+                }
+                case VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft: {
+                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_OPPONENT_WANTS_GET_FMT]");
+                    pvzstl::string opt = TodStringTranslate("[VS_UI_TIMED_DRAFT]");
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
@@ -772,6 +784,9 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
             auto seedType = SeedType(event1->data[0]);
             bool isZombieChooser = event1->data[1] != 0;
             const uint8_t cursorFlags = event1->data[2];
+            if ((cursorFlags & SeedChooserScreen::kBanTimeoutSkipEventFlag) != 0) {
+                break;
+            }
             bool moveOnly = (cursorFlags & SeedChooserScreen::kCursorMoveOnlyEventFlag) != 0;
             int syncedPageIndex = (cursorFlags & SeedChooserScreen::kCursorPageOneEventFlag) != 0 ? 1 : 0;
             SeedChooserScreen *seedChooser = (isZombieChooser ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen);
@@ -934,10 +949,17 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
             auto seedType = SeedType(event1->data[0]);
             bool isZombieChooser = event1->data[1] != 0;
             const uint8_t cursorFlags = event1->data[2];
+            const bool banTimeoutSkip = (cursorFlags & SeedChooserScreen::kBanTimeoutSkipEventFlag) != 0;
             bool moveOnly = (cursorFlags & SeedChooserScreen::kCursorMoveOnlyEventFlag) != 0;
             int syncedPageIndex = (cursorFlags & SeedChooserScreen::kCursorPageOneEventFlag) != 0 ? 1 : 0;
             SeedChooserScreen *seedChooser = (isZombieChooser ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen);
             if (seedChooser == nullptr) {
+                break;
+            }
+            if (banTimeoutSkip) {
+                if (event->type == EVENT_SERVER_SEEDCHOOSER_BAN_SEED) {
+                    seedChooser->SkipTimedBan();
+                }
                 break;
             }
             if (isZombieChooser) {
@@ -1056,6 +1078,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtendedSeeds, eventButtonInit->data2, false);
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BanMode, eventButtonInit->data3, false);
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BalancePatch, eventButtonInit->data4, false);
+            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft, eventButtonInit->data5, false);
             U8_Event eventState = {{EventType::EVENT_CLIENT_VSSETUP_SEND_NAME_STATE}, mApp->mPlayerInfo->mVSResultsSendPlayerName};
             netplay::PutEvent(eventState);
         } break;
@@ -1135,6 +1158,7 @@ void VSSetupMenu::OnStateEnter(VSSetupState theState) {
                 mAddonWidget->mExtendedSeedsMode,
                 mAddonWidget->mBanMode,
                 mAddonWidget->mBalancePatchMode,
+                mAddonWidget->mTimedDraftMode,
                 // Keep the B1x8 payload layout compatible. Builtin AI
                 // preferences are local-only and intentionally stay zero.
             };
@@ -1315,6 +1339,7 @@ void VSSetupMenu::ButtonDepress_Origin(int theId) {
                     mAddonWidget->SetDisable(mAddonWidget->mBanModeCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mBalancePatchCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mAISettingsButton);
+                    mAddonWidget->SetDisable(mAddonWidget->mTimedDraftCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mBackButton);
                     mAddonWidget->mDrawString = false;
                     //                    PickBackgroundImmediately();

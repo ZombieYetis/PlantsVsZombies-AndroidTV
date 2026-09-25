@@ -98,6 +98,9 @@ private:
 public:
     static constexpr uint8_t kCursorMoveOnlyEventFlag = 0x01;
     static constexpr uint8_t kCursorPageOneEventFlag = 0x02;
+    static constexpr uint8_t kBanTimeoutSkipEventFlag = 0x04;
+    static constexpr int kPickCountdownSeconds = 45;
+    static constexpr int kBanCountdownSeconds = 30;
 
     enum SeedDir {
         SEED_DIR_UP,
@@ -153,6 +156,8 @@ public:
     bool mGlobalBpBansApplied = false;
     ChosenSeed mChosenSeedsExtended[NUM_SEED_TYPES_EXTENDED]{};
     GameButton *mMainMenuButton = nullptr;
+    int mTimedDraftTicksRemaining = 0;
+    bool mTimedDraftWasActive = false;
 
     SeedChooserScreen(bool theIsZombieChooser) {
         _constructor(theIsZombieChooser);
@@ -223,6 +228,10 @@ public:
     void CrazyDavePickSeeds();
     void OnStartButton();
     void Update();
+    void UpdateTimedDraftCountdown();
+    void ResetTimedDraftCountdown();
+    void HandleTimedDraftTimeout();
+    void SkipTimedBan();
     void UpdateBuiltinAIPick();
     void UpdateImitaterButton();
     void UpdateCursor();
@@ -244,6 +253,7 @@ public:
     void ShowToolTip(int thePlayerIndex);
     int GetNextSeedInDir(int theNumSeed, SeedDir theMoveDirection);
     void Draw(Sexy::Graphics *g);
+    void DrawTimedDraftCountdown(Sexy::Graphics *g);
     void DrawBanIcon(Sexy::Graphics *g);
     void SetPageIndex(int thePageIndex);
     SeedType SeedHitTest(int x, int y);

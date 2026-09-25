@@ -74,6 +74,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     mAIEnhancementMode = mApp->mPlayerInfo->mVSAIEnhancementMode;
     mAIDraftDisabledMode = mApp->mPlayerInfo->mVSAIDraftDisabledMode;
     mAITemplateDeckDisabledMode = mApp->mPlayerInfo->mVSAITemplateDeckDisabledMode;
+    mTimedDraftMode = mApp->mPlayerInfo->mVSTimedDraftMode;
     msBalancePatchMode = mBalancePatchMode;
     msExtraPacketMode = mExtraPacketMode;
     msExtendedSeedsMode = mExtendedSeedsMode;
@@ -82,6 +83,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     msAIEnhancementMode = mAIEnhancementMode;
     msAIDraftDisabledMode = mAIDraftDisabledMode;
     msAITemplateDeckDisabledMode = mAITemplateDeckDisabledMode;
+    msTimedDraftMode = mTimedDraftMode;
 
     mExtraPacketCheckbox = MakeNewCheckbox(VSSetupAddonWidget_ExtraPacket, this, theVSSetupMenu, mExtraPacketMode);
     mExtendedSeedsCheckbox = MakeNewCheckbox(VSSetupAddonWidget_ExtendedSeeds, this, theVSSetupMenu, mExtendedSeedsMode);
@@ -89,23 +91,28 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     mBalancePatchCheckbox = MakeNewCheckbox(VSSetupAddonWidget_BalancePatch, this, theVSSetupMenu, mBalancePatchMode);
     mAISettingsButton = MakeButton(VSSetupAddonWidget_AISettings, mButtonListener, theVSSetupMenu, "[VS_UI_AI_SETTINGS]");
     mAISettingsButton->mDrawStoneButton = true;
+    mTimedDraftCheckbox = MakeNewCheckbox(VSSetupAddonWidget_TimedDraft, this, theVSSetupMenu, mTimedDraftMode);
 
     mBoard->AddWidget(mExtraPacketCheckbox);
     mBoard->AddWidget(mExtendedSeedsCheckbox);
     mBoard->AddWidget(mBanModeCheckbox);
     mBoard->AddWidget(mBalancePatchCheckbox);
     mBoard->AddWidget(mAISettingsButton);
+    mBoard->AddWidget(mTimedDraftCheckbox);
 
     mExtraPacketCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_EXTRA_PACKET_Y, 175, 50);
     mExtendedSeedsCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_EXTENDED_SEEDS_Y, 175, 50);
     mBanModeCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_BAN_MODE_Y, 175, 50);
     mBalancePatchCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_BALANCE_PATCH_Y, 175, 50);
     mAISettingsButton->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_AI_SETTINGS_Y, 175, 50);
+    mTimedDraftCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_AI_SETTINGS_Y, 175, 50);
 
     UpdateGlobalBpButtonState();
 
     if (IsOnlineModeActive()) {
         SetDisable(mAISettingsButton);
+    } else {
+        SetDisable(mTimedDraftCheckbox);
     }
 
     if (Challenge::msVSShuffleMode) {
@@ -114,6 +121,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
         SetDisable(mBanModeCheckbox);
         SetDisable(mBalancePatchCheckbox);
         SetDisable(mAISettingsButton);
+        SetDisable(mTimedDraftCheckbox);
         SetDisable(mGlobalBpButton);
         mBanMode = false;
     }
@@ -140,6 +148,9 @@ VSSetupAddonWidget::~VSSetupAddonWidget() {
         if (mAISettingsButton) {
             mBoard->RemoveWidget(mAISettingsButton);
         }
+        if (mTimedDraftCheckbox) {
+            mBoard->RemoveWidget(mTimedDraftCheckbox);
+        }
         if (mGlobalBpButton) {
             mBoard->RemoveWidget(mGlobalBpButton);
         }
@@ -151,6 +162,7 @@ VSSetupAddonWidget::~VSSetupAddonWidget() {
     delete mBanModeCheckbox;
     delete mBalancePatchCheckbox;
     delete mAISettingsButton;
+    delete mTimedDraftCheckbox;
     delete mGlobalBpButton;
 }
 
@@ -231,7 +243,7 @@ void VSSetupAddonWidget::ButtonDepress(this VSSetupAddonWidget &self, int theId)
 }
 
 void VSSetupAddonWidget::CheckboxChecked(int theId, bool checked) {
-    if (theId < VSSetupAddonWidget_ExtraPacket || theId > VSSetupAddonWidget_AITemplateDeckDisabled) {
+    if ((theId < VSSetupAddonWidget_ExtraPacket || theId > VSSetupAddonWidget_AITemplateDeckDisabled) && theId != VSSetupAddonWidget_TimedDraft) {
         return;
     }
     // AI settings are intentionally local-only. They configure the local
@@ -283,6 +295,8 @@ bool VSSetupAddonWidget::GetAddonMode(int theId) const {
             return mAIDraftDisabledMode;
         case VSSetupAddonWidget_AITemplateDeckDisabled:
             return mAITemplateDeckDisabledMode;
+        case VSSetupAddonWidget_TimedDraft:
+            return mTimedDraftMode;
         default:
             return false;
     }
@@ -365,6 +379,14 @@ void VSSetupAddonWidget::SetAddonMode(int theId, bool checked, bool saveDetails)
                 mApp->mPlayerInfo->mVSAITemplateDeckDisabledMode = mAITemplateDeckDisabledMode;
             }
             break;
+        case VSSetupAddonWidget_TimedDraft:
+            mTimedDraftMode = checked;
+            mTimedDraftCheckbox->SetChecked(mTimedDraftMode, false);
+            msTimedDraftMode = mTimedDraftMode;
+            if (saveDetails) {
+                mApp->mPlayerInfo->mVSTimedDraftMode = mTimedDraftMode;
+            }
+            break;
         default:
             break;
     }
@@ -401,6 +423,10 @@ void VSSetupAddonWidget::Draw(Graphics *g) const {
     if (mBalancePatchCheckbox->mVisible) {
         g->SetColor(mBalancePatchMode ? Color(255, 255, 153) : Color(0, 205, 0, 255));
         g->DrawString(TodStringTranslate("[VS_UI_BALANCE_PATCH]"), VS_ADDON_BUTTON_X + 40, VS_BUTTON_BALANCE_PATCH_Y + 25);
+    }
+    if (mTimedDraftCheckbox->mVisible) {
+        const Color labelColor = mTimedDraftMode ? Color(255, 255, 153) : Color(0, 205, 0, 255);
+        TodDrawString(g, "[VS_UI_TIMED_DRAFT]", VS_ADDON_BUTTON_X + 40, VS_BUTTON_AI_SETTINGS_Y + 25, Sexy::FONT_DWARVENTODCRAFT18, labelColor, DS_ALIGN_LEFT);
     }
 }
 

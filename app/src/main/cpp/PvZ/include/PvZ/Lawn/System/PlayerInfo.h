@@ -113,7 +113,8 @@ public:
     bool mVSAIEnhancementMode;
     bool mVSAIDraftDisabledMode;
     bool mVSAITemplateDeckDisabledMode;
-    bool mUnused675[64];
+    bool mVSTimedDraftMode;
+    bool mUnused676[63];
     bool mHapticFeedbackEnabled;
     bool mZombatarEnabled;
     unsigned char mZombatarHat;

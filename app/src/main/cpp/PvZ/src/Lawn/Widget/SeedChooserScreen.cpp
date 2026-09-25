@@ -40,6 +40,7 @@
 #include "PvZ/SexyAppFramework/SexyAppBase.h"
 #include "PvZ/Symbols.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
+#include "PvZ/TodLib/Effect/Reanimator.h"
 
 #include <unistd.h>
 
@@ -1741,6 +1742,8 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
     mDimCounter = 0;
     mOpeningDialog = false;
     mSeedChooserAge = 0;
+    mTimedDraftTicksRemaining = 0;
+    mTimedDraftWasActive = false;
 
     if (!repickSeeds.empty()) {
         // 实现无尽模式保留上次选卡。为什么不直接像WP版那样一一对应地选卡呢？因为玩家有可能通过爆炸坚果修改卡槽选中了多个相同类型的卡片或不在SeedChooser内的卡片，一一对应的话会有BUG
@@ -1986,10 +1989,127 @@ void SeedChooserScreen::UpdateBuiltinAIPick() {
     mMouseVisible = mouseWasVisible;
 }
 
+void SeedChooserScreen::ResetTimedDraftCountdown() {
+    const int seconds = mBanningPhase ? kBanCountdownSeconds : kPickCountdownSeconds;
+    mTimedDraftTicksRemaining = seconds * MP_SUDDEN_DEATH_TICKS_PER_SECOND;
+    mTimedDraftWasActive = false;
+}
+
+void SeedChooserScreen::SkipTimedBan() {
+    if (!mBanningPhase || mSeedsInBanned >= mNumBanPackets) {
+        return;
+    }
+
+    ++mSeedsInBanned;
+
+    bool banRoundFinished = false;
+    SeedChooserScreen *plantChooser = mApp->mSeedChooserScreen;
+    SeedChooserScreen *zombieChooser = mApp->mZombieChooserScreen;
+    if (plantChooser != nullptr && zombieChooser != nullptr && plantChooser->mSeedsInBanned >= plantChooser->mNumBanPackets && zombieChooser->mSeedsInBanned >= zombieChooser->mNumBanPackets) {
+        plantChooser->mBanningPhase = false;
+        zombieChooser->mBanningPhase = false;
+        banRoundFinished = true;
+    }
+
+    int gamepadIndex = mApp->PlayerToGamepadIndex(mPlayerIndex);
+    if (gamepadIndex < 0 || gamepadIndex > 1) {
+        gamepadIndex = mPlayerIndex;
+    }
+    OnPlayerPickedSeed(gamepadIndex);
+    if (banRoundFinished && mIsZombieChooser) {
+        OnPlayerPickedSeed(gamepadIndex);
+    }
+}
+
+void SeedChooserScreen::HandleTimedDraftTimeout() {
+    if (!IsRemoteServer() || !CanPickNow()) {
+        return;
+    }
+
+    if (mBanningPhase) {
+        U8x3_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BAN_SEED}, {0, uint8_t(mIsZombieChooser), kBanTimeoutSkipEventFlag}};
+        netplay::PutEvent(event);
+        SkipTimedBan();
+        return;
+    }
+
+    std::vector<int> candidates;
+    candidates.reserve(GetSeedStorageCount());
+    for (int seedIndex = 0; seedIndex < GetSeedStorageCount(); ++seedIndex) {
+        ChosenSeed &chosenSeed = GetChosenSeed(seedIndex);
+        const SeedType seedType = mIsZombieChooser ? GetZombieSeedType(seedIndex) : GetPlantSeedType(seedIndex);
+        if (seedType == SeedType::SEED_NONE || !HasPacket(seedType, mIsZombieChooser) || chosenSeed.mSeedState != ChosenSeedState::SEED_IN_CHOOSER || SeedNotAllowedToPick(seedType)
+            || SeedNotAllowedDuringTrial(seedType)) {
+            continue;
+        }
+        candidates.push_back(seedIndex);
+    }
+
+    if (candidates.empty()) {
+        mTimedDraftTicksRemaining = MP_SUDDEN_DEATH_TICKS_PER_SECOND;
+        return;
+    }
+
+    const int seedIndex = candidates[Sexy::Rand(int(candidates.size()))];
+    const int firstPageSeedCount = mIsZombieChooser ? GetZombieFirstPageSeedCount(this) : NUM_SEEDS_IN_CHOOSER;
+    const int pageIndex = seedIndex >= firstPageSeedCount ? 1 : 0;
+    const int pageSeedIndex = seedIndex - (pageIndex == 1 ? firstPageSeedCount : 0);
+    SetPageIndex(pageIndex);
+
+    int seedX = 0;
+    int seedY = 0;
+    GetSeedPositionInChooser(pageSeedIndex, seedX, seedY);
+    if (mPlayerIndex == 0) {
+        mCursorPositionX1 = seedX;
+        mCursorPositionY1 = seedY;
+        mSeedIndex1 = pageSeedIndex;
+    } else {
+        mCursorPositionX2 = seedX;
+        mCursorPositionY2 = seedY;
+        mSeedIndex2 = pageSeedIndex;
+    }
+
+    ChosenSeed &chosenSeed = GetChosenSeed(seedIndex);
+    const SeedType seedType = mIsZombieChooser ? GetZombieSeedType(seedIndex) : GetPlantSeedType(seedIndex);
+    chosenSeed.mSeedType = seedType;
+
+    const uint8_t cursorFlags = pageIndex == 1 ? kCursorPageOneEventFlag : 0;
+    U8x3_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_SELECT_SEED}, {uint8_t(seedType), uint8_t(mIsZombieChooser), cursorFlags}};
+    netplay::PutEvent(event);
+    ClickedSeedInChooser_Orgin(chosenSeed, mPlayerIndex);
+}
+
+void SeedChooserScreen::UpdateTimedDraftCountdown() {
+    const bool onlineSession = IsRemoteClient() || IsRemoteServer() || gIsServerModeSpectator || gIsReplayMode;
+    VSSetupMenu *setupMenu = mApp->mVSSetupMenu;
+    if (!onlineSession || !VSSetupAddonWidget::msTimedDraftMode || setupMenu == nullptr || setupMenu->mState != VSSetupMenu::VS_SETUP_STATE_CUSTOM_BATTLE) {
+        mTimedDraftWasActive = false;
+        return;
+    }
+
+    if (!CanPickNow()) {
+        mTimedDraftWasActive = false;
+        return;
+    }
+
+    if (!mTimedDraftWasActive) {
+        const int seconds = mBanningPhase ? kBanCountdownSeconds : kPickCountdownSeconds;
+        mTimedDraftTicksRemaining = seconds * MP_SUDDEN_DEATH_TICKS_PER_SECOND;
+        mTimedDraftWasActive = true;
+    }
+
+    if (mTimedDraftTicksRemaining > 0) {
+        --mTimedDraftTicksRemaining;
+    }
+    if (mTimedDraftTicksRemaining == 0 && IsRemoteServer()) {
+        HandleTimedDraftTimeout();
+    }
+}
 
 void SeedChooserScreen::Update() {
     Sexy::Widget::Update();
     mSeedChooserAge++;
+    UpdateTimedDraftCountdown();
 
     // 记录当前1P选卡是否选满
     if (mApp->IsCoopMode()) {
@@ -2462,8 +2582,15 @@ int SeedChooserScreen::GetSeedPacketIndex(int theSeedIndex) const {
 
 void SeedChooserScreen::OnPlayerPickedSeed(int thePlayerIndex) {
     VSSetupMenu *aVSSetupScreen = mApp->mVSSetupMenu;
-    if (aVSSetupScreen)
+    if (aVSSetupScreen) {
         aVSSetupScreen->OnPlayerPickedSeed(thePlayerIndex);
+        if (mApp->mSeedChooserScreen != nullptr) {
+            mApp->mSeedChooserScreen->ResetTimedDraftCountdown();
+        }
+        if (mApp->mZombieChooserScreen != nullptr) {
+            mApp->mZombieChooserScreen->ResetTimedDraftCountdown();
+        }
+    }
 }
 
 SeedType SeedChooserScreen::FindSeedInBank(int theIndexInBank, int thePlayerIndex) {
@@ -4567,7 +4694,35 @@ void SeedChooserScreen::Draw(Graphics *g) { // Early returns for dialogsif (mApp
     //        }
     //    }
 
+    DrawTimedDraftCountdown(g);
     DeferOverlay(0);
+}
+
+void SeedChooserScreen::DrawTimedDraftCountdown(Graphics *g) {
+    VSSetupMenu *setupMenu = mApp->mVSSetupMenu;
+    if (!VSSetupAddonWidget::msTimedDraftMode || setupMenu == nullptr || setupMenu->mState != VSSetupMenu::VS_SETUP_STATE_CUSTOM_BATTLE || !CanPickNow()) {
+        return;
+    }
+
+    Graphics timerGraphics(*g);
+    timerGraphics.mTransX = 0;
+    timerGraphics.mTransY = 0;
+
+    if (mBoard->mChallenge != nullptr) {
+        Reanimation *clockReanim = mApp->ReanimationTryToGet(mBoard->mChallenge->mReanimChallenge);
+        if (clockReanim != nullptr) {
+            clockReanim->Draw(&timerGraphics);
+        }
+    }
+
+    int remainingTicks = mTimedDraftTicksRemaining;
+    if (!mTimedDraftWasActive && remainingTicks <= 0) {
+        const int seconds = mBanningPhase ? kBanCountdownSeconds : kPickCountdownSeconds;
+        remainingTicks = seconds * MP_SUDDEN_DEATH_TICKS_PER_SECOND;
+    }
+    const int remainingSeconds = std::max(0, (remainingTicks + MP_SUDDEN_DEATH_TICKS_PER_SECOND - 1) / MP_SUDDEN_DEATH_TICKS_PER_SECOND);
+    const Color timerColor = remainingSeconds <= 10 ? Color(255, 0, 0) : Color::White;
+    TodDrawString(&timerGraphics, StrFormat("%d:%02d", remainingSeconds / 60, remainingSeconds % 60), 400, 620, Sexy::FONT_DWARVENTODCRAFT18, timerColor, DS_ALIGN_CENTER);
 }
 
 void SeedChooserScreen::SetPageIndex(int thePageIndex) {

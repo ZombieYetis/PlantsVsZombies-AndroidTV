@@ -58,6 +58,7 @@ public:
         VSSetupAddonWidget_AITemplateDeckDisabled = 22,
         VSSetupAddonWidget_AISettings = 23,
         VSSetupAddonWidget_AISettingsClose = 24,
+        VSSetupAddonWidget_TimedDraft = 25,
     };
 
     enum GlobalBpMode {
@@ -74,6 +75,7 @@ public:
     static inline bool msAIEnhancementMode = false;
     static inline bool msAIDraftDisabledMode = false;
     static inline bool msAITemplateDeckDisabledMode = false;
+    static inline bool msTimedDraftMode = false;
     static inline GlobalBpMode msGlobalBpMode = GlobalBpMode::GLOBALBP_CLOSED;
     static inline bool msGlobalBpSeedsInitialized = false;
     static inline int msGlobalBpWins[2] = {0, 0};
@@ -89,6 +91,7 @@ public:
     Sexy::Checkbox *mBanModeCheckbox = nullptr;
     Sexy::Checkbox *mBalancePatchCheckbox = nullptr;
     GameButton *mAISettingsButton = nullptr;
+    Sexy::Checkbox *mTimedDraftCheckbox = nullptr;
     AISettingsWidget *mAISettingsWidget = nullptr;
     bool mExtraPacketMode = false;
     bool mExtendedSeedsMode = false;
@@ -99,6 +102,7 @@ public:
     bool mAIEnhancementMode = false;
     bool mAIDraftDisabledMode = false;
     bool mAITemplateDeckDisabledMode = false;
+    bool mTimedDraftMode = false;
     bool mDrawString = true;
 
     VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu);
