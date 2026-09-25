@@ -857,7 +857,7 @@ void Zombie::UpdateZombieCrossingGuard() {
                 UnbindRealatedZombie();
             } else {
                 mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
-                mPhaseCounter = 1000;
+                mPhaseCounter = 500;
                 StartWalkAnim(10);
                 if (IsRemoteServer()) {
                     U16U16_Event event{};
@@ -883,7 +883,7 @@ void Zombie::UpdateZombieCrossingGuard() {
                 }
             }
             mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
-            mPhaseCounter = 1000;
+            mPhaseCounter = 1500;
             StartWalkAnim(10);
         }
         return;

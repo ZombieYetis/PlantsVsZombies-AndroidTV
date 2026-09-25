@@ -3089,7 +3089,7 @@ void Board::processServerEvent(const BaseEvent *event) {
                 Zombie *aThrower = mZombies.DataArrayGet(clientThrowerID);
                 if (eventFire->data2 == NETPLAY_ZOMBIE_ID_NULL) {
                     aThrower->mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
-                    aThrower->mPhaseCounter = 1000;
+                    aThrower->mPhaseCounter = 500;
                     aThrower->StartWalkAnim(10);
                 } else {
                     uint16_t clientTargetID = 0;

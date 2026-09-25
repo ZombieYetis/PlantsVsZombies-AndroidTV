@@ -576,7 +576,7 @@ void Plant::UpdateAbilities() {
 }
 
 void Plant::UpdateEndurian() {
-    static constexpr int kEndurianDamage = 20;
+    static constexpr int kEndurianDamage = 15;
     static constexpr int kEndurianDamageInterval = 100;
 
     Zombie *aZombie = mBoard->GetLadderAt(mPlantCol, mRow) == nullptr ? FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
@@ -2246,6 +2246,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_EXPLORER:
         case SeedType::SEED_ZOMBIE_DOGWALKER:
         case SeedType::SEED_ZOMBIE_TELEPORTATION:
+        case SeedType::SEED_ZOMBIE_CROSSING_GUARD:
         case SeedType::SEED_ZOMBIE_SCIENTIST:
             return 100;
         case SeedType::SEED_TORCHWOOD:
@@ -2258,7 +2259,6 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_DOLPHIN_RIDER:
         case SeedType::SEED_ZOMBIE_JALAPENO_HEAD:
         case SeedType::SEED_ZOMBIE_GATLINGPEA_HEAD:
-        case SeedType::SEED_ZOMBIE_CROSSING_GUARD:
             return 125;
         case SeedType::SEED_SNOWPEA:
         case SeedType::SEED_REPEATER:
