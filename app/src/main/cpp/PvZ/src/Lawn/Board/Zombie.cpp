@@ -937,7 +937,7 @@ bool Zombie::HasScientistTriggerTarget() {
 
     Zombie *aZombie = nullptr;
     while (mBoard->IterateZombies(aZombie)) {
-        if (aZombie == this || aZombie->IsDeadOrDying() || !mHasHead || !aZombie->IsOnBoard()) {
+        if (aZombie == this || aZombie->IsDeadOrDying() || !aZombie->mHasHead || !aZombie->IsOnBoard()) {
             continue;
         }
 
