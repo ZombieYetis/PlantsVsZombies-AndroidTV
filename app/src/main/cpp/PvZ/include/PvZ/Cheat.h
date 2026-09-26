@@ -43,7 +43,7 @@ consteval bool CheckList(const StringArray<N> &list) {
 }
 
 using SettingsList = StringArray<4>;
-using FeatureList = StringArray<123>;
+using FeatureList = StringArray<124>;
 
 namespace lang {
 
@@ -201,6 +201,7 @@ namespace lang {
             "112_CollapseAdd_OnceCheckBox_Remove All Plnats",
             "115_CollapseAdd_OnceCheckBox_Remove All Zombies",
             "116_CollapseAdd_OnceCheckBox_Remove All Grave Stones",
+            "117_CollapseAdd_OnceCheckBox_Remove All Ladders",
             "113_CollapseAdd_OnceCheckBox_Remove All Mowers",
             "CollapseAdd_RichTextView_<font color='yellow'>Set State:",
             "9_CollapseAdd_OnceCheckBox_Hypnotize All Zombies",
@@ -403,6 +404,7 @@ namespace lang {
             "112_CollapseAdd_OnceCheckBox_Xóa tất cả cây",
             "115_CollapseAdd_OnceCheckBox_Xóa tất cả zombie",
             "116_CollapseAdd_OnceCheckBox_Xóa tất cả bia mộ",
+            "117_CollapseAdd_OnceCheckBox_Xóa tất cả thang",
             "113_CollapseAdd_OnceCheckBox_Xóa tất cả máy cắt cỏ",
             "CollapseAdd_RichTextView_<font color='yellow'>Đặt trạng thái:",
             "9_CollapseAdd_OnceCheckBox_Thôi miên tất cả zombie",
@@ -608,6 +610,7 @@ namespace lang {
             "112_CollapseAdd_OnceCheckBox_清除所有植物",
             "115_CollapseAdd_OnceCheckBox_清除所有僵尸",
             "116_CollapseAdd_OnceCheckBox_清除所有墓碑",
+            "117_CollapseAdd_OnceCheckBox_清除所有梯子",
             "113_CollapseAdd_OnceCheckBox_清除所有小推车",
             "CollapseAdd_RichTextView_<font color='yellow'>杂项:",
             "9_CollapseAdd_OnceCheckBox_魅惑所有僵尸",

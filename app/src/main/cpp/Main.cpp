@@ -348,6 +348,9 @@ extern "C" JNIEXPORT void JNICALL Java_com_android_support_Preferences_Changes(J
         case 116:
             clearAllGraves = boolean; // 清除所有墓碑
             break;
+        case 117:
+            gCheatClearAllLadders = boolean; // 清除所有梯子
+            break;
         case 121:
             formationId = value - 1; // 选择白天泳池阵型
             break;

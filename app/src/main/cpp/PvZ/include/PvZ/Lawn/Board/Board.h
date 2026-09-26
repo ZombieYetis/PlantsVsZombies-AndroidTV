@@ -852,6 +852,7 @@ inline bool clearAllZombies;
 inline bool hypnoAllZombies;
 inline bool freezeAllZombies;
 inline bool clearAllGraves;
+inline bool gCheatClearAllLadders;
 inline bool clearAllMowers;
 inline bool recoverAllMowers;
 inline bool startAllMowers;

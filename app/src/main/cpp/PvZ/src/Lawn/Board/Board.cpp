@@ -3568,9 +3568,21 @@ static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
         }
     }
     // 单格
-    else if (theCol < 9 && theRow < 6) {
+    else if (theCol < colsCount && theRow < rowsCount) {
         if (theBoard->GetGraveStoneAt(theCol, theRow) == nullptr) {
             theBoard->mChallenge->GraveDangerSpawnGraveAt(theCol, theRow);
+        }
+    }
+}
+
+static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
+    const int colsCount = 9;
+    const int rowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+
+    // 防止选“所有行”或“所有列”的时候放置到空地, 暂时只允许单格放置
+    if (theCol < colsCount && theRow < rowsCount) {
+        if (theBoard->GetLadderAt(theCol, theRow) == nullptr) {
+            theBoard->AddALadder(theCol, theRow);
         }
     }
 }
@@ -3772,6 +3784,17 @@ void Board::Update() {
         clearAllGraves = false;
     }
 
+    if (gCheatClearAllLadders) {
+        if (!IsOnlineServerModeActive() && !gIsReplayMode) {
+            for (GridItem *aGridItem = nullptr; IterateGridItems(aGridItem);) {
+                if (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER) {
+                    aGridItem->GridItemDie();
+                }
+            }
+        }
+        gCheatClearAllLadders = false;
+    }
+
     if (clearAllMowers) {
         if (mApp->mGameScene == GameScenes::SCENE_PLAYING && !IsOnlineServerModeActive() && !gIsReplayMode) {
             RemoveAllMowers();
@@ -3882,11 +3905,8 @@ void Board::Update() {
 
     // 放置梯子
     if (gCheatPlaceLadder) {
-        // 防止选“所有行”或“所有列”的时候放置到空地
-        if (gCheatPlaceColumn < 9 && gCheatPlaceRow < (StageHas6Rows() ? 6 : 5) && !IsOnlineServerModeActive() && !gIsReplayMode) {
-            if (GetLadderAt(gCheatPlaceColumn, gCheatPlaceRow) == nullptr) {
-                AddALadder(gCheatPlaceColumn, gCheatPlaceRow);
-            }
+        if (!IsOnlineServerModeActive() && !gIsReplayMode) {
+            CheatPlaceLadder(this, gCheatPlaceColumn, gCheatPlaceRow);
         }
         gCheatPlaceLadder = false;
     }
