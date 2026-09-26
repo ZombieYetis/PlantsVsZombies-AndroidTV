@@ -3441,44 +3441,47 @@ void Board::processServerEvent(const BaseEvent *event) {
     }
 }
 
-static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType theSeedType, bool isImitaterPlant) {
-    const int colsCount = (theSeedType == SeedType::SEED_COBCANNON) ? 8 : 9; // 玉米加农炮不种在九列
-    const int width = (theSeedType == SeedType::SEED_COBCANNON) ? 2 : 1;     // 玉米加农炮宽度两列
-    const int rowsCount = theBoard->StageHas6Rows() ? 6 : 5;
-    const bool isIZMode = theBoard->mApp->IsIZombieLevel();
+static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType theSeedType, bool theIsImitaterPlant) {
+    const int aColsCount = (theSeedType == SeedType::SEED_COBCANNON) ? 8 : 9; // 玉米加农炮不种在九列
+    const int aWidth = (theSeedType == SeedType::SEED_COBCANNON) ? 2 : 1;     // 玉米加农炮宽度两列
+    const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+    const bool aIsIZMode = theBoard->mApp->IsIZombieLevel();
 
-    auto PlacePlant = [theBoard, theSeedType, isImitaterPlant, isIZMode](int theCol, int theRow) {
-        Plant *aPlant = theBoard->AddPlant(theCol, theRow, theSeedType, (isImitaterPlant ? SeedType::SEED_IMITATER : SeedType::SEED_NONE), 0, true);
-        if (isImitaterPlant) {
+    const bool aIsAllCol = theCol == 9;
+    const bool aIsAllRow = theRow == 6;
+
+    auto PlacePlant = [theBoard, theSeedType, theIsImitaterPlant, aIsIZMode](int theCol, int theRow) {
+        Plant *aPlant = theBoard->AddPlant(theCol, theRow, theSeedType, (theIsImitaterPlant ? SeedType::SEED_IMITATER : SeedType::SEED_NONE), 0, true);
+        if (theIsImitaterPlant) {
             aPlant->SetImitaterFilterEffect();
         }
-        if (isIZMode) {
+        if (aIsIZMode) {
             theBoard->mChallenge->IZombieSetupPlant(aPlant);
         }
     };
 
     // 全场
-    if (theCol == 9 && theRow == 6) {
-        for (int col = 0; col < colsCount; col += width) {
-            for (int row = 0; row < rowsCount; row++) {
+    if (aIsAllCol && aIsAllRow) {
+        for (int col = 0; col < aColsCount; col += aWidth) {
+            for (int row = 0; row < aRowsCount; ++row) {
                 PlacePlant(col, row);
             }
         }
     }
     // 单行
-    else if (theCol == 9 && theRow < 6) {
-        for (int col = 0; col < colsCount; col += width) {
+    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
+        for (int col = 0; col < aColsCount; col += aWidth) {
             PlacePlant(col, theRow);
         }
     }
     // 单列
-    else if (theCol < 9 && theRow == 6) {
-        for (int row = 0; row < rowsCount; row++) {
+    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
+        for (int row = 0; row < aRowsCount; ++row) {
             PlacePlant(theCol, row);
         }
     }
     // 单格
-    else if (theCol < colsCount && theRow < rowsCount) {
+    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
         PlacePlant(theCol, theRow);
     }
 }
@@ -3489,101 +3492,153 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
         return;
     }
 
-    const int colsCount = 9;
-    const int rowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+    const int aColsCount = 9;
+    const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+
+    const bool aIsOutside = theCol == 10;
+    const bool aIsAllCol = theCol == 9;
+    const bool aIsAllRow = theRow == 6;
 
     // 僵尸出生线
-    if (theCol == 10 && theRow == 6) {
-        for (int row = 0; row < rowsCount; ++row) {
-            theBoard->AddZombieInRow(theZombieType, row, theBoard->mCurrentWave, true);
+    if (aIsOutside) {
+        if (aIsAllRow) {
+            for (int row = 0; row < aRowsCount; ++row) {
+                theBoard->AddZombieInRow(theZombieType, row, theBoard->mCurrentWave, true);
+            }
+        }
+        // Note: Use `MAX_GRID_SIZE_Y` instead of `aRowsCount`, for BACKGROUND_ZOMBIQUARIUM
+        else if (theRow < MAX_GRID_SIZE_Y) {
+            theBoard->AddZombieInRow(theZombieType, theRow, theBoard->mCurrentWave, true);
         }
     }
-    // 僵尸出生点
-    else if (theCol == 10 && theRow < 6) {
-        theBoard->AddZombieInRow(theZombieType, theRow, theBoard->mCurrentWave, true);
-    }
     // 全场
-    else if (theCol == 9 && theRow == 6) {
-        for (int col = 0; col < colsCount; ++col) {
-            for (int row = 0; row < rowsCount; ++row) {
+    else if (aIsAllCol && aIsAllRow) {
+        for (int col = 0; col < aColsCount; ++col) {
+            for (int row = 0; row < aRowsCount; ++row) {
                 theBoard->mChallenge->IZombiePlaceZombie(theZombieType, col, row);
             }
         }
     }
     // 单行
-    else if (theCol == 9 && theRow < 6) {
-        for (int col = 0; col < colsCount; ++col) {
+    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
+        for (int col = 0; col < aColsCount; ++col) {
             theBoard->mChallenge->IZombiePlaceZombie(theZombieType, col, theRow);
         }
     }
     // 单列
-    else if (theCol < 9 && theRow == 6) {
-        for (int row = 0; row < rowsCount; ++row) {
+    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
+        for (int row = 0; row < aRowsCount; ++row) {
             theBoard->mChallenge->IZombiePlaceZombie(theZombieType, theCol, row);
         }
     }
     // 单格
-    else if (theCol < colsCount && theRow < rowsCount) {
+    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
         theBoard->mChallenge->IZombiePlaceZombie(theZombieType, theCol, theRow);
     }
 }
 
 static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
-    const int colsCount = 9;
-    const int rowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+    const int aColsCount = 9;
+    const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
-    // 全场
-    if (theCol == 9 && theRow == 6) {
-        for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
-            if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE) {
-                aGridItem->GridItemDie();
+    const bool aIsAllCol = theCol == 9;
+    const bool aIsAllRow = theRow == 6;
+
+    bool aGridBad[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
+    for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
+        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE && (aIsAllCol || aGridItem->mGridX == theCol) && (aIsAllRow || aGridItem->mGridY == theRow)) {
+            if (0 <= aGridItem->mGridX && aGridItem->mGridX < MAX_GRID_SIZE_X && 0 <= aGridItem->mGridY && aGridItem->mGridY < MAX_GRID_SIZE_Y) {
+                aGridBad[aGridItem->mGridX][aGridItem->mGridY] = true;
             }
         }
-        for (int col = 0; col < colsCount; ++col) {
-            for (int row = 0; row < rowsCount; ++row) {
-                theBoard->mChallenge->GraveDangerSpawnGraveAt(col, row);
+    }
+
+    auto PlaceGrave = [theBoard, &aGridBad](int theCol, int theRow) {
+        if (!aGridBad[theCol][theRow]) {
+            theBoard->mChallenge->GraveDangerSpawnGraveAt(theCol, theRow);
+        }
+    };
+
+    // 全场
+    if (aIsAllCol && aIsAllRow) {
+        for (int col = 0; col < aColsCount; ++col) {
+            for (int row = 0; row < aRowsCount; ++row) {
+                PlaceGrave(col, row);
             }
         }
     }
     // 单行
-    else if (theCol == 9 && theRow < 6) {
-        for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
-            if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE && aGridItem->mGridY == theRow) {
-                aGridItem->GridItemDie();
-            }
-        }
-        for (int col = 0; col < colsCount; ++col) {
-            theBoard->mChallenge->GraveDangerSpawnGraveAt(col, theRow);
+    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
+        for (int col = 0; col < aColsCount; ++col) {
+            PlaceGrave(col, theRow);
         }
     }
     // 单列
-    else if (theCol < 9 && theRow == 6) {
-        for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
-            if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE && aGridItem->mGridX == theCol) {
-                aGridItem->GridItemDie();
-            }
-        }
-        for (int row = 0; row < rowsCount; ++row) {
-            theBoard->mChallenge->GraveDangerSpawnGraveAt(theCol, row);
+    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
+        for (int row = 0; row < aRowsCount; ++row) {
+            PlaceGrave(theCol, row);
         }
     }
     // 单格
-    else if (theCol < colsCount && theRow < rowsCount) {
-        if (theBoard->GetGraveStoneAt(theCol, theRow) == nullptr) {
-            theBoard->mChallenge->GraveDangerSpawnGraveAt(theCol, theRow);
-        }
+    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
+        PlaceGrave(theCol, theRow);
     }
 }
 
 static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
-    const int colsCount = 9;
-    const int rowsCount = theBoard->StageHas6Rows() ? 6 : 5;
+    const int aColsCount = 9;
+    const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
-    // 防止选“所有行”或“所有列”的时候放置到空地, 暂时只允许单格放置
-    if (theCol < colsCount && theRow < rowsCount) {
-        if (theBoard->GetLadderAt(theCol, theRow) == nullptr) {
+    const bool aIsAllCol = theCol == 9;
+    const bool aIsAllRow = theRow == 6;
+
+    bool aGridGood[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
+    for (Plant *aPlant = nullptr; theBoard->IteratePlants(aPlant);) {
+        if ((aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
+            || (aPlant->IsSpiky() && theBoard->GetFlowerPotAt(aPlant->mPlantCol, aPlant->mRow) != nullptr) // 原版特性
+        ) {
+            if (0 <= aPlant->mPlantCol && aPlant->mPlantCol < MAX_GRID_SIZE_X && 0 <= aPlant->mRow && aPlant->mRow < MAX_GRID_SIZE_Y) {
+                aGridGood[aPlant->mPlantCol][aPlant->mRow] = true;
+            }
+        }
+    }
+    for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
+        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER && (aIsAllCol || aGridItem->mGridX == theCol) && (aIsAllRow || aGridItem->mGridY == theRow)) {
+            if (0 <= aGridItem->mGridX && aGridItem->mGridX < MAX_GRID_SIZE_X && 0 <= aGridItem->mGridY && aGridItem->mGridY < MAX_GRID_SIZE_Y) {
+                aGridGood[aGridItem->mGridX][aGridItem->mGridY] = false;
+            }
+        }
+    }
+
+    auto PlaceLadder = [theBoard, &aGridGood](int theCol, int theRow) {
+        if (aGridGood[theCol][theRow]) {
             theBoard->AddALadder(theCol, theRow);
         }
+    };
+
+    // 全场
+    if (aIsAllCol && aIsAllRow) {
+        for (int col = 0; col < aColsCount; ++col) {
+            for (int row = 0; row < aRowsCount; ++row) {
+                PlaceLadder(col, row);
+            }
+        }
+    }
+    // 单行
+    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
+        for (int col = 0; col < aColsCount; ++col) {
+            PlaceLadder(col, theRow);
+        }
+    }
+    // 单列
+    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
+        for (int row = 0; row < aRowsCount; ++row) {
+            PlaceLadder(theCol, row);
+        }
+    }
+    // 单格
+    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
+        PlaceLadder(theCol, theRow);
     }
 }
 
