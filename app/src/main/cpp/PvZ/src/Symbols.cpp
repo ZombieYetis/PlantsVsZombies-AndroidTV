@@ -412,6 +412,14 @@ bool LoadGameMain() {
     ChallengeScreen_SetScrollTargetAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen15SetScrollTargetEi");
     ChallengeScreen_KeyDownAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen7KeyDownEN4Sexy7KeyCodeE");
     ChallengeScreen_UpdateButtonsAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen13UpdateButtonsEv");
+    ChallengeScreen_UpdateToolTipAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen13UpdateToolTipEv");
+    ChallengeScreen_KeyCharAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen7KeyCharEc");
+    ChallengeScreen_GameButtonDownAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen14GameButtonDownEN4Sexy13GamepadButtonEij");
+    ChallengePageHasEntryAddr = libGameMain.GetSymbol("_Z21ChallengePageHasEntryiii");
+    GetChallengeByRowColumnAddr = libGameMain.GetSymbol("_Z23GetChallengeByRowColumniii");
+    GetModeByRowColumnAddr = libGameMain.GetSymbol("_Z18GetModeByRowColumniii");
+    gDisableDebugKeysAddr = libGameMain.GetSymbol("gDisableDebugKeys");
+    LawnApp_ShowHelpBarWidgetAddr = libGameMain.GetSymbol("_ZN7LawnApp17ShowHelpBarWidgetEv");
     ChallengeScreen_ButtonPressAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen11ButtonPressEi");
     ChallengeScreen_ButtonDepressAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen13ButtonDepressEi");
     ChallengeScreen_SetUnlockChallengeIndexAddr = libGameMain.GetSymbol("_ZN15ChallengeScreen23SetUnlockChallengeIndexE13ChallengePageb");

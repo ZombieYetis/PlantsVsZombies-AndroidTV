@@ -1342,7 +1342,7 @@ bool LawnApp::IsNight() {
 int LawnApp::TrophiesNeedForGoldSunflower() {
     // 修复新增的小游戏不记入金向日葵达成条件
     int theNumMiniGames = 0;
-    for (int i = 0; i < 94; ++i) {
+    for (int i = 0; i < NUM_CHALLENGE_MODES; ++i) {
         if (GetChallengeDefinition(i).mPage == ChallengePage::CHALLENGE_PAGE_CHALLENGE) {
             theNumMiniGames++;
         }

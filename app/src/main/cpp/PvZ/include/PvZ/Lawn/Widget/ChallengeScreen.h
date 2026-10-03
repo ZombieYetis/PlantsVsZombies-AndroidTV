@@ -30,7 +30,10 @@
 #include "HelpBarWidget.h"
 #include "NetplayLobbyWidget.h"
 
-inline constexpr int NUM_CHALLENGE_MODES(int(GameMode::NUM_GAME_MODES - 1));
+inline constexpr int NUM_CHALLENGE_MODES_ORIGINAL(int(GameMode::NUM_GAME_MODES - 1));
+inline constexpr int MAX_CHALLENGE_MODES = 200;
+inline constexpr int NUM_CHALLENGE_MODES_EXTENDED = MAX_CHALLENGE_MODES - NUM_CHALLENGE_MODES_ORIGINAL;
+extern const int NUM_CHALLENGE_MODES;
 inline constexpr int GAMEMODE_MP_VS_DAY = 70;
 inline constexpr int GAMEMODE_MP_VS_NIGHT = 71;
 inline constexpr int GAMEMODE_MP_VS_POOL_DAY = 72;
@@ -45,11 +48,11 @@ public:
     enum {
         ChallengeScreen_Back = 100,
         ChallengeScreen_Mode = 200,
-        ChallengeScreen_Page = 300,
+        ChallengeScreen_Page = ChallengeScreen_Mode + MAX_CHALLENGE_MODES,
     };
 
 public:
-    Sexy::ButtonWidget *mChallengeButtons[NUM_CHALLENGE_MODES]; // 65 ~ 158
+    Sexy::ButtonWidget *mChallengeButtons[NUM_CHALLENGE_MODES_ORIGINAL]; // 65 ~ 158
     LawnApp *mApp;                                              // 159
     ToolTipWidget *mToolTip;                                    // 160
     ChallengePage mPage;                                        // 161
@@ -64,8 +67,8 @@ public:
     int mScrollPosition;                                        // 185
     int mScrollTargetPosition;                                  // 186
     float mScrollAnimationTime;                                 // 187
-    int mPageChallengeIndex[NUM_CHALLENGE_MODES];               // 188 ~ 281
-    float mPageChallengeAnimTime[NUM_CHALLENGE_MODES];          // 282 ~ 375
+    int mPageChallengeIndex[NUM_CHALLENGE_MODES_ORIGINAL];      // 188 ~ 281
+    float mPageChallengeAnimTime[NUM_CHALLENGE_MODES_ORIGINAL]; // 282 ~ 375
     int mPageChallengeCount;                                    // 376
     GameMode mSelectedGameMode;                                 // 377 其值固定比mSelectedMode小2
     int mSelectedChallengeIndex;                                // 378
@@ -73,6 +76,22 @@ public:
     // 大小380个整数, 以下是新增成员!
     NewLawnButton *mBackButton = nullptr;
     NetplayLobbyWidget *mNetplayLobbyWidget = nullptr;
+    Sexy::ButtonWidget *mChallengeButtonsExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
+    int mPageChallengeIndexExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
+    float mPageChallengeAnimTimeExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
+
+    Sexy::ButtonWidget *&GetChallengeButton(int theChallengeIndex) {
+        return theChallengeIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mChallengeButtons[theChallengeIndex]
+            : mChallengeButtonsExtended[theChallengeIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+    }
+    int &GetPageChallengeIndex(int thePageIndex) {
+        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeIndex[thePageIndex]
+            : mPageChallengeIndexExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+    }
+    float &GetPageChallengeAnimTime(int thePageIndex) {
+        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeAnimTime[thePageIndex]
+            : mPageChallengeAnimTimeExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+    }
 
     ChallengeScreen(LawnApp *theApp, ChallengePage thePage) {
         _constructor(theApp, thePage);
@@ -82,18 +101,17 @@ public:
         _destructor();
     };
 
-    void SetUnlockChallengeIndex(ChallengePage thePage, bool theIsIZombie = false) {
-        reinterpret_cast<void (*)(ChallengeScreen *, ChallengePage, bool)>(ChallengeScreen_SetUnlockChallengeIndexAddr)(this, thePage, theIsIZombie);
-    }
+    void SetUnlockChallengeIndex(ChallengePage thePage, bool theIsIZombie = false);
     void SetScrollTarget(int theIndex) {
         reinterpret_cast<void (*)(ChallengeScreen *, int)>(ChallengeScreen_SetScrollTargetAddr)(this, theIndex);
     }
-    int MoreTrophiesNeeded(int theChallengeIndex) {
-        return reinterpret_cast<int (*)(ChallengeScreen *, int)>(ChallengeScreen_MoreTrophiesNeededAddr)(this, theChallengeIndex);
-    }
-    int AccomplishmentsNeeded(int theChallengeIndex) {
-        return reinterpret_cast<int (*)(ChallengeScreen *, int)>(ChallengeScreen_AccomplishmentsNeededAddr)(this, theChallengeIndex);
-    }
+    int MoreTrophiesNeeded(int theChallengeIndex);
+    int AccomplishmentsNeeded(int theChallengeIndex);
+    bool IsScaryPotterLevel(GameMode theGameMode);
+    bool IsIZombieLevel(GameMode theGameMode);
+    void UpdateToolTip();
+    void KeyChar(char theChar);
+    void GameButtonDown(Sexy::GamepadButton theButton, int thePlayerIndex, unsigned int theModifierFlag);
 
     void Draw(Sexy::Graphics *g);
     void AddedToManager(Sexy::WidgetManager *theWidgetManager);
@@ -127,33 +145,14 @@ public:
     int mCol;                   // 4 无用
     const char *mChallengeName; // 5
 };
-extern ChallengeDefinition gChallengeDefs[200];
+extern ChallengeDefinition gChallengeDefs[];
 
 ChallengeDefinition &GetChallengeDefinition(int theChallengeMode);
+bool ChallengePageHasEntry(ChallengePage thePage, int theRow, int theCol);
+int GetChallengeByRowColumn(ChallengePage thePage, int theRow, int theCol);
+GameMode GetModeByRowColumn(ChallengePage thePage, int theRow, int theCol);
 /***************************************************************************************************************/
 inline int gChallengeScreenRequestState = 0;
 inline bool gChallengeScreenOpenReplayManage = false;
-
-inline void (*old_ChallengeScreen_ChallengeScreen)(ChallengeScreen *challengeScreen, LawnApp *lawnApp, ChallengePage page);
-
-inline void (*old_ChallengeScreen_KeyDown)(ChallengeScreen *challengeScreen, Sexy::KeyCode code);
-
-inline void (*old_ChallengeScreen_Draw)(ChallengeScreen *challengeScreen, Sexy::Graphics *graphics);
-
-inline void (*old_ChallengeScreen_DrawButton)(ChallengeScreen *, Sexy::Graphics *, int, int);
-
-inline void (*old_ChallengeScreen_AddedToManager)(ChallengeScreen *a, Sexy::WidgetManager *a2);
-
-inline void (*old_ChallengeScreen_Update)(ChallengeScreen *a);
-
-inline void (*old_ChallengeScreen_RemovedFromManager)(ChallengeScreen *a, Sexy::WidgetManager *a2);
-
-inline void (*old_ChallengeScreen__destructor)(ChallengeScreen *challengeScreen);
-
-inline void (*old_ChallengeScreen_MouseDown)(ChallengeScreen *challengeScreen, int x, int y, int theClickCount);
-
-inline void (*old_ChallengeScreen_MouseDrag)(ChallengeScreen *challengeScreen, int x, int y);
-
-inline void (*old_ChallengeScreen_MouseUp)(ChallengeScreen *challengeScreen, int x, int y);
 
 #endif // PVZ_LAWN_WIDGET_CHALLENGE_SCREEN_H

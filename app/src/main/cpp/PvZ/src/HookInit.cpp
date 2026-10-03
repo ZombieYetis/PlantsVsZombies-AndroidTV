@@ -238,16 +238,25 @@ void InitHookFunction() {
     homura::HookFunc(Challenge_DrawBackdropAddr, &Challenge::DrawBackdrop, &old_Challenge_DrawBackdrop);
 
 
-    homura::HookFunc(ChallengeScreen_AddedToManagerAddr, &ChallengeScreen::AddedToManager, &old_ChallengeScreen_AddedToManager);
-    homura::HookFunc(ChallengeScreen_RemovedFromManagerAddr, &ChallengeScreen::RemovedFromManager, &old_ChallengeScreen_RemovedFromManager);
-    homura::HookFunc(ChallengeScreen_Delete2Addr, &ChallengeScreen::_destructor, &old_ChallengeScreen__destructor);
-    homura::HookFunc(ChallengeScreen_UpdateAddr, &ChallengeScreen::Update, &old_ChallengeScreen_Update);
-    homura::HookFunc(ChallengeScreen_ChallengeScreenAddr, &ChallengeScreen::_constructor, &old_ChallengeScreen_ChallengeScreen);
-    homura::HookFunc(ChallengeScreen_DrawAddr, &ChallengeScreen::Draw, &old_ChallengeScreen_Draw);
-    homura::HookFunc(ChallengeScreen_KeyDownAddr, &ChallengeScreen::KeyDown, &old_ChallengeScreen_KeyDown);
+    homura::HookFunc(ChallengeScreen_AddedToManagerAddr, &ChallengeScreen::AddedToManager, nullptr);
+    homura::HookFunc(ChallengeScreen_RemovedFromManagerAddr, &ChallengeScreen::RemovedFromManager, nullptr);
+    homura::HookFunc(ChallengeScreen_Delete2Addr, &ChallengeScreen::_destructor, nullptr);
+    homura::HookFunc(ChallengeScreen_UpdateAddr, &ChallengeScreen::Update, nullptr);
+    homura::HookFunc(ChallengeScreen_ChallengeScreenAddr, &ChallengeScreen::_constructor, nullptr);
+    homura::HookFunc(ChallengeScreen_DrawAddr, &ChallengeScreen::Draw, nullptr);
+    homura::HookFunc(ChallengeScreen_KeyDownAddr, &ChallengeScreen::KeyDown, nullptr);
     homura::HookFunc(ChallengeScreen_ButtonDepressAddr, &ChallengeScreen::ButtonDepress, nullptr);
     homura::HookFunc(ChallengeScreen_UpdateButtonsAddr, &ChallengeScreen::UpdateButtons, nullptr);
-    homura::HookFunc(ChallengeScreen_DrawButtonAddr, &ChallengeScreen::DrawButton, &old_ChallengeScreen_DrawButton);
+    homura::HookFunc(ChallengeScreen_DrawButtonAddr, &ChallengeScreen::DrawButton, nullptr);
+    homura::HookFunc(ChallengeScreen_UpdateToolTipAddr, &ChallengeScreen::UpdateToolTip, nullptr);
+    homura::HookFunc(ChallengeScreen_KeyCharAddr, &ChallengeScreen::KeyChar, nullptr);
+    homura::HookFunc(ChallengeScreen_GameButtonDownAddr, &ChallengeScreen::GameButtonDown, nullptr);
+    homura::HookFunc(ChallengeScreen_SetUnlockChallengeIndexAddr, &ChallengeScreen::SetUnlockChallengeIndex, nullptr);
+    homura::HookFunc(ChallengeScreen_MoreTrophiesNeededAddr, &ChallengeScreen::MoreTrophiesNeeded, nullptr);
+    homura::HookFunc(ChallengeScreen_AccomplishmentsNeededAddr, &ChallengeScreen::AccomplishmentsNeeded, nullptr);
+    homura::HookFunc(ChallengePageHasEntryAddr, &ChallengePageHasEntry, nullptr);
+    homura::HookFunc(GetChallengeByRowColumnAddr, &GetChallengeByRowColumn, nullptr);
+    homura::HookFunc(GetModeByRowColumnAddr, &GetModeByRowColumn, nullptr);
     homura::HookFunc(GetChallengeDefinitionAddr, &GetChallengeDefinition, nullptr);
 
 
@@ -773,9 +782,9 @@ void InitVTableHookFunction() {
     homura::HookVirtualFunc(vTableForMailScreenAddr, 140, &MailScreen::ButtonPress, &old_MailScreen_ButtonPress);
     homura::HookVirtualFunc(vTableForMailScreenAddr, 141, &MailScreen::ButtonDepress, &old_MailScreen_ButtonDepress);
 
-    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 78, &ChallengeScreen::MouseDown, &old_ChallengeScreen_MouseDown);
-    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 81, &ChallengeScreen::MouseUp, &old_ChallengeScreen_MouseUp);
-    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 83, &ChallengeScreen::MouseDrag, &old_ChallengeScreen_MouseDrag);
+    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 78, &ChallengeScreen::MouseDown, nullptr);
+    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 81, &ChallengeScreen::MouseUp, nullptr);
+    homura::HookVirtualFunc(vTableForChallengeScreenAddr, 83, &ChallengeScreen::MouseDrag, nullptr);
     homura::HookVirtualFunc(vTableForChallengeScreenAddr, 130, &ChallengeScreen::ButtonPress, nullptr);
 
     // homura::HookVirtualFunc(vTableForVSResultsMenuAddr, 78, &VSResultsMenu::MouseDown,nullptr);
