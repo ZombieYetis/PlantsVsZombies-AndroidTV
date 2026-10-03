@@ -150,6 +150,12 @@ void Board::_constructor(LawnApp *theApp) {
 
     mApp = theApp;
     mApp->mBoard = this;
+    // Netplay mappings belong to this board, including coop games.
+    // A new board must not resolve events through the previous game's slots.
+    serverPlantIDMap.clear();
+    serverZombieIDMap.clear();
+    serverCoinIDMap.clear();
+    serverGridItemIDMap.clear();
     unknownBool = false;
 
     mZombies.DataArrayInitialize(1024U, "zombies");
@@ -334,10 +340,6 @@ void Board::_constructor(LawnApp *theApp) {
     if (theApp->IsVSMode()) {
         mShovelWidget = new ShovelRedirectWidget(this);
         mShovelWidget->Resize(gTouchVSShovelRect.mX, gTouchVSShovelRect.mY, gTouchVSShovelRect.mWidth, gTouchVSShovelRect.mHeight);
-        serverPlantIDMap.clear();
-        serverZombieIDMap.clear();
-        serverCoinIDMap.clear();
-        serverGridItemIDMap.clear();
     }
     mReplayControlsWidget = new ReplayControlsWidget(this);
 }
