@@ -659,8 +659,11 @@ public:
     ~Board() = delete;
 
     void InitLevel();
+    void InitSurvivalStage();
+    void InitSurvivalStage_Origin();
     void SetGrids();
     void StartLevel();
+    void MapLoadedNetplayIds();
     void Update();
     void AddedToManager(Sexy::WidgetManager *theWidgetManager);
     void RemovedFromManager(Sexy::WidgetManager *theWidgetManager);
@@ -961,6 +964,7 @@ inline void (*old_Board_AddedToManager)(Board *, Sexy::WidgetManager *);
 inline void (*old_Board_RemovedFromManager)(Board *, Sexy::WidgetManager *);
 
 inline void (*old_Board_InitLevel)(Board *board);
+inline void (*old_Board_InitSurvivalStage)(Board *board);
 
 inline void (*old_Board_ButtonDepress)(Board *board, int id);
 

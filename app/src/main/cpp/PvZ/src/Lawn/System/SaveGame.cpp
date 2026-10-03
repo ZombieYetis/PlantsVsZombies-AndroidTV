@@ -18,15 +18,293 @@
  */
 
 #include "PvZ/Lawn/System/SaveGame.h"
+#include "Homura/Logger.h"
 #include "PvZ/GlobalVariable.h"
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/Board/Challenge.h"
 #include "PvZ/Lawn/Board/CursorObject.h"
 #include "PvZ/Lawn/Board/MessageWidget.h"
 #include "PvZ/Lawn/Board/SeedBank.h"
+#include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
+#include "PvZ/NetPlay.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
+
+#include <cstring>
+#include <algorithm>
+#include <chrono>
+#include <memory>
+
+namespace {
+enum class OnlineLoadState { Idle, AwaitingHost, Sending, Receiving, AwaitingReady, AwaitingResume };
+OnlineLoadState gOnlineLoadState = OnlineLoadState::Idle;
+bool gApplyingOnlineSaveGame = false;
+std::vector<unsigned char> gOnlineSaveData;
+std::size_t gOnlineSaveOffset = 0;
+uint32_t gOnlineSaveSize = 0;
+uint32_t gOnlineSaveHash = 0;
+bool gOnlineSaveLoaded = false;
+constexpr std::size_t kMaxOnlineSaveSize = 64 * 1024 * 1024;
+auto gOnlineSaveProgress = std::chrono::steady_clock::now();
+
+uint32_t SaveDataHash(const std::vector<unsigned char> &data) {
+    uint32_t hash = 2166136261u;
+    for (unsigned char byte : data) {
+        hash = (hash ^ byte) * 16777619u;
+    }
+    return hash;
+}
+
+bool ApplyOnlineSave(LawnApp *app, SaveGameContext *context) {
+    struct ApplyingSave {
+        ApplyingSave() {
+            gApplyingOnlineSaveGame = true;
+        }
+        ~ApplyingSave() {
+            gApplyingOnlineSaveGame = false;
+        }
+    } applyingSave;
+
+    app->KillSeedChooserScreen();
+    app->PostEnterLevel();
+    app->MakeNewBoard();
+    app->SetSecondPlayer(1);
+    if (!LawnLoadGame(app->mBoard, context)) {
+        return false;
+    }
+
+    // The native PostLoadGame ends with ClearSecondPlayer. The scoped flag
+    // preserves the online connection while retaining its other fixups.
+    app->mBoard->PostLoadGame();
+    app->SetSecondPlayer(1);
+    for (int player = 0; player < 2; ++player) {
+        auto *controls = app->mBoard->mGamepadControls[player];
+        controls->mApp = app;
+        controls->mBoard = app->mBoard;
+        controls->mPlayerIndex = player;
+        controls->mGamepadIndex = player;
+        controls->mGamepadState = BaseGamepadControls::MOVEMENT_STATE_NORMAL;
+        controls->mSelectedSeedIndex = 0;
+        app->mBoard->ClearCursor(player);
+    }
+    app->mBoard->mPaused = false;
+    app->mBoardResult = BoardResult::BOARDRESULT_NONE;
+    app->mFirstTimeGameSelector = false;
+    app->mBoard->MapLoadedNetplayIds();
+    return true;
+}
+
+void AbortOnlineSave(LawnApp *app, bool notifyPeer) {
+    if (notifyPeer && IsRemoteServer()) {
+        BaseEvent event = {EVENT_SERVER_SAVEGAME_ABORT};
+        netplay::PutEvent(event);
+    }
+    netplay::ResetSaveGameTransfer();
+    app->mNeedLoadGame = false;
+    app->KillSeedChooserScreen();
+    app->ReturnToModeSelect();
+    LOG_ERROR("[NETPLAY] coop save transfer failed; returned to mode selection");
+}
+} // namespace
+
+bool netplay::IsApplyingOnlineSaveGame() noexcept {
+    return gApplyingOnlineSaveGame;
+}
+
+bool netplay::IsSynchronizingSaveGame() noexcept {
+    return gOnlineLoadState != OnlineLoadState::Idle;
+}
+
+void netplay::ResetSaveGameTransfer() noexcept {
+    gOnlineLoadState = OnlineLoadState::Idle;
+    gOnlineSaveData.clear();
+    gOnlineSaveOffset = 0;
+    gOnlineSaveSize = 0;
+    gOnlineSaveHash = 0;
+    gOnlineSaveLoaded = false;
+}
+
+bool netplay::StartCoopEndlessLoad(LawnApp *app) {
+    ResetSaveGameTransfer();
+    gOnlineSaveProgress = std::chrono::steady_clock::now();
+    if (!IsRemoteServer()) {
+        // Never consult the guest's local save. Wait for the host's decision.
+        app->KillSeedChooserScreen();
+        app->KillBoard();
+        app->mGameScene = GameScenes::SCENE_LEVEL_INTRO;
+        gOnlineLoadState = OnlineLoadState::AwaitingHost;
+        return true;
+    }
+
+    if (!app->TryLoadGame()) {
+        delete app->mSaveGame;
+        app->mSaveGame = nullptr;
+        BaseEvent event = {EVENT_SERVER_SAVEGAME_NEW_GAME};
+        PutEvent(event);
+        return false;
+    }
+
+    std::unique_ptr<SaveGameContext> context(app->mSaveGame);
+    app->mSaveGame = nullptr;
+    app->mNeedLoadGame = false; // This handshake replaces the local continue dialog.
+    app->mSaveGameOperation = SaveGameOperation::SAVE_GAME_OPERATION_NONE;
+    if (context->mBuffer.mData.size() < sizeof(SaveFileHeader) || context->mBuffer.mData.size() > kMaxOnlineSaveSize || !ApplyOnlineSave(app, context.get())) {
+        AbortOnlineSave(app, true);
+        return true;
+    }
+
+    gOnlineSaveData = std::move(context->mBuffer.mData);
+    gOnlineSaveSize = static_cast<uint32_t>(gOnlineSaveData.size());
+    gOnlineSaveHash = SaveDataHash(gOnlineSaveData);
+    gOnlineLoadState = OnlineLoadState::Sending;
+    U16UNI32UNI32_Event begin{};
+    begin.type = EVENT_SERVER_SAVEGAME_BEGIN;
+    begin.data1 = uint16_t(app->mGameMode);
+    begin.data2.u32 = gOnlineSaveSize;
+    begin.data3.u32 = gOnlineSaveHash;
+    PutEvent(begin);
+    LOG_INFO("[NETPLAY] sending coop save: {} bytes", gOnlineSaveSize);
+    return true;
+}
+
+void netplay::UpdateSaveGameTransfer(LawnApp *app) {
+    if (!IsSynchronizingSaveGame()) {
+        return;
+    }
+    if (!IsOnlineModeActive() && !gIsReplayMode && !gIsServerModeSpectator) {
+        ResetSaveGameTransfer();
+        return;
+    }
+    if (!gIsReplayMode && std::chrono::steady_clock::now() - gOnlineSaveProgress > std::chrono::minutes(2)) {
+        if (IsRemoteServer()) {
+            AbortOnlineSave(app, true);
+        } else {
+            // Closing the stalled stream prevents late chunks reaching a new board.
+            app->ClearSecondPlayer();
+            AbortOnlineSave(app, false);
+        }
+        return;
+    }
+    if (gOnlineLoadState != OnlineLoadState::Sending || HasPendingSendData()) {
+        return;
+    }
+    // Bound queued data so a save cannot flood the relay's pending-write queue.
+    const std::size_t batchEnd = std::min(gOnlineSaveOffset + 16 * 1024, gOnlineSaveData.size());
+    while (gOnlineSaveOffset < batchEnd) {
+        U16U8x240_Event chunk{};
+        chunk.type = EVENT_SERVER_SAVEGAME_CHUNK;
+        chunk.count = static_cast<uint16_t>(std::min(sizeof(chunk.data), gOnlineSaveData.size() - gOnlineSaveOffset));
+        std::memcpy(chunk.data, gOnlineSaveData.data() + gOnlineSaveOffset, chunk.count);
+        PutEvent(chunk);
+        gOnlineSaveOffset += chunk.count;
+    }
+    gOnlineSaveProgress = std::chrono::steady_clock::now();
+    if (gOnlineSaveOffset == gOnlineSaveData.size()) {
+        BaseEvent end = {EVENT_SERVER_SAVEGAME_END};
+        PutEvent(end);
+        gOnlineSaveData.clear();
+        gOnlineLoadState = OnlineLoadState::AwaitingReady;
+    }
+}
+
+bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fromHost) {
+    if (event->type < EVENT_SERVER_SAVEGAME_BEGIN || event->type > EVENT_SERVER_SAVEGAME_ABORT) {
+        return false;
+    }
+    if (app->mGameMode != GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
+        return true;
+    }
+    if (!fromHost) {
+        if (event->type == EVENT_CLIENT_SAVEGAME_READY && IsRemoteServer() && (gOnlineLoadState == OnlineLoadState::Sending || gOnlineLoadState == OnlineLoadState::AwaitingReady)) {
+            if (static_cast<const U8_Event *>(event)->data == 0) {
+                AbortOnlineSave(app, true);
+            } else if (gOnlineLoadState == OnlineLoadState::AwaitingReady) {
+                BaseEvent resume = {EVENT_SERVER_SAVEGAME_RESUME};
+                PutEvent(resume);
+                ResetSaveGameTransfer();
+            }
+        }
+        return true;
+    }
+
+    switch (event->type) {
+        case EVENT_SERVER_SAVEGAME_NEW_GAME:
+            if (gOnlineLoadState == OnlineLoadState::AwaitingHost) {
+                ResetSaveGameTransfer();
+                app->PostEnterLevel();
+                app->NewGame();
+            }
+            break;
+        case EVENT_SERVER_SAVEGAME_BEGIN: {
+            const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
+            if (begin->data1 != uint16_t(GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) || begin->data2.u32 < sizeof(SaveFileHeader) || begin->data2.u32 > kMaxOnlineSaveSize) {
+                U8_Event ready = {{EVENT_CLIENT_SAVEGAME_READY}, 0};
+                if (!gIsReplayMode && !gIsServerModeSpectator)
+                    PutEvent(ready);
+                break;
+            }
+            ResetSaveGameTransfer();
+            gOnlineLoadState = OnlineLoadState::Receiving;
+            gOnlineSaveSize = begin->data2.u32;
+            gOnlineSaveHash = begin->data3.u32;
+            gOnlineSaveData.reserve(gOnlineSaveSize);
+            gOnlineSaveProgress = std::chrono::steady_clock::now();
+            break;
+        }
+        case EVENT_SERVER_SAVEGAME_CHUNK: {
+            if (gOnlineLoadState != OnlineLoadState::Receiving)
+                break;
+            const auto *chunk = static_cast<const U16U8x240_Event *>(event);
+            if (chunk->count > sizeof(chunk->data) || gOnlineSaveData.size() + chunk->count > gOnlineSaveSize) {
+                gOnlineLoadState = OnlineLoadState::AwaitingResume;
+                U8_Event ready = {{EVENT_CLIENT_SAVEGAME_READY}, 0};
+                if (!gIsReplayMode && !gIsServerModeSpectator)
+                    PutEvent(ready);
+                break;
+            }
+            gOnlineSaveData.insert(gOnlineSaveData.end(), chunk->data, chunk->data + chunk->count);
+            gOnlineSaveProgress = std::chrono::steady_clock::now();
+            break;
+        }
+        case EVENT_SERVER_SAVEGAME_END: {
+            if (gOnlineLoadState != OnlineLoadState::Receiving)
+                break;
+            bool loaded = false;
+            if (gOnlineSaveData.size() == gOnlineSaveSize && SaveDataHash(gOnlineSaveData) == gOnlineSaveHash) {
+                SaveGameContext context{};
+                context.mReading = true;
+                context.mBuffer.mData = std::move(gOnlineSaveData);
+                context.mBuffer.mDataBitSize = int(gOnlineSaveSize * 8);
+                context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
+                // Apply before consuming any later gameplay event from this TCP batch.
+                loaded = ApplyOnlineSave(app, &context);
+            }
+            gOnlineLoadState = OnlineLoadState::AwaitingResume;
+            gOnlineSaveLoaded = loaded;
+            gOnlineSaveProgress = std::chrono::steady_clock::now();
+            U8_Event ready = {{EVENT_CLIENT_SAVEGAME_READY}, uint8_t(loaded)};
+            if (!gIsReplayMode && !gIsServerModeSpectator)
+                PutEvent(ready);
+            LOG_INFO("[NETPLAY] received coop save: loaded={}", loaded);
+            break;
+        }
+        case EVENT_SERVER_SAVEGAME_RESUME:
+            if (gOnlineLoadState == OnlineLoadState::AwaitingResume) {
+                if (gOnlineSaveLoaded)
+                    ResetSaveGameTransfer();
+                else
+                    AbortOnlineSave(app, false);
+            }
+            break;
+        case EVENT_SERVER_SAVEGAME_ABORT:
+            AbortOnlineSave(app, false);
+            break;
+        default:
+            break;
+    }
+    return true;
+}
 
 bool LawnSaveGame_Original(Board *theBoard, const pvzstl::string &theFilePath) {
     SaveGameContext aContext{};
@@ -45,6 +323,11 @@ bool LawnSaveGame_Original(Board *theBoard, const pvzstl::string &theFilePath) {
 }
 
 bool LawnSaveGame(Board *theBoard, const pvzstl::string &theFilePath) {
+    if (theBoard->mApp->IsCoopMode() && IsRemoteClientOrViewer()) {
+        // A received board must never replace the guest's own local coop save.
+        theBoard->mApp->mNeedGoBackToMain = false;
+        return true;
+    }
     if (disableSaveUserdata) {
         theBoard->mApp->mNeedGoBackToMain = false; // 用于从暂停菜单返回主界面
         return true;
@@ -113,12 +396,14 @@ bool LawnLoadGame_Original(Board *theBoard, SaveGameContext *theContext) {
 
     // 检查存档魔数和版本范围。
     if (aHeader.mMagicNumber != SAVE_FILE_MAGIC_NUMBER || aHeader.mBuildVersion > SAVE_FILE_VERSION) {
-        gLawnApp->HandleCorruptedGameFile();
+        if (!netplay::IsApplyingOnlineSaveGame())
+            gLawnApp->HandleCorruptedGameFile();
         return false;
     }
     // 魔数正确，但不是当前支持的版本。
     if (aHeader.mBuildVersion != SAVE_FILE_VERSION) {
-        gLawnApp->HandleOldGameFile();
+        if (!netplay::IsApplyingOnlineSaveGame())
+            gLawnApp->HandleOldGameFile();
         return false;
     }
     SyncBoard(theContext, theBoard);
@@ -129,7 +414,8 @@ bool LawnLoadGame_Original(Board *theBoard, SaveGameContext *theContext) {
         }
     }
     if (theContext->mFailed) {
-        gLawnApp->HandleCorruptedGameFile();
+        if (!netplay::IsApplyingOnlineSaveGame())
+            gLawnApp->HandleCorruptedGameFile();
         return false;
     }
 
@@ -201,17 +487,21 @@ void FixBoardAfterLoad(Board *theBoard) {
     }
 
     theBoard->mAdvice->mApp = app;
-    theBoard->mCursorObject[0]->mApp = app;
-    theBoard->mCursorObject[0]->mBoard = theBoard;
-    theBoard->mCursorPreview[0]->mApp = app;
-    theBoard->mCursorPreview[0]->mBoard = theBoard;
-    SeedBank *aSeedBank = theBoard->mSeedBank[0];
-    aSeedBank->mApp = app;
-    aSeedBank->mBoard = theBoard;
-    for (auto &aPacket : aSeedBank->mSeedPackets) {
-        aPacket.mApp = app;
-        aPacket.mBoard = theBoard;
-        aPacket.mSeedBank = aSeedBank;
+    for (int player = 0; player < 2; ++player) {
+        theBoard->mCursorObject[player]->mApp = app;
+        theBoard->mCursorObject[player]->mBoard = theBoard;
+        theBoard->mCursorPreview[player]->mApp = app;
+        theBoard->mCursorPreview[player]->mBoard = theBoard;
+        SeedBank *aSeedBank = theBoard->mSeedBank[player];
+        if (aSeedBank != nullptr) {
+            aSeedBank->mApp = app;
+            aSeedBank->mBoard = theBoard;
+            for (auto &aPacket : aSeedBank->mSeedPackets) {
+                aPacket.mApp = app;
+                aPacket.mBoard = theBoard;
+                aPacket.mSeedBank = aSeedBank;
+            }
+        }
     }
     theBoard->mChallenge->mApp = app;
     theBoard->mChallenge->mBoard = theBoard;
@@ -228,6 +518,8 @@ bool LawnLoadGame(Board *theBoard, SaveGameContext *theContext) {
     if (theBoard->mApp->IsCoopMode()) {
         if (theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS) {
             bool result = LawnLoadGame_Original(theBoard, theContext);
+            if (!result)
+                return false;
             int theSeedNum = 6;
             SeedBank *seedBank1 = theBoard->mSeedBank[0];
             SeedBank *seedBank2 = theBoard->mSeedBank[1];
@@ -251,6 +543,8 @@ bool LawnLoadGame(Board *theBoard, SaveGameContext *theContext) {
             return result;
         } else {
             bool result = LawnLoadGame_Original(theBoard, theContext);
+            if (!result)
+                return false;
             int theSeedNum = 4;
             SeedBank *seedBank1 = theBoard->mSeedBank[0];
             SeedBank *seedBank2 = theBoard->mSeedBank[1];

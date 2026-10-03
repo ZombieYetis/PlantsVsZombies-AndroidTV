@@ -43,6 +43,7 @@
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
 #include "PvZ/Lawn/System/ReanimationLawn.h"
+#include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/Lawn/VSActionSystem.h"
 #include "PvZ/Lawn/Widget/ChallengeScreen.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
@@ -94,6 +95,15 @@ struct CoopToolState {
     bool touching = false;
 };
 CoopToolState gCoopTools[2];
+bool gLocalLawnViewTouch = false;
+
+SeedChooserScreen *GetOnlineCoopLawnView(Board *board) {
+    SeedChooserScreen *chooser = board->mApp->mSeedChooserScreen;
+    if (!IsOnlineModeActive() || !board->mApp->IsCoopMode() || board->mApp->mGameScene != SCENE_LEVEL_INTRO || chooser == nullptr || chooser->mChooseState != SeedChooserState::CHOOSE_VIEW_LAWN) {
+        return nullptr;
+    }
+    return chooser;
+}
 
 int DecodeSelectedSeedIndex(uint8_t encodedIndex, const SeedBank *seedBank) {
     if (encodedIndex == kNoSelectedSeedIndex) {
@@ -111,6 +121,7 @@ int DecodeSelectedSeedIndex(uint8_t encodedIndex, const SeedBank *seedBank) {
 } // namespace
 
 void Board::_constructor(LawnApp *theApp) {
+    gLocalLawnViewTouch = false;
     for (auto &tool : gCoopTools) {
         tool = {};
     }
@@ -1294,6 +1305,9 @@ bool Board::KeyUp(Sexy::KeyCode theKey) {
 }
 
 bool Board::KeyDown(KeyCode theKey) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return true;
+    }
     // 联机对战屏蔽按键，仅允许返回键
     bool isOnlineMode = (IsRemoteClient() || IsRemoteServer());
     if (isOnlineMode) {
@@ -3750,13 +3764,36 @@ void Board::processServerEvent(const BaseEvent *event) {
 
         } break;
 
+        case EVENT_SERVER_BOARD_MORE_ZOMBIES: {
+            const auto *stageEvent = static_cast<const U16UNI32_Event *>(event);
+            if (!mApp->IsCoopMode() || mApp->mGameScene != SCENE_PLAYING || stageEvent->data1 != uint16_t(mApp->mGameMode) || stageEvent->data2.i32 != mChallenge->mSurvivalStage) {
+                break;
+            }
+            DisplayAdvice("[ADVICE_MORE_ZOMBIES]", MESSAGE_STYLE_BIG_MIDDLE, ADVICE_NONE);
+            mApp->mMusic->FadeOut(500);
+            mApp->PlaySample(Sexy::SOUND_HUGE_WAVE);
+        } break;
+        case EVENT_SERVER_BOARD_INIT_SURVIVAL_STAGE: {
+            const auto *stageEvent = static_cast<const U16UNI32_Event *>(event);
+            const int nextStage = stageEvent->data2.i32;
+            if (!mApp->IsCoopMode() || stageEvent->data1 != uint16_t(mApp->mGameMode) || nextStage <= mChallenge->mSurvivalStage) {
+                break;
+            }
+            // CheckForGameEnd increments this on the host before InitSurvivalStage.
+            // Apply its result once, rather than running local end-of-round logic.
+            mChallenge->mSurvivalStage = nextStage;
+            InitSurvivalStage_Origin();
+        } break;
         case EVENT_SERVER_BOARD_START_LEVEL: {
             // 与主机端同步置0
             mMainCounter = 0;
-            serverPlantIDMap.clear();
-            serverZombieIDMap.clear();
-            serverCoinIDMap.clear();
-            serverGridItemIDMap.clear();
+            // Repicking keeps the same board, including surviving objects and IDs.
+            if (!mApp->IsCoopMode() || mChallenge->mSurvivalStage == 0) {
+                serverPlantIDMap.clear();
+                serverZombieIDMap.clear();
+                serverCoinIDMap.clear();
+                serverGridItemIDMap.clear();
+            }
 
         } break;
         case EVENT_SERVER_BOARD_GAMEOVER_EXIT: {
@@ -4086,6 +4123,9 @@ static void CheatSetZombieSpawn(Board *theBoard, const bool (&theZombiesToSpawn)
 
 
 void Board::Update() {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     isMainMenu = false;
 
     if (UsesOnlineCoopTools()) {
@@ -5072,6 +5112,9 @@ void Board::MouseMove(int x, int y) {
 }
 
 void Board::MouseDownWithPlant(int x, int y, int theClickCount, int thePlayerIndex) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     // 右击鼠标：放下卡牌
     if (theClickCount < 0) {
         RefreshSeedPacketFromCursor(thePlayerIndex);
@@ -5501,7 +5544,20 @@ void Board::ClientMouseUpLocal(int x, int y) {
 
 // 触控落下手指在此处理
 void Board::MouseDown(int x, int y, int theClickCount) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (gIsServerModeSpectator || gIsReplayMode) {
+        return;
+    }
+
+    gLocalLawnViewTouch = false;
+    if (SeedChooserScreen *chooser = GetOnlineCoopLawnView(this)) {
+        // Lawn viewing belongs to this device, so consume the whole touch locally.
+        gLocalLawnViewTouch = true;
+        if (chooser->CancelLawnView()) {
+            chooser->RebuildHelpbar();
+        }
         return;
     }
 
@@ -5929,7 +5985,13 @@ void Board::__MouseDown(int x, int y, int theClickCount) {
 }
 
 void Board::MouseDrag(int x, int y) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (gIsServerModeSpectator || gIsReplayMode) {
+        return;
+    }
+    if (gLocalLawnViewTouch || GetOnlineCoopLawnView(this) != nullptr) {
         return;
     }
     // Drag函数仅仅负责移动光标即可
@@ -6123,7 +6185,17 @@ void Board::__MouseDrag(int x, int y) {
 }
 
 void Board::MouseUp(int x, int y, int theClickCount) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (gIsServerModeSpectator || gIsReplayMode) {
+        return;
+    }
+    if (gLocalLawnViewTouch || GetOnlineCoopLawnView(this) != nullptr) {
+        gLocalLawnViewTouch = false;
+        if (IsRemoteClient()) {
+            ClientMouseUpLocal(x, y);
+        }
         return;
     }
     if (!IsRemoteClient() && !IsRemoteServer()) {
@@ -6252,6 +6324,8 @@ TouchState gTouchStateSecond = TouchState::TOUCHSTATE_NONE;
 } // namespace
 
 void Board::MouseDownSecond(int x, int y, int theClickCount) {
+    if (netplay::IsSynchronizingSaveGame())
+        return;
     if (HandleCoopToolTouch(mGamepadControls[1]->mGamepadIndex == 1 ? 1 : 0, x, y, CoopToolTouch::Down)) {
         gPlayerIndexSecond = TouchPlayerIndex::TOUCHPLAYER_NONE;
         gTouchStateSecond = TouchState::TOUCHSTATE_NONE;
@@ -6657,6 +6731,9 @@ void Board::MouseDownSecond(int x, int y, int theClickCount) {
 
 
 void Board::MouseDragSecond(int x, int y) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (HandleCoopToolTouch(mGamepadControls[1]->mGamepadIndex == 1 ? 1 : 0, x, y, CoopToolTouch::Drag)) {
         return;
     }
@@ -6814,6 +6891,9 @@ void Board::MouseDragSecond(int x, int y) {
 
 
 void Board::MouseUpSecond(int x, int y, int theClickCount) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (HandleCoopToolTouch(mGamepadControls[1]->mGamepadIndex == 1 ? 1 : 0, x, y, CoopToolTouch::Up)) {
         return;
     }
@@ -6903,6 +6983,56 @@ void Board::MouseUpSecond(int x, int y, int theClickCount) {
     gTouchStateSecond = TouchState::TOUCHSTATE_NONE;
 }
 
+
+void Board::InitSurvivalStage() {
+    if (mApp->IsCoopMode()) {
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
+        if (IsRemoteServer()) {
+            U16UNI32_Event event{};
+            event.type = EVENT_SERVER_BOARD_INIT_SURVIVAL_STAGE;
+            event.data1 = uint16_t(mApp->mGameMode);
+            event.data2.i32 = mChallenge->mSurvivalStage;
+            netplay::PutEvent(event);
+        }
+    }
+    InitSurvivalStage_Origin();
+}
+
+void Board::InitSurvivalStage_Origin() {
+    if (mApp->IsCoopMode() && (IsRemoteServer() || IsRemoteClientOrViewer())) {
+        const bool wasPauseSyncFromRemote = gPauseSyncFromRemote;
+        gPauseSyncFromRemote = true;
+        mApp->KillDialog(Dialogs::DIALOG_CONFIRM_IN_GAME_RESTART);
+        mApp->KillNewOptionsDialog();
+        gPauseSyncFromRemote = wasPauseSyncFromRemote;
+        mPaused = false;
+        mNextSurvivalStageCounter = 0;
+        mBoardFadeOutCounter = -1;
+        mApp->KillSeedChooserScreen();
+    }
+
+    old_Board_InitSurvivalStage(this);
+}
+
+void Board::MapLoadedNetplayIds() {
+    // SyncDataArray restores each saved slot and ID verbatim on both peers.
+    // Map by ID, not coordinates: stacked plants and multiple zombies share cells.
+    const auto mapArray = [](auto &array, IdMap &ids) {
+        ids.clear();
+        for (uint32_t slot = 0; slot < array.mMaxUsedCount; ++slot) {
+            const uint32_t id = array.mBlock[slot].mID;
+            if ((id >> DATA_ARRAY_KEY_SHIFT) != 0) {
+                ids[uint16_t(id)] = uint16_t(id);
+            }
+        }
+    };
+    mapArray(mPlants, serverPlantIDMap);
+    mapArray(mZombies, serverZombieIDMap);
+    mapArray(mCoins, serverCoinIDMap);
+    mapArray(mGridItems, serverGridItemIDMap);
+}
 
 void Board::StartLevel() {
     if (mApp->IsVSMode()) {
@@ -7037,6 +7167,9 @@ void Board::UpdateButtons() {
 
 
 void Board::ButtonDepress(int theId) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
     if (theId == 1000) {
         if (gIsServerModeSpectator && mBoardFadeOutCounter > 0) {
             return; // 修复观战在 FadeOut 界面返回会导致 NewOptionsDialog 卡死
@@ -7153,7 +7286,16 @@ bool Board::GrantAchievement(AchievementType theAchievementId, bool theIsShow) {
 }
 
 void Board::FadeOutLevel() {
+    const bool notifyMoreZombies = IsRemoteServer() && mApp->IsCoopMode() && mApp->mGameScene == SCENE_PLAYING && IsSurvivalStageWithRepick();
     old_Board_FadeOutLevel(this);
+
+    if (notifyMoreZombies) {
+        U16UNI32_Event event{};
+        event.type = EVENT_SERVER_BOARD_MORE_ZOMBIES;
+        event.data1 = uint16_t(mApp->mGameMode);
+        event.data2.i32 = mChallenge->mSurvivalStage;
+        netplay::PutEvent(event);
+    }
 
     if (mApp->IsSurvivalMode() && mChallenge->mSurvivalStage >= 19) {
         GrantAchievement(AchievementType::ACHIEVEMENT_IMMORTAL, true);

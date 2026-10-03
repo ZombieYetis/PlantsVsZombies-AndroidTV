@@ -39,6 +39,7 @@ bool LoadGameMain() {
     Board_BoardAddr = libGameMain.GetSymbol("_ZN5BoardC2EP7LawnApp");
     Board__destructorAddr = libGameMain.GetSymbol("_ZN5BoardD2Ev");
     Board_InitLevelAddr = libGameMain.GetSymbol("_ZN5Board9InitLevelEv");
+    Board_InitSurvivalStageAddr = libGameMain.GetSymbol("_ZN5Board17InitSurvivalStageEv");
     Board_StartLevelAddr = libGameMain.GetSymbol("_ZN5Board10StartLevelEv");
     Board_RemovedFromManagerAddr = libGameMain.GetSymbol("_ZN5Board18RemovedFromManagerEPN4Sexy13WidgetManagerE");
     Board_FadeOutLevelAddr = libGameMain.GetSymbol("_ZN5Board12FadeOutLevelEv");

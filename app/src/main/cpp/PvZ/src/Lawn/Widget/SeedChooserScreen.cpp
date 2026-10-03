@@ -1847,13 +1847,13 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
         }
     } else {
         if (mStoreButton) {
-            if (!mApp->CanShowStore()) { // 去除在未解锁商店时商店按钮
+            if (!mApp->CanShowStore() || (mApp->IsCoopMode() && IsOnlineModeActive())) { // 未解锁或联机结盟时禁用商店
                 mStoreButton->mDisabled = true;
                 mStoreButton->mBtnNoDraw = true;
             }
         }
         if (mAlmanacButton) {
-            if (!mApp->CanShowAlmanac()) { // 去除在未解锁图鉴时的图鉴按钮
+            if (!mApp->CanShowAlmanac() || (mApp->IsCoopMode() && IsOnlineModeActive())) { // 未解锁或联机结盟时禁用图鉴
                 mAlmanacButton->mDisabled = true;
                 mAlmanacButton->mBtnNoDraw = true;
             }
@@ -3901,6 +3901,9 @@ void SeedChooserScreen::ButtonDepress(int theId) {
 }
 
 void SeedChooserScreen::ButtonDepress_Origin(int theId) {
+    if (mApp->IsCoopMode() && IsOnlineModeActive() && (theId == SeedChooserScreen_Store || theId == SeedChooserScreen_Almanac)) {
+        return;
+    }
     if (mApp->IsCoopMode() && theId == SeedChooserScreen_BackToModeSelect) {
         mApp->ReturnToModeSelect();
         return;
@@ -4242,6 +4245,14 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount) {
     }
     if (mApp->GetDialogCount() != 0 || mImitaterDialog != nullptr) {
         return; // 存在模仿者选框、不建议种子选框等时
+    }
+    if (mApp->IsCoopMode() && IsOnlineModeActive() && mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN) {
+        gSeedChooserTouchState = SeedChooserTouchState::SEEDCHOOSER_TOUCHSTATE_NONE;
+        gSeedChooserTouchOwner = nullptr;
+        if (CancelLawnView()) {
+            RebuildHelpbar();
+        }
+        return;
     }
     NormalizeLocalPoint(this, x, y);
     if (x < 0 || x >= mWidth || y < 0 || y >= mHeight) {

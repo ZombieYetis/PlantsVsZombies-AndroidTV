@@ -28,6 +28,7 @@
 #include "PvZ/Lawn/Board/ZenGarden.h"
 #include "PvZ/Lawn/Board/Zombie.h"
 #include "PvZ/Lawn/LawnApp.h"
+#include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/Lawn/Widget/VSSetupAddonWidget.h"
 #include "PvZ/NetPlay.h"
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
@@ -1169,6 +1170,9 @@ void GamepadControls::DrawPreview(Sexy::Graphics *g) {
 }
 
 void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerIndex, unsigned int unk) {
+    if (netplay::IsSynchronizingSaveGame()) {
+        return;
+    }
 
     if (!mApp->IsVSMode() || theButton != Sexy::GamepadButton::GAMEPAD_BUTTON_A) {
         return old_GamepadControls_OnButtonDown(this, theButton, thePlayerIndex, unk);

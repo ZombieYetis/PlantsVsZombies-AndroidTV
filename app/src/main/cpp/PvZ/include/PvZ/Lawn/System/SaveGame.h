@@ -28,6 +28,8 @@
 #include "PvZ/TodLib/Effect/Reanimator.h"
 
 class Board;
+class LawnApp;
+struct BaseEvent;
 
 #define SAVE_FILE_MAGIC_NUMBER 0xFEEDDEAD
 #define SAVE_FILE_VERSION 8
@@ -101,5 +103,15 @@ inline void GetSavedGameName(const pvzstl::string &name, GameMode theGameMode, i
     reinterpret_cast<void (*)(const pvzstl::string &, GameMode, int, int)>(GetSavedGameNameAddr)(name, theGameMode, theProfileId, theId);
 }
 void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameContext &theContext);
+
+namespace netplay {
+// State is external to LawnApp/Board to preserve the native object layouts.
+bool StartCoopEndlessLoad(LawnApp *app);
+bool HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fromHost);
+void UpdateSaveGameTransfer(LawnApp *app);
+void ResetSaveGameTransfer() noexcept;
+bool IsSynchronizingSaveGame() noexcept;
+bool IsApplyingOnlineSaveGame() noexcept;
+} // namespace netplay
 
 #endif // PVZ_LAWN_SYSTEM_SAVE_GAME_H

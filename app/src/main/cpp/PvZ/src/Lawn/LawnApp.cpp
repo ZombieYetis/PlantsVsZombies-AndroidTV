@@ -383,6 +383,10 @@ void LawnApp::DoConfirmBackToMain(bool theIsSave) {
 
 
 void LawnApp::ClearSecondPlayer() {
+    if (netplay::IsApplyingOnlineSaveGame()) {
+        return;
+    }
+    netplay::ClearSendBuffer();
     gIsServerModeNetplay = false;
     gIsConnectedToServer = false;
     gServerModeTransport = ServerModeTransport::NONE;
@@ -510,6 +514,11 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
         replay::RecordPacket(ReplayPacketDir::InboundClient, clientRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
         LOG_DEBUG("event.type = {}", int(event->type));
 
+        if (netplay::HandleSaveGameEvent(this, event, false)) {
+            offset += event->size;
+            continue;
+        }
+
         if (event->type == EVENT_PING) {
             auto *eventPing = static_cast<const U16_Event *>(event);
             U16_Event eventPong = {{EVENT_PONG}, eventPing->data};
@@ -526,7 +535,7 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
                 }
             }
         } else if (event->type >= EVENT_CLIENT_BOARD_TOUCH_DOWN && event->type < NUM_EVENT_BOARD) {
-            if (mBoard != nullptr) {
+            if (mBoard != nullptr && !netplay::IsSynchronizingSaveGame()) {
                 mBoard->processClientEvent(event);
             }
         } else if (event->type >= EVENT_SERVER_CHALLENGESCREEN_SELECT_MODE && event->type < NUM_EVENT_CHALLENGESCREEN) {
@@ -573,6 +582,11 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
         BaseEvent *event = netplay::GetEvent(alignedBuf, serverRecvPtr);
         replay::RecordPacket(ReplayPacketDir::InboundServer, serverRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
         LOG_DEBUG("event.type = {}", int(event->type));
+
+        if (netplay::HandleSaveGameEvent(this, event, true)) {
+            offset += event->size;
+            continue;
+        }
 
         if (waitDialog != nullptr && waitDialog->ServerIsWaitingReservedSpectate()) {
             if (event->type == EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE) {
@@ -854,6 +868,7 @@ void LawnApp::UpdateFrames() {
     //    UpdateSessionState(); // 连接渡维服务器用
     //    UpdatePlayTimeStats(); // 本来就是空函数，故注释
 
+    netplay::UpdateSaveGameTransfer(this);
     int updateCount = 0;
 
     if (gSlowMo) {
@@ -875,6 +890,10 @@ void LawnApp::UpdateFrames() {
 
     if (replayActive && !replayPaused && !runReplayFrame) {
         updateCount = 0;
+    }
+
+    if (netplay::IsSynchronizingSaveGame() && !replayActive) {
+        updateCount = 0; // Keep pumping TCP, but do not advance either saved board.
     }
 
     for (int i = 0; i < updateCount; ++i) {
@@ -902,7 +921,12 @@ void LawnApp::UpdateFrames() {
             mEffectSystem->ProcessDeleteQueue();
         }
 
-        CheckForGameEnd();
+        // Coop clients enter the next survival stage only on the host's event.
+        // Running the native check here could increment the stage/profile twice.
+        const bool waitForCoopRepick = IsRemoteClientOrViewer() && IsCoopMode() && mBoard != nullptr && mBoard->IsSurvivalStageWithRepick();
+        if (!waitForCoopRepick) {
+            CheckForGameEnd();
+        }
         UpdateSavingDingus();
     }
 
@@ -1637,8 +1661,8 @@ void LawnApp::LoadingCompleted() {
 }
 
 bool LawnApp::TryLoadGame() {
-    // TODO: 适配结盟无尽的读档
-    if (IsOnlineModeActive()) {
+    // 联机仅限结盟无尽支持读档
+    if (IsOnlineModeActive() && (!IsRemoteServer() || mGameMode != GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS)) {
         return false;
     }
 
@@ -1728,9 +1752,13 @@ void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame) {
         netplay::FlushSendBuffer(gTcpServerSocket);
     }
     replay::ResetRecorder();
+    netplay::ResetSaveGameTransfer();
     if (IsOnlineModeActive()) {
-        PostEnterLevel();
         mGameMode = theGameMode;
+        if (theLookForSavedGame && theGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS && netplay::StartCoopEndlessLoad(this)) {
+            return;
+        }
+        PostEnterLevel();
         NewGame();
         return;
     }

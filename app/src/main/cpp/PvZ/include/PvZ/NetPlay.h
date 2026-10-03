@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3204;
+inline constexpr uint32_t NETPLAY_VERSION = 3205;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -235,6 +235,8 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_PLAY_FOLEY,
     EVENT_CLIENT_BOARD_GAMEOVER_EXIT,
     EVENT_SERVER_BOARD_GAMEOVER_EXIT,
+    EVENT_SERVER_BOARD_INIT_SURVIVAL_STAGE,
+    EVENT_SERVER_BOARD_MORE_ZOMBIES,
 
     EVENT_SERVER_BOARD_SEEDBANK_ADDSEED,
 
@@ -245,7 +247,15 @@ enum EventType : uint8_t {
     /************************************************************/
     EVENT_CLIENT_VSRESULT_BUTTON_DEPRESS,
     EVENT_SERVER_VSRESULT_BUTTON_DEPRESS,
-    NUM_EVENT_VSRESULT
+    NUM_EVENT_VSRESULT,
+
+    EVENT_SERVER_SAVEGAME_BEGIN,
+    EVENT_SERVER_SAVEGAME_CHUNK,
+    EVENT_SERVER_SAVEGAME_END,
+    EVENT_CLIENT_SAVEGAME_READY,
+    EVENT_SERVER_SAVEGAME_RESUME,
+    EVENT_SERVER_SAVEGAME_NEW_GAME,
+    EVENT_SERVER_SAVEGAME_ABORT
 };
 
 struct BaseEvent {
@@ -299,6 +309,12 @@ struct I16_Event : BaseEvent {
 struct U8U8_Event : BaseEvent {
     uint8_t data1;
     uint8_t data2;
+};
+
+// Fixed-size transport chunks keep save files inside the existing event framing.
+struct U16U8x240_Event : BaseEvent {
+    uint16_t count;
+    uint8_t data[240];
 };
 
 struct U8x3_Event : BaseEvent {
@@ -559,6 +575,7 @@ void PutEvent(T &&event) {
 
 bool FlushSendBuffer(int socket);
 void ClearSendBuffer() noexcept;
+bool HasPendingSendData() noexcept;
 
 std::size_t ParseEventSize(const std::byte *data);
 

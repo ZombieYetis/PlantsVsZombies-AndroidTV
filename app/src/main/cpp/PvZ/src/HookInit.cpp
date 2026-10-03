@@ -121,6 +121,7 @@ void InitHookFunction() {
     homura::HookFunc(Board_BoardAddr, &Board::_constructor, nullptr);
     homura::HookFunc(Board__destructorAddr, &Board::_destructor, nullptr);
     homura::HookFunc(Board_InitLevelAddr, &Board::InitLevel, &old_Board_InitLevel);
+    homura::HookFunc(Board_InitSurvivalStageAddr, &Board::InitSurvivalStage, &old_Board_InitSurvivalStage);
     homura::HookFunc(Board_StartLevelAddr, &Board::StartLevel, &old_Board_StartLevel);
     homura::HookFunc(Board_RemovedFromManagerAddr, &Board::RemovedFromManager, &old_Board_RemovedFromManager);
     homura::HookFunc(Board_FadeOutLevelAddr, &Board::FadeOutLevel, &old_Board_FadeOutLevel);

@@ -42,6 +42,7 @@ inline void *Board_UpdateAddr;
 inline void *Board_BoardAddr;
 inline void *Board__destructorAddr;
 inline void *Board_InitLevelAddr;
+inline void *Board_InitSurvivalStageAddr;
 inline void *Board_StartLevelAddr;
 inline void *Board_RemovedFromManagerAddr;
 inline void *Board_GetPlantsOnLawnAddr;
