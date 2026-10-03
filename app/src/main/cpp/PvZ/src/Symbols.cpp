@@ -331,6 +331,7 @@ bool LoadGameMain() {
     LawnApp_UpdateFramesAddr = libGameMain.GetSymbol("_ZN7LawnApp12UpdateFramesEv");
     LawnApp_FinishLoadGameAddr = libGameMain.GetSymbol("_ZN7LawnApp14FinishLoadGameEv");
     LawnApp_IsAdventureModeAddr = libGameMain.GetSymbol("_ZN7LawnApp15IsAdventureModeEv");
+    LawnApp_GetCurrentChallengeDefAddr = libGameMain.GetSymbol("_ZN7LawnApp22GetCurrentChallengeDefEv");
     LawnApp_IsWallnutBowlingLevelAddr = libGameMain.GetSymbol("_ZN7LawnApp21IsWallnutBowlingLevelEv");
     LawnApp_IsCoopModeAddr = libGameMain.GetSymbol("_ZN7LawnApp10IsCoopModeEv");
     LawnApp_IsTwinSunbankModeAddr = libGameMain.GetSymbol("_ZN7LawnApp17IsTwinSunbankModeEv");
@@ -591,7 +592,6 @@ bool LoadGameMain() {
     Zombie_BossStartDeathAddr = libGameMain.GetSymbol("_ZN6Zombie14BossStartDeathEv");
     Zombie_BossCanStompRowAddr = libGameMain.GetSymbol("_ZN6Zombie15BossCanStompRowEi");
     Zombie_PickBungeeZombieTargetAddr = libGameMain.GetSymbol("_ZN6Zombie22PickBungeeZombieTargetEi");
-    gBossZombieListAddr = libGameMain.GetSymbol("gBossZombieList");
     Zombie_UpdateZombiePogoAddr = libGameMain.GetSymbol("_ZN6Zombie16UpdateZombiePogoEv");
     Zombie_UpdateZombieCatapultAddr = libGameMain.GetSymbol("_ZN6Zombie20UpdateZombieCatapultEv");
     Zombie_PogoBreakAddr = libGameMain.GetSymbol("_ZN6Zombie9PogoBreakEj");

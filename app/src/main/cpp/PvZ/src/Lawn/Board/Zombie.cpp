@@ -40,6 +40,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <iterator>
 
 #include <numbers>
 
@@ -122,6 +123,32 @@ ZombieDefinition gExtendedZombieDefs[] = {
     {ZOMBIE_CROSSING_GUARD, REANIM_ZOMBIE_CROSSING_GUARD, 4, 36, 10, 1000, "CROSSING_GUARD_ZOMBIE"},
     {ZOMBIE_SCIENTIST, REANIM_ZOMBIE_SCIENTIST, 2, 33, 10, 2000, "SCIENTIST_ZOMBIE"},
 };
+
+static ZombieType gBossZombieList[] = {ZombieType::ZOMBIE_TRAFFIC_CONE,
+                                       ZombieType::ZOMBIE_PAIL,
+                                       ZombieType::ZOMBIE_FOOTBALL,
+                                       ZombieType::ZOMBIE_POLEVAULTER,
+                                       ZombieType::ZOMBIE_JACK_IN_THE_BOX,
+                                       ZombieType::ZOMBIE_LADDER,
+                                       ZombieType::ZOMBIE_ZAMBONI,
+                                       ZombieType::ZOMBIE_CATAPULT,
+                                       ZombieType::ZOMBIE_POGO,
+                                       ZombieType::ZOMBIE_NEWSPAPER,
+                                       ZombieType::ZOMBIE_DOOR,
+                                       ZombieType::ZOMBIE_GARGANTUAR};
+
+static ZombieType gBossZombieListHard[] = {ZombieType::ZOMBIE_TRAFFIC_CONE,
+                                           ZombieType::ZOMBIE_PAIL,
+                                           ZombieType::ZOMBIE_FOOTBALL,
+                                           ZombieType::ZOMBIE_SUPER_FAN_IMP,
+                                           ZombieType::ZOMBIE_GIGA_POLEVAULTER,
+                                           ZombieType::ZOMBIE_JACK_IN_THE_BOX,
+                                           ZombieType::ZOMBIE_GIGA_FOOTBALL,
+                                           ZombieType::ZOMBIE_ZAMBONI,
+                                           ZombieType::ZOMBIE_CATAPULT,
+                                           ZombieType::ZOMBIE_POGO,
+                                           ZombieType::ZOMBIE_SUNDAY_EDITION,
+                                           ZombieType::ZOMBIE_GIGA_GARGANTUAR};
 
 ZombieDefinition &GetZombieDefinition(ZombieType theZombieType) {
     if (theZombieType == ZOMBIE_TRASHCAN) {
@@ -213,6 +240,12 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
         // 默认值
         // mZombieRect = Rect(36, 0, 42, 115);
         // mZombieAttackRect = Rect(50, 0, 20, 115);
+        case ZombieType::ZOMBIE_BOSS:
+            if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
+                mBodyHealth = 80000;
+            }
+            break;
+
         case ZombieType::ZOMBIE_BALLOON:
             if (mApp->IsVSMode() && IsOnBoard()) {
                 mAltitude = 0.0f;
@@ -10839,19 +10872,24 @@ void Zombie::BossDie() {
 }
 
 void Zombie::BossSpawnContact() {
-    if (IsRemoteClientOrViewer())
+    if (IsRemoteClientOrViewer()) {
         return;
+    }
 
+    const bool aIsHardMode = mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD;
     ZombieType aZombieType;
     if (mZombieAge < 3500) {
-        aZombieType = ZombieType::ZOMBIE_NORMAL;
+        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_TRAFFIC_CONE : ZombieType::ZOMBIE_NORMAL;
     } else if (mZombieAge < 8000) {
-        aZombieType = ZombieType::ZOMBIE_TRAFFIC_CONE;
+        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_PAIL : ZombieType::ZOMBIE_TRAFFIC_CONE;
     } else if (mZombieAge < 12500) {
-        aZombieType = ZombieType::ZOMBIE_PAIL;
+        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_FOOTBALL : ZombieType::ZOMBIE_PAIL;
     } else {
-        const auto *aZombieList = reinterpret_cast<const ZombieType *>(gBossZombieListAddr);
-        const int aZombieTypeCount = mTargetRow == 0 ? 11 : 12;
+        const ZombieType *aZombieList = aIsHardMode ? gBossZombieListHard : gBossZombieList;
+        int aZombieTypeCount = aIsHardMode ? int(std::size(gBossZombieListHard)) : int(std::size(gBossZombieList));
+        if (mTargetRow == 0) {
+            aZombieTypeCount--;
+        }
         aZombieType = aZombieList[Rand(aZombieTypeCount)];
     }
 

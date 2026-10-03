@@ -46,6 +46,7 @@ class MainMenu;
 class SeedChooserScreen;
 class CreditScreen;
 class ChallengeScreen;
+class ChallengeDefinition;
 class AlmanacDialog;
 class PoolEffect;
 class ReanimatorCache;
@@ -627,6 +628,7 @@ public:
     bool IsIZombieLevel() const;
     bool IsWallnutBowlingLevel() const;
     bool IsAdventureMode() const;
+    ChallengeDefinition &GetCurrentChallengeDef() const;
     bool IsPuzzleMode() const;
     static bool IsSurvivalNormal(GameMode theGameMode);
     static bool IsSurvivalHard(GameMode theGameMode);

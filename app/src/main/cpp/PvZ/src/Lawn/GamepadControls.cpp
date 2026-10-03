@@ -406,7 +406,7 @@ void GamepadControls::_constructor(Board *theBoard, int thePlayerIndex1, int the
         return;
 
     GameMode aGameMode = mApp->mGameMode;
-    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || (aGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && aGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS));
+    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || mApp->IsCoopMode());
     if (!gKeyboardMode && !isTwoSeedBankMode && aGameMode != GameMode::GAMEMODE_CHALLENGE_SLOT_MACHINE) {
         mIsInShopSeedBank = true; // 是否在Shop栏。
     }

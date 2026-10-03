@@ -53,26 +53,26 @@ public:
 
 public:
     Sexy::ButtonWidget *mChallengeButtons[NUM_CHALLENGE_MODES_ORIGINAL]; // 65 ~ 158
-    LawnApp *mApp;                                              // 159
-    ToolTipWidget *mToolTip;                                    // 160
-    ChallengePage mPage;                                        // 161
-    bool mCheatEnableChallenges;                                // 648
-    UnlockingState mUnlockState;                                // 163
-    int mUnlockStateCounter;                                    // 164
-    int mUnlockChallengeIndex;                                  // 165
-    float mLockShakeX;                                          // 166
-    float mLockShakeY;                                          // 167
-    Sexy::Curve1DUtil mUtil;                                    // 168 ~ 183
-    HelpBarWidget *mHelpBarWidget;                              // 184
-    int mScrollPosition;                                        // 185
-    int mScrollTargetPosition;                                  // 186
-    float mScrollAnimationTime;                                 // 187
-    int mPageChallengeIndex[NUM_CHALLENGE_MODES_ORIGINAL];      // 188 ~ 281
-    float mPageChallengeAnimTime[NUM_CHALLENGE_MODES_ORIGINAL]; // 282 ~ 375
-    int mPageChallengeCount;                                    // 376
-    GameMode mSelectedGameMode;                                 // 377 其值固定比mSelectedMode小2
-    int mSelectedChallengeIndex;                                // 378
-    int mSurvivalCount;                                         // 379
+    LawnApp *mApp;                                                       // 159
+    ToolTipWidget *mToolTip;                                             // 160
+    ChallengePage mPage;                                                 // 161
+    bool mCheatEnableChallenges;                                         // 648
+    UnlockingState mUnlockState;                                         // 163
+    int mUnlockStateCounter;                                             // 164
+    int mUnlockChallengeIndex;                                           // 165
+    float mLockShakeX;                                                   // 166
+    float mLockShakeY;                                                   // 167
+    Sexy::Curve1DUtil mUtil;                                             // 168 ~ 183
+    HelpBarWidget *mHelpBarWidget;                                       // 184
+    int mScrollPosition;                                                 // 185
+    int mScrollTargetPosition;                                           // 186
+    float mScrollAnimationTime;                                          // 187
+    int mPageChallengeIndex[NUM_CHALLENGE_MODES_ORIGINAL];               // 188 ~ 281
+    float mPageChallengeAnimTime[NUM_CHALLENGE_MODES_ORIGINAL];          // 282 ~ 375
+    int mPageChallengeCount;                                             // 376
+    GameMode mSelectedGameMode;                                          // 377 其值固定比mSelectedMode小2
+    int mSelectedChallengeIndex;                                         // 378
+    int mSurvivalCount;                                                  // 379
     // 大小380个整数, 以下是新增成员!
     NewLawnButton *mBackButton = nullptr;
     NetplayLobbyWidget *mNetplayLobbyWidget = nullptr;
@@ -81,16 +81,13 @@ public:
     float mPageChallengeAnimTimeExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
 
     Sexy::ButtonWidget *&GetChallengeButton(int theChallengeIndex) {
-        return theChallengeIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mChallengeButtons[theChallengeIndex]
-            : mChallengeButtonsExtended[theChallengeIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+        return theChallengeIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mChallengeButtons[theChallengeIndex] : mChallengeButtonsExtended[theChallengeIndex - NUM_CHALLENGE_MODES_ORIGINAL];
     }
     int &GetPageChallengeIndex(int thePageIndex) {
-        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeIndex[thePageIndex]
-            : mPageChallengeIndexExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeIndex[thePageIndex] : mPageChallengeIndexExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
     }
     float &GetPageChallengeAnimTime(int thePageIndex) {
-        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeAnimTime[thePageIndex]
-            : mPageChallengeAnimTimeExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
+        return thePageIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mPageChallengeAnimTime[thePageIndex] : mPageChallengeAnimTimeExtended[thePageIndex - NUM_CHALLENGE_MODES_ORIGINAL];
     }
 
     ChallengeScreen(LawnApp *theApp, ChallengePage thePage) {

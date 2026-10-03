@@ -1748,6 +1748,14 @@ void Board::PickBackground() {
         mPlantRow[5] = PlantRowType::PLANTROW_NORMAL;
         InitCoverLayer();
         SetGrids();
+    } else if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
+        mBackground = BackgroundType::BACKGROUND_6_BOSS;
+        LoadBackgroundImages();
+        for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++) {
+            mPlantRow[aRow] = aRow == 5 ? PlantRowType::PLANTROW_DIRT : PlantRowType::PLANTROW_NORMAL;
+        }
+        InitCoverLayer();
+        SetGrids();
     } else if (mApp->mGameMode == GameMode::GAMEMODE_MP_VS) {
         mBackground = gVSBackground;
         LoadBackgroundImages();
@@ -5820,7 +5828,7 @@ void Board::__MouseDown(int x, int y, int theClickCount) {
         gPlayerIndex = mGamepadControls[0]->mGamepadIndex == 0 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER1 : TouchPlayerIndex::TOUCHPLAYER_PLAYER2;
     } else if (aGameMode == GameMode::GAMEMODE_MP_VS) {
         gPlayerIndex = PixelToGridX(x, y) > 5 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER2 : TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
-    } else if (aGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && aGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
+    } else if (mApp->IsCoopMode()) {
         gPlayerIndex = x > 400 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER2 : TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
     } else {
         gPlayerIndex = TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
@@ -6032,7 +6040,7 @@ void Board::__MouseDrag(int x, int y) {
     bool isCobCannonSelected_2P = mGamepadControls[1]->mIsCobCannonSelected;
     BaseGamepadControls::MovementState mGameState = mGamepadControls[0]->mGamepadState;
     GameMode mGameMode = mApp->mGameMode;
-    bool isTwoSeedBankMode = (mGameMode == GameMode::GAMEMODE_MP_VS || (mGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && mGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS));
+    bool isTwoSeedBankMode = (mGameMode == GameMode::GAMEMODE_MP_VS || mApp->IsCoopMode());
     int seedBankHeight = mApp->IsChallengeWithoutSeedBank() ? 87 : seedBank->mY + seedBank->mHeight;
 
     if (gTouchState == TouchState::TOUCHSTATE_SEED_BANK && mApp->IsVSMode()) {
@@ -6355,7 +6363,7 @@ void Board::MouseDownSecond(int x, int y, int theClickCount) {
     MouseHitTest(x, y, &hitResult, false);
     GameObjectType aObjectType = hitResult.mObjectType;
     GameMode aGameMode = mApp->mGameMode;
-    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || (aGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && aGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS));
+    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || mApp->IsCoopMode());
     GameScenes aGameScene = mApp->mGameScene;
 
     SeedChooserScreen *aSeedChooserScreen = mApp->mSeedChooserScreen;
@@ -6560,7 +6568,7 @@ void Board::MouseDownSecond(int x, int y, int theClickCount) {
         gPlayerIndexSecond = mGamepadControls[1]->mGamepadIndex == 0 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER1 : TouchPlayerIndex::TOUCHPLAYER_PLAYER2;
     } else if (aGameMode == GameMode::GAMEMODE_MP_VS) {
         gPlayerIndexSecond = PixelToGridX(x, y) > 5 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER2 : TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
-    } else if (aGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && aGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
+    } else if (mApp->IsCoopMode()) {
         gPlayerIndexSecond = x > 400 ? TouchPlayerIndex::TOUCHPLAYER_PLAYER2 : TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
     } else {
         gPlayerIndexSecond = TouchPlayerIndex::TOUCHPLAYER_PLAYER1;
@@ -6747,7 +6755,7 @@ void Board::MouseDragSecond(int x, int y) {
     BaseGamepadControls::MovementState aGameState = mGamepadControls[0]->mGamepadState;
     BaseGamepadControls::MovementState aGameState_2P = mGamepadControls[1]->mGamepadState;
     GameMode aGameMode = mApp->mGameMode;
-    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || (aGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && aGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS));
+    bool isTwoSeedBankMode = (aGameMode == GameMode::GAMEMODE_MP_VS || mApp->IsCoopMode());
     int seedBankHeight = mApp->IsChallengeWithoutSeedBank() ? 87 : aSeedBank->mY + aSeedBank->mHeight;
     if (gTouchStateSecond == TouchState::TOUCHSTATE_SEED_BANK && gTouchLastYSecond < seedBankHeight && y >= seedBankHeight) {
         gTouchStateSecond = TouchState::TOUCHSTATE_BOARD_MOVED_FROM_SEED_BANK;
@@ -7442,7 +7450,7 @@ void Board::DrawBackdrop(Sexy::Graphics *g) {
         }
         return;
     }
-    if (mGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && mGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS && mGameMode != GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING) {
+    if (mApp->IsCoopMode() && mGameMode != GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING) {
         if (IsRemoteServer() || IsRemoteClientOrViewer()) {
             return;
         }

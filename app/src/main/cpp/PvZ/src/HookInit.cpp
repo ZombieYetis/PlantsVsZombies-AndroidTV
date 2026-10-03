@@ -75,6 +75,10 @@ void InitHookFunction() {
     homura::HookFunc(LawnApp__destructorAddr, &LawnApp::_destructor, &old_LawnApp__destructor);
     homura::HookFunc(LawnApp_InitAddr, &LawnApp::Init, &old_LawnApp_Init);
     homura::HookFunc(LawnApp_IsNightAddr, &LawnApp::IsNight, &old_LawnApp_IsNight);
+    homura::HookFunc(LawnApp_IsCoopModeAddr, &LawnApp::IsCoopMode, nullptr);
+    // IsTwinSunbankMode is a 4-byte branch to IsCoopMode. Hooking it overwrites IsPuzzleMode.
+    homura::HookFunc(LawnApp_IsFinalBossLevelAddr, &LawnApp::IsFinalBossLevel, nullptr);
+    homura::HookFunc(LawnApp_GetCurrentChallengeDefAddr, &LawnApp::GetCurrentChallengeDef, nullptr);
     homura::HookFunc(LawnApp_HardwareInitAddr, &LawnApp::HardwareInit, &old_LawnApp_HardwareInit);
     homura::HookFunc(LawnApp_DoBackToMainAddr, &LawnApp::DoBackToMain, &old_LawnApp_DoBackToMain);
     homura::HookFunc(LawnApp_DoSettingsDialogAddr, &LawnApp::DoSettingsDialog, nullptr);

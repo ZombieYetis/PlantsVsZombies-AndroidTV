@@ -26,8 +26,8 @@
 #include "PvZ/Lawn/System/PlayerInfo.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
-#include "PvZ/SexyAppFramework/Graphics/Graphics.h"
 #include "PvZ/SexyAppFramework/Graphics/Font.h"
+#include "PvZ/SexyAppFramework/Graphics/Graphics.h"
 #include "PvZ/Symbols.h"
 #include "PvZ/TodLib/Common/TodCommon.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
@@ -60,7 +60,7 @@ bool IsValidVsMode(int mode) {
 }
 
 bool IsValidCoopMode(int mode) {
-    return mode >= GAMEMODE_TWO_PLAYER_COOP_DAY && mode <= GAMEMODE_TWO_PLAYER_COOP_ENDLESS;
+    return (mode >= GAMEMODE_TWO_PLAYER_COOP_DAY && mode <= GAMEMODE_TWO_PLAYER_COOP_ENDLESS) || mode == GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD;
 }
 
 bool IsNetplayChallengePage(ChallengePage page) {
@@ -80,8 +80,7 @@ int SelectionToNetplayMode(ChallengePage page, int selection) {
     if (page == CHALLENGE_PAGE_COOP) {
         return aDef.mPage == page ? int(aDef.mChallengeMode) : -1;
     }
-    if (page == CHALLENGE_PAGE_VS && aDef.mChallengeMode == GAMEMODE_MP_VS
-        && aDef.mChallengeName != nullptr && aDef.mChallengeName[0] != '\0'
+    if (page == CHALLENGE_PAGE_VS && aDef.mChallengeMode == GAMEMODE_MP_VS && aDef.mChallengeName != nullptr && aDef.mChallengeName[0] != '\0'
         && (aDef.mPage == CHALLENGE_PAGE_VS || aDef.mPage == CHALLENGE_PAGE_LIMBO)) {
         const int aMode = GAMEMODE_MP_VS_DAY + aDef.mRow * 5 + aDef.mCol;
         return IsValidVsMode(aMode) ? aMode : -1;
@@ -140,6 +139,8 @@ pvzstl::string GetNetplayModeName(int mode) {
             return TodStringTranslate("[COOP_HARD_4]");
         case GAMEMODE_TWO_PLAYER_COOP_BOSS:
             return TodStringTranslate("[COOP_FINAL_BOSS]");
+        case GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD:
+            return TodStringTranslate("[COOP_FINAL_BOSS_HARD]");
         case GAMEMODE_TWO_PLAYER_COOP_ENDLESS:
             return TodStringTranslate("[COOP_ENDLESS]");
         default:
@@ -254,6 +255,7 @@ ChallengeDefinition gChallengeDefs[] = {
     {GameMode::GAMEMODE_MP_VS, 3, ChallengePage::CHALLENGE_PAGE_VS, 0, 3, "[MP_VS_POOL_NIGHT]"},
     {GameMode::GAMEMODE_MP_VS, 4, ChallengePage::CHALLENGE_PAGE_LIMBO, 0, 4, "[MP_VS_ROOF]"},
     {GameMode::GAMEMODE_MP_VS, 0, ChallengePage::CHALLENGE_PAGE_VS, 1, 0, "[MP_VS_SHUFFLE_MODE]"},
+    {GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD, 19, ChallengePage::CHALLENGE_PAGE_COOP, 2, 1, "[COOP_FINAL_BOSS_HARD]"},
 };
 
 const int NUM_CHALLENGE_MODES = int(std::size(gChallengeDefs));
@@ -333,8 +335,8 @@ void ChallengeScreen::_constructor(LawnApp *theApp, ChallengePage thePage) {
     mHelpBarWidget->AddButton(GamepadButton::GAMEPAD_BUTTON_B, "[BACK]", HelpBarWidget::HELP_ALIGN_NONE);
     mHelpBarWidget->mUnk[24] = 0;
     gNetplayLobbyFinished = false;
-    mBackButton = MakeNewButton(ChallengeScreen_Back, this, this, "[CLOSE]", nullptr,
-        Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED, Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW, Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW);
+    mBackButton =
+        MakeNewButton(ChallengeScreen_Back, this, this, "[CLOSE]", nullptr, Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED, Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW, Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW);
     mBackButton->mTextOffsetX = -2;
     mBackButton->mTextOffsetY = -4;
     mBackButton->mTextDownOffsetX = 1;
@@ -414,13 +416,11 @@ GameMode GetModeByRowColumn(ChallengePage thePage, int theRow, int theCol) {
 
 bool ChallengeScreen::IsScaryPotterLevel(GameMode theGameMode) {
     // TV interleaves Scary Potter and I, Zombie entries.
-    return theGameMode >= GAMEMODE_SCARY_POTTER_1 && theGameMode <= GAMEMODE_SCARY_POTTER_ENDLESS
-        && (theGameMode - GAMEMODE_SCARY_POTTER_1) % 2 == 0;
+    return theGameMode >= GAMEMODE_SCARY_POTTER_1 && theGameMode <= GAMEMODE_SCARY_POTTER_ENDLESS && (theGameMode - GAMEMODE_SCARY_POTTER_1) % 2 == 0;
 }
 
 bool ChallengeScreen::IsIZombieLevel(GameMode theGameMode) {
-    return theGameMode >= GAMEMODE_PUZZLE_I_ZOMBIE_1 && theGameMode <= GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS
-        && (theGameMode - GAMEMODE_PUZZLE_I_ZOMBIE_1) % 2 == 0;
+    return theGameMode >= GAMEMODE_PUZZLE_I_ZOMBIE_1 && theGameMode <= GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS && (theGameMode - GAMEMODE_PUZZLE_I_ZOMBIE_1) % 2 == 0;
 }
 
 void ChallengeScreen::SetUnlockChallengeIndex(ChallengePage thePage, bool theIsIZombie) {
@@ -432,8 +432,7 @@ void ChallengeScreen::SetUnlockChallengeIndex(ChallengePage thePage, bool theIsI
         if (aDef.mChallengeName == nullptr || aDef.mPage != thePage) {
             continue;
         }
-        if (thePage == CHALLENGE_PAGE_PUZZLE
-            && !(theIsIZombie ? IsIZombieLevel(aDef.mChallengeMode) : IsScaryPotterLevel(aDef.mChallengeMode))) {
+        if (thePage == CHALLENGE_PAGE_PUZZLE && !(theIsIZombie ? IsIZombieLevel(aDef.mChallengeMode) : IsScaryPotterLevel(aDef.mChallengeMode))) {
             continue;
         }
         if (AccomplishmentsNeeded(aChallengeMode) > 0) {
@@ -456,14 +455,15 @@ int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex) {
     if (aMode == GAMEMODE_MP_VS) {
         return 0;
     }
-    if (aMode >= GAMEMODE_TWO_PLAYER_COOP_DAY && aMode <= GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
+    if (IsValidCoopMode(aMode)) {
         if (mApp->mPlayerInfo->GetFlag(1)) {
             return 0;
         }
         if (aMode == GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
             return 1;
         }
-        const int aLevelsNeeded = int(aMode) - GAMEMODE_TWO_PLAYER_COOP_DAY - mApp->mPlayerInfo->mLevel / 10;
+        const GameMode aUnlockMode = aMode == GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD ? GAMEMODE_TWO_PLAYER_COOP_BOSS : aMode;
+        const int aLevelsNeeded = int(aUnlockMode) - GAMEMODE_TWO_PLAYER_COOP_DAY - mApp->mPlayerInfo->mLevel / 10;
         return aLevelsNeeded <= 0 ? 0 : aLevelsNeeded == 1 ? 1 : 2;
     }
     if (mApp->mGameMode == GAMEMODE_UPSELL && mApp->mGameScene == SCENE_LEVEL_INTRO) {
@@ -485,8 +485,7 @@ int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex) {
         int aLevelsCompleted = 0;
         for (int i = 0; i < NUM_CHALLENGE_MODES; i++) {
             const ChallengeDefinition &aPuzzleDef = GetChallengeDefinition(i);
-            if (aPuzzleDef.mChallengeName != nullptr
-                && (aIsIZombie ? IsIZombieLevel(aPuzzleDef.mChallengeMode) : IsScaryPotterLevel(aPuzzleDef.mChallengeMode))
+            if (aPuzzleDef.mChallengeName != nullptr && (aIsIZombie ? IsIZombieLevel(aPuzzleDef.mChallengeMode) : IsScaryPotterLevel(aPuzzleDef.mChallengeMode))
                 && mApp->HasBeatenChallenge(aPuzzleDef.mChallengeMode)) {
                 aLevelsCompleted++;
             }
@@ -515,8 +514,7 @@ int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex) {
 int ChallengeScreen::AccomplishmentsNeeded(int theChallengeIndex) {
     int aTrophiesNeeded = MoreTrophiesNeeded(theChallengeIndex);
     const GameMode aMode = GetChallengeDefinition(theChallengeIndex).mChallengeMode;
-    if (mApp->IsSurvivalEndless(aMode) && aTrophiesNeeded <= 3 && mApp->GetNumTrophies(CHALLENGE_PAGE_SURVIVAL) < 10
-        && mApp->HasFinishedAdventure() && !mApp->IsTrialStageLocked()) {
+    if (mApp->IsSurvivalEndless(aMode) && aTrophiesNeeded <= 3 && mApp->GetNumTrophies(CHALLENGE_PAGE_SURVIVAL) < 10 && mApp->HasFinishedAdventure() && !mApp->IsTrialStageLocked()) {
         aTrophiesNeeded = 1;
     }
     return mCheatEnableChallenges ? 0 : aTrophiesNeeded;
@@ -528,8 +526,7 @@ void ChallengeScreen::UpdateToolTip() {
         return;
     }
     ButtonWidget *aButton = GetChallengeButton(mSelectedChallengeIndex);
-    if (aButton == nullptr || !aButton->mVisible || !aButton->mDisabled || AccomplishmentsNeeded(mSelectedChallengeIndex) > 1
-        || MoreTrophiesNeeded(mSelectedChallengeIndex) <= 0) {
+    if (aButton == nullptr || !aButton->mVisible || !aButton->mDisabled || AccomplishmentsNeeded(mSelectedChallengeIndex) > 1 || MoreTrophiesNeeded(mSelectedChallengeIndex) <= 0) {
         mToolTip->mVisible = false;
         return;
     }
@@ -919,12 +916,12 @@ void ChallengeScreen::DrawButton(Graphics *g, int theChallengeIndex, int theChal
     }
     // TV's page value 5 is the VS page here, not the extended page-count sentinel.
     const bool aSurvivalThumbnail = mPage == CHALLENGE_PAGE_SURVIVAL || mPage == CHALLENGE_PAGE_VS
-        || (mPage == CHALLENGE_PAGE_COOP && aDef.mChallengeMode != GAMEMODE_TWO_PLAYER_COOP_BOWLING && aDef.mChallengeMode != GAMEMODE_TWO_PLAYER_COOP_BOSS);
+        || (mPage == CHALLENGE_PAGE_COOP && aDef.mChallengeMode != GAMEMODE_TWO_PLAYER_COOP_BOWLING && aDef.mChallengeMode != GAMEMODE_TWO_PLAYER_COOP_BOSS
+            && aDef.mChallengeMode != GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD);
     Image *aThumbnail = aSurvivalThumbnail ? Sexy::IMAGE_SURVIVAL_THUMBNAILS : Sexy::IMAGE_CHALLENGE_THUMBNAILS;
     const int aCelWidth = aThumbnail->GetCelWidth();
     const int aCelHeight = aThumbnail->GetCelHeight();
-    Rect aSourceRect((aDef.mChallengeIconIndex % aThumbnail->mNumCols) * aCelWidth,
-        (aDef.mChallengeIconIndex / aThumbnail->mNumCols) * aCelHeight, aCelWidth, aCelHeight);
+    Rect aSourceRect((aDef.mChallengeIconIndex % aThumbnail->mNumCols) * aCelWidth, (aDef.mChallengeIconIndex / aThumbnail->mNumCols) * aCelHeight, aCelWidth, aCelHeight);
     g->DrawImage(aThumbnail, Rect(aPosX + 6, aPosY + 2, 104, 104), aSourceRect);
     g->SetColorizeImages(false);
     g->DrawImage(Sexy::IMAGE_CHALLENGE_NAME_BACK, aPosX - 6, aPosY - 2, 720, 118);
@@ -947,9 +944,7 @@ void ChallengeScreen::DrawButton(Graphics *g, int theChallengeIndex, int theChal
 
     // Record storage is still the native profile array, not the button capacity.
     const int aRecordIndex = int(aDef.mChallengeMode) - GAMEMODE_SURVIVAL_NORMAL_STAGE_1;
-    const int aRecord = mPage != CHALLENGE_PAGE_VS && aRecordIndex >= 0
-        && aRecordIndex < int(std::size(mApp->mPlayerInfo->mChallengeRecords))
-        ? mApp->mPlayerInfo->mChallengeRecords[aRecordIndex] : 0;
+    const int aRecord = mPage != CHALLENGE_PAGE_VS && aRecordIndex >= 0 && aRecordIndex < int(std::size(mApp->mPlayerInfo->mChallengeRecords)) ? mApp->mPlayerInfo->mChallengeRecords[aRecordIndex] : 0;
     if (theChallengeIndex == mUnlockChallengeIndex) {
         if (mUnlockState == UnlockingState::UNLOCK_FADING) {
             g->SetColor(Color(255, 255, 255, TodAnimateCurve(25, 0, mUnlockStateCounter, 255, 0, CURVE_LINEAR)));
@@ -968,9 +963,9 @@ void ChallengeScreen::DrawButton(Graphics *g, int theChallengeIndex, int theChal
             TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14OUTLINE, Color::White, DS_ALIGN_CENTER_VERTICAL_MIDDLE, false);
             TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER_VERTICAL_MIDDLE, false);
         } else if ((aDef.mChallengeMode >= GAMEMODE_SURVIVAL_NORMAL_STAGE_1 && aDef.mChallengeMode <= GAMEMODE_SURVIVAL_ENDLESS_STAGE_5)
-            || (aDef.mChallengeMode >= GAMEMODE_TWO_PLAYER_COOP_DAY && aDef.mChallengeMode <= GAMEMODE_TWO_PLAYER_COOP_ROOF)
-            || (aDef.mChallengeMode >= GAMEMODE_TWO_PLAYER_COOP_DAY_HARD && aDef.mChallengeMode <= GAMEMODE_TWO_PLAYER_COOP_ROOF_HARD)
-            || aDef.mChallengeMode == GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
+                   || (aDef.mChallengeMode >= GAMEMODE_TWO_PLAYER_COOP_DAY && aDef.mChallengeMode <= GAMEMODE_TWO_PLAYER_COOP_ROOF)
+                   || (aDef.mChallengeMode >= GAMEMODE_TWO_PLAYER_COOP_DAY_HARD && aDef.mChallengeMode <= GAMEMODE_TWO_PLAYER_COOP_ROOF_HARD)
+                   || aDef.mChallengeMode == GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
             pvzstl::string aAchievement = aRecord == 1 ? TodStringTranslate("[ONE_FLAG]") : TodReplaceNumberString("[COUNT_FLAGS]", "{COUNT}", aRecord);
             TodDrawString(g, aAchievement, aPosX + 48, aPosY + 48, Sexy::FONT_CONTINUUMBOLD14OUTLINE, Color::White, DS_ALIGN_CENTER);
             TodDrawString(g, aAchievement, aPosX + 48, aPosY + 48, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);

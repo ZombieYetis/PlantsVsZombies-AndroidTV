@@ -1447,6 +1447,17 @@ bool LawnApp::IsAdventureMode() const {
     return mGameMode == GameMode::GAMEMODE_ADVENTURE;
 }
 
+ChallengeDefinition &LawnApp::GetCurrentChallengeDef() const {
+    for (int i = 0; i < NUM_CHALLENGE_MODES; i++) {
+        ChallengeDefinition &aDef = GetChallengeDefinition(i);
+        if (aDef.mChallengeMode == mGameMode) {
+            return aDef;
+        }
+    }
+
+    return GetChallengeDefinition(mGameMode - GameMode::GAMEMODE_SURVIVAL_NORMAL_STAGE_1);
+}
+
 bool LawnApp::IsPuzzleMode() const {
     return mGameMode >= GameMode::GAMEMODE_SCARY_POTTER_1 && mGameMode <= GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS;
 }
@@ -1529,7 +1540,11 @@ bool LawnApp::IsVSMode() const {
 }
 
 bool LawnApp::IsCoopMode() const {
-    return mGameMode >= GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY && mGameMode <= GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS;
+    return mGameMode == GameMode::GAMEMODE_MP_VS_COOP || mGameMode == GameMode::GAMEMODE_MP_VS_UNKONWN || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY
+        || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_NIGHT || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_POOL || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_ROOF
+        || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_DAY_HARD || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_NIGHT_HARD
+        || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_POOL_HARD || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_ROOF_HARD || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS
+        || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD;
 }
 
 bool LawnApp::IsTwinSunbankMode() const {
@@ -1544,11 +1559,13 @@ bool LawnApp::IsMiniBossLevel() const {
 }
 
 bool LawnApp::IsFinalBossLevel() const {
-    if (mBoard == nullptr)
+    if (mBoard == nullptr) {
         return false;
+    }
 
-    if (mGameMode == GameMode::GAMEMODE_CHALLENGE_FINAL_BOSS || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS)
+    if (mGameMode == GameMode::GAMEMODE_CHALLENGE_FINAL_BOSS || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS || mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
         return true;
+    }
 
     return IsAdventureMode() && mPlayerInfo->mLevel == 50;
 }

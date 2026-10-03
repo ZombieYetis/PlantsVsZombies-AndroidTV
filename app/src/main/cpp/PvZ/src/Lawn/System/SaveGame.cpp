@@ -335,7 +335,8 @@ bool LawnSaveGame(Board *theBoard, const pvzstl::string &theFilePath) {
 
     // 结盟模式存档，将SeedBank2的4个种子放到SeedBank1里面。因为原版存档逻辑难以改动，只好出此下策，凑合着存吧。
     if (theBoard->mApp->IsCoopMode()) {
-        if (theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS) {
+        if (theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS
+            || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
             int aNumSeeds = 6;
             SeedBank *seedBank1 = theBoard->mSeedBank[0];
             SeedBank *seedBank2 = theBoard->mSeedBank[1];
@@ -516,7 +517,8 @@ void FixBoardAfterLoad(Board *theBoard) {
 bool LawnLoadGame(Board *theBoard, SaveGameContext *theContext) {
     // 结盟模式读档，将SeedBank2的4个种子从SeedBank1里面取出。因为原版读档逻辑难以改动，只好出此下策，凑合着读吧。
     if (theBoard->mApp->IsCoopMode()) {
-        if (theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS) {
+        if (theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOWLING || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS
+            || theBoard->mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
             bool result = LawnLoadGame_Original(theBoard, theContext);
             if (!result)
                 return false;
