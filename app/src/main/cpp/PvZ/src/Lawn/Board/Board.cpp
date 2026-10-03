@@ -88,6 +88,18 @@ constexpr uintptr_t kBoardButtonListenerVtableOffset = 0x1FC;
 constexpr uintptr_t kBoardButtonListenerVTableOffset2 = 0x228;
 constexpr uint8_t kNoSelectedSeedIndex = UINT8_MAX;
 
+struct ZombieWavesEvent : BaseEvent {
+    uint8_t numWaves;
+    uint8_t zombieAllowed[100];
+};
+
+struct ZombieWaveEvent : BaseEvent {
+    uint8_t wave;
+    uint8_t zombies[MAX_ZOMBIES_IN_WAVE];
+};
+static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
+static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES < UINT8_MAX);
+
 // Kept outside Board to preserve the native object's layout.
 struct CoopToolState {
     GameObjectType tool = OBJECT_TYPE_NONE;
@@ -3794,6 +3806,27 @@ void Board::processServerEvent(const BaseEvent *event) {
             mChallenge->mSurvivalStage = nextStage;
             InitSurvivalStage_Origin();
         } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_WAVES: {
+            const auto *wavesEvent = static_cast<const ZombieWavesEvent *>(event);
+            mNumWaves = wavesEvent->numWaves;
+            for (int type = 0; type < 100; ++type) {
+                mZombieAllowed[type] = wavesEvent->zombieAllowed[type] != 0;
+            }
+            mZombieWavesReady = mNumWaves == 0;
+        } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_WAVE: {
+            const auto *waveEvent = static_cast<const ZombieWaveEvent *>(event);
+            for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
+                const uint8_t type = waveEvent->zombies[index];
+                mZombiesInWave[waveEvent->wave][index] = type == UINT8_MAX ? ZombieType::ZOMBIE_INVALID : ZombieType(type);
+            }
+            if (waveEvent->wave + 1 == mNumWaves) {
+                mZombieWavesReady = true;
+                if (mCutScene != nullptr && !mCutScene->mPlacedZombies) {
+                    mCutScene->mPreloaded = false;
+                }
+            }
+        } break;
         case EVENT_SERVER_BOARD_START_LEVEL: {
             // 与主机端同步置0
             mMainCounter = 0;
@@ -4937,6 +4970,8 @@ void Board::PutZombieInWave(ZombieType theZombieType, int theWaveNumber, ZombieP
 }
 
 void Board::PickZombieWaves() {
+    mZombieWavesReady = !(mApp->IsCoopMode() && IsOnlineModeActive() && IsRemoteClientOrViewer());
+
     // 有问题，在111和115里，冒险中锤僵尸的mNumWaves从8变6了
     if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN && !IsLevelDataLoaded()) {
         mNumWaves = 20;
@@ -4997,6 +5032,21 @@ void Board::PickZombieWaves() {
     }
 
     old_Board_PickZombieWaves(this);
+
+    if (mApp->IsCoopMode() && IsRemoteServer()) {
+        ZombieWavesEvent wavesEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVES}, uint8_t(mNumWaves), {}};
+        for (int type = 0; type < 100; ++type) {
+            wavesEvent.zombieAllowed[type] = mZombieAllowed[type];
+        }
+        netplay::PutEvent(wavesEvent);
+        for (int wave = 0; wave < mNumWaves; ++wave) {
+            ZombieWaveEvent waveEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVE}, uint8_t(wave), {}};
+            for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
+                waveEvent.zombies[index] = uint8_t(mZombiesInWave[wave][index]);
+            }
+            netplay::PutEvent(waveEvent);
+        }
+    }
 }
 
 ZombieType Board::PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePicker *theZombiePicker) {

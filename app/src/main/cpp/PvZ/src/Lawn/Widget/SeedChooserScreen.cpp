@@ -2264,6 +2264,9 @@ void SeedChooserScreen::EnableStartButton(int theIsEnabled) {
 }
 
 void SeedChooserScreen::OnStartButton() {
+    if (mApp->IsCoopMode() && IsOnlineModeActive() && IsRemoteClientOrViewer()) {
+        return;
+    }
     if (mApp->mGameMode == GameMode::GAMEMODE_MP_VS) {
         // 如果是对战模式，则直接关闭种子选择界面。用于修复对战模式选卡完毕后点击开始按钮导致的闪退
         CloseSeedChooser();
@@ -2274,6 +2277,19 @@ void SeedChooserScreen::OnStartButton() {
 }
 
 void SeedChooserScreen::CloseSeedChooser() {
+    if (mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN) {
+        // Closing skips UpdateViewLawn's return animation and advice cleanup.
+        mChooseState = SeedChooserState::CHOOSE_NORMAL;
+        mViewLawnTime = 0;
+        if (mBoard->mHelpIndex == AdviceType::ADVICE_SURVIVE_FLAGS) {
+            mBoard->ClearAdviceImmediately();
+        }
+    }
+    if (mApp->IsCoopMode() && IsRemoteServer()) {
+        // Notify peers only after the host has accepted every repick warning.
+        U8U8_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(SeedChooserScreen_Start), 0};
+        netplay::PutEvent(event);
+    }
     auto syncBankPackets = [&](SeedBank *seedBank, int chosenPlayerIndex) {
         if (seedBank == nullptr) {
             return;
@@ -2792,7 +2808,13 @@ void SeedChooserScreen::ProcessCoopServerEvent(const BaseEvent *event) {
 
     if (event->type == EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS) {
         const auto &buttonEvent = *static_cast<const U8U8_Event *>(event);
-        if ((buttonEvent.data1 == SeedChooserScreen_Start || buttonEvent.data1 == SeedChooserScreen_BackToModeSelect) && buttonEvent.data2 == 0) {
+        if (buttonEvent.data1 == SeedChooserScreen_Start && buttonEvent.data2 == 0) {
+            // The host already validated the cards; never open a local modal warning.
+            for (int index = 0; index < GetSeedStorageCount(); ++index) {
+                LandFlyingSeed(GetChosenSeed(index));
+            }
+            CloseSeedChooser();
+        } else if (buttonEvent.data1 == SeedChooserScreen_BackToModeSelect && buttonEvent.data2 == 0) {
             ButtonDepress_Origin(buttonEvent.data1);
         }
     }
@@ -3883,8 +3905,6 @@ void SeedChooserScreen::ButtonDepress(int theId) {
         if (IsRemoteClient()) {
             return;
         }
-        U8U8_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(theId), 0};
-        netplay::PutEvent(event);
     }
 
     if (mApp->IsVSMode()) {

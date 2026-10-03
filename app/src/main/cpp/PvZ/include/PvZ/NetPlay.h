@@ -240,6 +240,9 @@ enum EventType : uint8_t {
 
     EVENT_SERVER_BOARD_SEEDBANK_ADDSEED,
 
+    EVENT_SERVER_BOARD_ZOMBIE_WAVES,
+    EVENT_SERVER_BOARD_ZOMBIE_WAVE,
+
     // Local replay only. Never send this event through netplay::PutEvent.
     EVENT_LOCAL_BOARD_ACTION,
 

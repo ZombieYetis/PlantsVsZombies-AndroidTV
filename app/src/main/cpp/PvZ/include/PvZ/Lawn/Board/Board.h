@@ -410,6 +410,7 @@ public:
     ShovelRedirectWidget *mShovelWidget = nullptr;
     ReplayControlsWidget *mReplayControlsWidget = nullptr;
     bool mJacksonDanceMode = false;
+    bool mZombieWavesReady = true; // Outside the native/save-game sync block.
 
     Projectile *AddProjectile(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType);
     void SpawnTeleportEffect(float theX, float theY, int theRow);

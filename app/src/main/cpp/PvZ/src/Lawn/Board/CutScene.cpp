@@ -53,21 +53,12 @@ void CutScene::ShowShovel() {
 
 
 void CutScene::Update() {
-    if (mPreUpdatingBoard)
+    if (mPreUpdatingBoard || !mBoard->mZombieWavesReady) {
         return;
+    }
     if (mApp->mGameMode == GameMode::GAMEMODE_ADVENTURE_TWO_PLAYER || mApp->IsCoopMode()) {
         if (mApp->mSecondPlayerGamepadIndex == -1 && !mApp->GetDialog(Dialogs::DIALOG_CONTINUE) && NetplayLobbyWidget::GetInstance() == nullptr) {
             mApp->SetSecondPlayer(1);
-            // 未来做结盟联机时，可在此打开联机大厅。
-
-            //            mApp->AddDialog(aDialog);
-            //            mApp->mWidgetManager->SetFocus(aDialog);
-            //
-            //            int buttonId = aDialog->WaitForResult(true);
-            //            if (buttonId == 1001) {
-            //                mBoard->unknownBool = true;
-            //            } else {
-            //            }
             return;
         }
     }
@@ -90,8 +81,9 @@ bool CutScene::Is2x2Zombie(ZombieType theZombieType) {
 }
 
 void CutScene::PlaceStreetZombies() {
-    if (mPlacedZombies)
+    if (mPlacedZombies || !mBoard->mZombieWavesReady) {
         return;
+    }
 
     mPlacedZombies = true;
     if (mApp->IsFinalBossLevel() || mApp->IsScaryPotterLevel() || mApp->IsIZombieLevel() || mApp->IsWhackAZombieLevel() || mApp->IsWallnutBowlingLevel() || mApp->IsVSMode()) {
