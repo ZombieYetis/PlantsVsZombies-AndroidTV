@@ -274,9 +274,14 @@ struct BaseEvent {
     uint8_t size;
 };
 
-struct CoinCollectEvent : BaseEvent {
-    uint8_t playerIndex;
-    uint16_t coinID;
+struct ZombieWavesEvent : BaseEvent {
+    uint8_t numWaves;
+    uint8_t zombieAllowed[100];
+};
+
+struct ZombieWaveEvent : BaseEvent {
+    uint8_t wave;
+    uint8_t zombies[50];
 };
 
 union Union32Bit {
@@ -316,6 +321,20 @@ struct U8_Event : BaseEvent {
 
 struct U16_Event : BaseEvent {
     uint16_t data;
+};
+
+struct U8U16_Event : BaseEvent {
+    uint8_t data1;
+    uint16_t data2;
+};
+
+struct U16I16I16U8U8I16_Event : BaseEvent {
+    uint16_t data1;
+    int16_t data2;
+    int16_t data3;
+    uint8_t data4;
+    uint8_t data5;
+    int16_t data6;
 };
 
 struct I16_Event : BaseEvent {

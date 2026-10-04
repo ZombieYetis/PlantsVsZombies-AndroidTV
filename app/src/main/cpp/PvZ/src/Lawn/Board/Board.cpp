@@ -91,24 +91,7 @@ constexpr uintptr_t kBoardButtonListenerVtableOffset = 0x1FC;
 constexpr uintptr_t kBoardButtonListenerVTableOffset2 = 0x228;
 constexpr uint8_t kNoSelectedSeedIndex = UINT8_MAX;
 
-struct ZombieWavesEvent : BaseEvent {
-    uint8_t numWaves;
-    uint8_t zombieAllowed[100];
-};
-
-struct ZombieWaveEvent : BaseEvent {
-    uint8_t wave;
-    uint8_t zombies[MAX_ZOMBIES_IN_WAVE];
-};
-
-struct SunAddEvent : BaseEvent {
-    uint16_t coinID;
-    int16_t x;
-    int16_t y;
-    uint8_t coinType;
-    uint8_t motion;
-    int16_t groundY;
-};
+static_assert(sizeof(ZombieWaveEvent::zombies) == MAX_ZOMBIES_IN_WAVE);
 static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
 static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES < UINT8_MAX);
 
@@ -1524,14 +1507,14 @@ Coin *Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoi
     if (mApp->IsCoopMode() && IsRemoteServer() && aIsSun) {
         Coin *aCoin = old_Board_AddCoin(this, theX, theY, theCoinType, theCoinMotion);
         // 除创建参数和收集所需的 ID 外，只同步主机随机生成的落点。
-        SunAddEvent aEvent{};
+        U16I16I16U8U8I16_Event aEvent{};
         aEvent.type = EventType::EVENT_SERVER_BOARD_COIN_ADD_SUN;
-        aEvent.coinID = uint16_t(mCoins.DataArrayGetID(aCoin));
-        aEvent.x = int16_t(theX);
-        aEvent.y = int16_t(theY);
-        aEvent.coinType = uint8_t(aCoin->mType);
-        aEvent.motion = uint8_t(theCoinMotion);
-        aEvent.groundY = int16_t(aCoin->mGroundY);
+        aEvent.data1 = uint16_t(mCoins.DataArrayGetID(aCoin));
+        aEvent.data2 = int16_t(theX);
+        aEvent.data3 = int16_t(theY);
+        aEvent.data4 = uint8_t(aCoin->mType);
+        aEvent.data5 = uint8_t(theCoinMotion);
+        aEvent.data6 = int16_t(aCoin->mGroundY);
         netplay::PutEvent(aEvent);
         return aCoin;
     }
@@ -2449,22 +2432,22 @@ void Board::processServerEvent(const BaseEvent *event) {
             PauseFromSecondPlayer(event1->data);
         } break;
         case EVENT_SERVER_BOARD_COIN_ADD_SUN: {
-            const auto *aEvent = static_cast<const SunAddEvent *>(event);
-            Coin *aCoin = old_Board_AddCoin(this, aEvent->x, aEvent->y, CoinType(aEvent->coinType), CoinMotion(aEvent->motion));
-            aCoin->mGroundY = aEvent->groundY;
+            const auto *aEvent = static_cast<const U16I16I16U8U8I16_Event *>(event);
+            Coin *aCoin = old_Board_AddCoin(this, aEvent->data2, aEvent->data3, CoinType(aEvent->data4), CoinMotion(aEvent->data5));
+            aCoin->mGroundY = aEvent->data6;
 
             if (!mApp->IsCoopMode()) {
                 break;
             }
 
-            serverCoinIDMap[aEvent->coinID] = uint16_t(mCoins.DataArrayGetID(aCoin));
+            serverCoinIDMap[aEvent->data1] = uint16_t(mCoins.DataArrayGetID(aCoin));
         } break;
         case EVENT_SERVER_BOARD_COIN_COLLECT: {
             if (!mApp->IsCoopMode()) {
                 break;
             }
-            const auto *aEvent = static_cast<const CoinCollectEvent *>(event);
-            const auto aIt = serverCoinIDMap.find(aEvent->coinID);
+            const auto *aEvent = static_cast<const U8U16_Event *>(event);
+            const auto aIt = serverCoinIDMap.find(aEvent->data2);
             if (aIt == serverCoinIDMap.end()) {
                 break;
             }
@@ -2473,7 +2456,7 @@ void Board::processServerEvent(const BaseEvent *event) {
             if (aCoin == nullptr || aCoin->mDead || aCoin->mIsBeingCollected || (!aCoin->IsSun() && aCoin->mType != CoinType::COIN_COOP_DOUBLE_SUN)) {
                 break;
             }
-            old_Coin_Collect(aCoin, aEvent->playerIndex);
+            old_Coin_Collect(aCoin, aEvent->data1);
         } break;
         case EVENT_SERVER_BOARD_COIN_ADD: {
             auto *event1 = static_cast<const U8U8U16U16_Event *>(event);
