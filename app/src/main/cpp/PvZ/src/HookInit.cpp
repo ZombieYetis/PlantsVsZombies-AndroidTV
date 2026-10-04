@@ -148,6 +148,7 @@ void InitHookFunction() {
     homura::HookFunc(Board_UpdateGameObjectsAddr, &Board::UpdateGameObjects, &old_Board_UpdateGameObjects);
     homura::HookFunc(Board_IsFlagWaveAddr, &Board::IsFlagWave, &old_Board_IsFlagWave);
     homura::HookFunc(Board_SpawnZombieWaveAddr, &Board::SpawnZombieWave, &old_Board_SpawnZombieWave);
+    homura::HookFunc(Board_UpdateProgressMeterAddr, &Board::UpdateProgressMeter, &old_Board_UpdateProgressMeter);
     homura::HookFunc(Board_DrawProgressMeterAddr, &Board::DrawProgressMeter, &old_Board_DrawProgressMeter);
     homura::HookFunc(Board_GetNumWavesPerFlagAddr, &Board::GetNumWavesPerFlag, nullptr);
     homura::HookFunc(Board_IsLevelDataLoadedAddr, &Board::IsLevelDataLoaded, &old_Board_IsLevelDataLoaded);

@@ -693,6 +693,7 @@ public:
     int GetGraveStonesCount();
     void SpawnZombiesFromGraves();
     void SpawnZombieWave();
+    void UpdateProgressMeter();
     void DrawProgressMeter(Sexy::Graphics *g, int theX, int theY);
     int GetNumWavesPerFlag() const;
     bool IsLevelDataLoaded();
@@ -944,6 +945,8 @@ inline void (*old_Board_Update)(Board *board);
 inline bool (*old_Board_IsFlagWave)(Board *board, int currentWave);
 
 inline void (*old_Board_SpawnZombieWave)(Board *board);
+
+inline void (*old_Board_UpdateProgressMeter)(Board *board);
 
 inline void (*old_Board_DrawProgressMeter)(Board *board, Sexy::Graphics *graphics, int a3, int a4);
 

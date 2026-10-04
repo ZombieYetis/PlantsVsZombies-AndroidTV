@@ -85,6 +85,8 @@ IdMap serverZombieIDMap;
 IdMap serverCoinIDMap;
 IdMap serverGridItemIDMap;
 uint32_t gSyncedCobCannonSelection[2] = {};
+int gSyncedProgressMeterWidth = -1;
+int gSyncedProgressMeterWave = -1;
 constexpr uintptr_t kBoardButtonListenerVtableOffset = 0x1FC;
 constexpr uintptr_t kBoardButtonListenerVTableOffset2 = 0x228;
 constexpr uint8_t kNoSelectedSeedIndex = UINT8_MAX;
@@ -171,6 +173,8 @@ void Board::_constructor(LawnApp *theApp) {
     serverGridItemIDMap.clear();
     gSyncedCobCannonSelection[0] = 0;
     gSyncedCobCannonSelection[1] = 0;
+    gSyncedProgressMeterWidth = -1;
+    gSyncedProgressMeterWave = -1;
     unknownBool = false;
 
     mZombies.DataArrayInitialize(1024U, "zombies");
@@ -3867,6 +3871,12 @@ void Board::processServerEvent(const BaseEvent *event) {
             mChallenge->mSurvivalStage = nextStage;
             InitSurvivalStage_Origin();
         } break;
+        case EVENT_SERVER_BOARD_PROGRESS_METER: {
+            const auto *aEvent = static_cast<const U8U8U16_Event *>(event);
+            mProgressMeterWidth = aEvent->data1;
+            mCurrentWave = aEvent->data2;
+            mFlagRaiseCounter = aEvent->data3;
+        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WAVES: {
             const auto *wavesEvent = static_cast<const ZombieWavesEvent *>(event);
             mNumWaves = wavesEvent->numWaves;
@@ -4596,6 +4606,26 @@ void Board::SpawnZombiesFromGraves() {
 
 void Board::SpawnZombieWave() {
     old_Board_SpawnZombieWave(this);
+}
+
+void Board::UpdateProgressMeter() {
+    if (mApp->IsCoopMode() && IsRemoteClientOrViewer()) {
+        // 客户端只播放旗帜升起动画，进度和波次由主机同步，不能用本地出怪计时器重新计算。
+        if (mFlagRaiseCounter > 0) {
+            mFlagRaiseCounter--;
+        }
+        return;
+    }
+
+    old_Board_UpdateProgressMeter(this);
+
+    if (mApp->IsCoopMode() && IsRemoteServer() && (mProgressMeterWidth != gSyncedProgressMeterWidth || mCurrentWave != gSyncedProgressMeterWave)) {
+        // 仅在进度或波次变化时发送，旗帜动画计时不需要逐帧同步。
+        U8U8U16_Event aEvent = {{EventType::EVENT_SERVER_BOARD_PROGRESS_METER}, uint8_t(mProgressMeterWidth), uint8_t(mCurrentWave), uint16_t(mFlagRaiseCounter)};
+        netplay::PutEvent(aEvent);
+        gSyncedProgressMeterWidth = mProgressMeterWidth;
+        gSyncedProgressMeterWave = mCurrentWave;
+    }
 }
 
 void Board::DrawProgressMeter(Sexy::Graphics *g, int theX, int theY) {

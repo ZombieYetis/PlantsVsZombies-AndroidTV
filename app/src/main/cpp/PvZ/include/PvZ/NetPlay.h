@@ -247,6 +247,8 @@ enum EventType : uint8_t {
 
     EVENT_SERVER_BOARD_GAMEPAD_PICKUP_COB_CANNON,
 
+    EVENT_SERVER_BOARD_PROGRESS_METER,
+
     // 仅用于本地回放，不能通过 netplay::PutEvent 发送此事件。
     EVENT_LOCAL_BOARD_ACTION,
 
