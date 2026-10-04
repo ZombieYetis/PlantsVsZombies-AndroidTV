@@ -74,8 +74,8 @@ bool ApplyOnlineSave(LawnApp *app, SaveGameContext *context) {
         return false;
     }
 
-    // The native PostLoadGame ends with ClearSecondPlayer. The scoped flag
-    // preserves the online connection while retaining its other fixups.
+    // 原版 PostLoadGame 最后会调用 ClearSecondPlayer；此作用域内的标记
+    // 用于保留联机连接，同时保留原版的其他读档修正逻辑。
     app->mBoard->PostLoadGame();
     app->SetSecondPlayer(1);
     for (int player = 0; player < 2; ++player) {
@@ -129,7 +129,7 @@ bool netplay::StartCoopEndlessLoad(LawnApp *app) {
     ResetSaveGameTransfer();
     gOnlineSaveProgress = std::chrono::steady_clock::now();
     if (!IsRemoteServer()) {
-        // Never consult the guest's local save. Wait for the host's decision.
+        // 客户端不读取自己的本地存档，等待主机决定是否读档。
         app->KillSeedChooserScreen();
         app->KillBoard();
         app->mGameScene = GameScenes::SCENE_LEVEL_INTRO;
@@ -147,7 +147,7 @@ bool netplay::StartCoopEndlessLoad(LawnApp *app) {
 
     std::unique_ptr<SaveGameContext> context(app->mSaveGame);
     app->mSaveGame = nullptr;
-    app->mNeedLoadGame = false; // This handshake replaces the local continue dialog.
+    app->mNeedLoadGame = false; // 此握手流程取代本地继续游戏的对话框。
     app->mSaveGameOperation = SaveGameOperation::SAVE_GAME_OPERATION_NONE;
     if (context->mBuffer.mData.size() < sizeof(SaveFileHeader) || context->mBuffer.mData.size() > kMaxOnlineSaveSize || !ApplyOnlineSave(app, context.get())) {
         AbortOnlineSave(app, true);
@@ -180,7 +180,7 @@ void netplay::UpdateSaveGameTransfer(LawnApp *app) {
         if (IsRemoteServer()) {
             AbortOnlineSave(app, true);
         } else {
-            // Closing the stalled stream prevents late chunks reaching a new board.
+            // 关闭停滞的连接，防止迟到的存档分块进入新Board。
             app->ClearSecondPlayer();
             AbortOnlineSave(app, false);
         }
@@ -189,7 +189,7 @@ void netplay::UpdateSaveGameTransfer(LawnApp *app) {
     if (gOnlineLoadState != OnlineLoadState::Sending || HasPendingSendData()) {
         return;
     }
-    // Bound queued data so a save cannot flood the relay's pending-write queue.
+    // 限制排队数据量，避免存档传输塞满中转服务器的待发送队列。
     const std::size_t batchEnd = std::min(gOnlineSaveOffset + 16 * 1024, gOnlineSaveData.size());
     while (gOnlineSaveOffset < batchEnd) {
         U16U8x240_Event chunk{};
@@ -277,7 +277,7 @@ bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fro
                 context.mBuffer.mData = std::move(gOnlineSaveData);
                 context.mBuffer.mDataBitSize = int(gOnlineSaveSize * 8);
                 context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
-                // Apply before consuming any later gameplay event from this TCP batch.
+                // 在处理本批 TCP 数据中后续的游戏事件之前，先应用收到的存档。
                 loaded = ApplyOnlineSave(app, &context);
             }
             gOnlineLoadState = OnlineLoadState::AwaitingResume;
@@ -324,7 +324,7 @@ bool LawnSaveGame_Original(Board *theBoard, const pvzstl::string &theFilePath) {
 
 bool LawnSaveGame(Board *theBoard, const pvzstl::string &theFilePath) {
     if (theBoard->mApp->IsCoopMode() && IsRemoteClientOrViewer()) {
-        // A received board must never replace the guest's own local coop save.
+        // 接收的 Board 不能覆盖客户端自己的本地结盟存档。
         theBoard->mApp->mNeedGoBackToMain = false;
         return true;
     }

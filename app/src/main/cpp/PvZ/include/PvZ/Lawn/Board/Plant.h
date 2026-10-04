@@ -337,7 +337,11 @@ public:
     void UpdateShooting();
     void UpdateShooter();
     void LaunchPeanut();
-    void CobCannonFire(int x, int y);
+    void CobCannonFire(int theTargetX, int theTargetY);
+    void CobCannonFire_Origin(int theTargetX, int theTargetY);
+    void UpdateCobCannon();
+    void SyncCobCannonState();
+    void ApplyCobCannonState(PlantState theState, int theCountdown, int theShootingCounter, float theAnimTime);
     void Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem);
     void Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem);
     void PlayIdleAnim(float theRate);

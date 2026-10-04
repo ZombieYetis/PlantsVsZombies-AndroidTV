@@ -410,10 +410,11 @@ public:
     ShovelRedirectWidget *mShovelWidget = nullptr;
     ReplayControlsWidget *mReplayControlsWidget = nullptr;
     bool mJacksonDanceMode = false;
-    bool mZombieWavesReady = true; // Outside the native/save-game sync block.
+    bool mZombieWavesReady = true; // 位于原版对象及存档同步的数据区之外。
 
     Projectile *AddProjectile(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType);
     void SpawnTeleportEffect(float theX, float theY, int theRow);
+    void SyncCobCannonSelection(int thePlayerIndex);
     void TeleportZombie(Zombie *theZombie, float theDestX);
     bool TeleportPlant(Plant *thePlant, int theDestGridX, int theDestGridY);
     int PixelToGridX(int theX, int theY) {

@@ -37,6 +37,7 @@
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
 #include "PvZ/SexyAppFramework/Misc/SexyVector.h"
 #include "PvZ/Symbols.h"
+#include "PvZ/TodLib/Common/TodCommon.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
 #include "PvZ/TodLib/Effect/TodParticle.h"
@@ -539,7 +540,11 @@ void Plant::Update() {
     // Plant_Die(plant);
     // Plant_UpdateReanim(plant);
 
+    const PlantState previousState = mState;
     old_Plant_Update(this);
+    if (IsRemoteServer() && !mDead && mSeedType == SEED_COBCANNON && mState != previousState) {
+        SyncCobCannonState();
+    }
 }
 
 void Plant::UpdateBowling() {
@@ -1524,20 +1529,91 @@ void Plant::DoSpecial_Origin() {
     }
 }
 
-void Plant::CobCannonFire(int x, int y) {
+void Plant::CobCannonFire(int theTargetX, int theTargetY) {
+    if (IsRemoteClientOrViewer()) {
+        return;
+    }
+    if (IsRemoteServer()) {
+        U16UNI32_Event aEvent{};
+        aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_COB_CANNON_FIRE;
+        aEvent.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
+        aEvent.data2.i16x2.i16_1 = int16_t(theTargetX);
+        aEvent.data2.i16x2.i16_2 = int16_t(theTargetY);
+        netplay::PutEvent(aEvent);
+    }
+    CobCannonFire_Origin(theTargetX, theTargetY);
+}
+
+void Plant::CobCannonFire_Origin(int theTargetX, int theTargetY) {
     mState = PlantState::STATE_COBCANNON_FIRING;
     mShootingCounter = 206;
-    PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 12.0f);
-    mTargetY = y;
-    mTargetX = x - 47;
+    PlayBodyReanim("anim_shooting", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 12.0f);
 
-    Reanimation *bodyReanim = mApp->ReanimationGet(mBodyReanimID);
-    if (bodyReanim != nullptr) {
-        ReanimatorTrackInstance *trackInstance = bodyReanim->GetTrackInstanceByName("CobCannon_cob");
-        if (trackInstance != nullptr) {
-            trackInstance->mTrackColor = Sexy::Color::White;
+    mTargetX = theTargetX - 47.0f;
+    mTargetY = theTargetY;
+
+    Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+    if (aBodyReanim != nullptr) {
+        ReanimatorTrackInstance *aTrackInstance = aBodyReanim->GetTrackInstanceByName("CobCannon_cob");
+        if (aTrackInstance != nullptr) {
+            aTrackInstance->mTrackColor = Color::White;
         }
     }
+}
+
+void Plant::UpdateCobCannon() {
+    if (mState == PlantState::STATE_COBCANNON_ARMING) {
+        if (mStateCountdown == 0 && !IsRemoteClientOrViewer()) {
+            mState = PlantState::STATE_COBCANNON_LOADING;
+            PlayBodyReanim("anim_charge", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 12.0f);
+        }
+    } else if (mState == PlantState::STATE_COBCANNON_LOADING) {
+        Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+        if (aBodyReanim->ShouldTriggerTimedEvent(0.5f)) {
+            mApp->PlayFoley(FoleyType::FOLEY_SHOOP);
+        }
+        if (aBodyReanim->mLoopCount > 0 && !IsRemoteClientOrViewer()) {
+            mState = PlantState::STATE_COBCANNON_READY;
+            PlayIdleAnim(12.0f);
+        }
+    } else if (mState == PlantState::STATE_COBCANNON_READY) {
+        Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+        ReanimatorTrackInstance *aCobTrack = aBodyReanim->GetTrackInstanceByName("CobCannon_cob");
+        aCobTrack->mTrackColor = GetFlashingColor(mBoard->mMainCounter, 75);
+    } else if (mState == PlantState::STATE_COBCANNON_FIRING) {
+        Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+        if (aBodyReanim->ShouldTriggerTimedEvent(0.48f)) {
+            mApp->PlayFoley(FoleyType::FOLEY_COB_LAUNCH);
+        }
+    }
+}
+
+void Plant::SyncCobCannonState() {
+    U16U16U16UNI32UNI32_Event aEvent{};
+    aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_COB_CANNON_STATE;
+    aEvent.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
+    aEvent.data2 = uint16_t(mState);
+    aEvent.data3 = uint16_t(mStateCountdown);
+    aEvent.data4.i32 = mShootingCounter;
+    Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+    aEvent.data5.f32 = aBodyReanim->mAnimTime;
+    netplay::PutEvent(aEvent);
+}
+
+void Plant::ApplyCobCannonState(PlantState theState, int theCountdown, int theShootingCounter, float theAnimTime) {
+    mState = theState;
+    mStateCountdown = theCountdown;
+    mShootingCounter = theShootingCounter;
+
+    Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+    if (mState == PlantState::STATE_COBCANNON_ARMING) {
+        PlayBodyReanim("anim_unarmed_idle", ReanimLoopType::REANIM_LOOP, 20, aBodyReanim->mDefinition->mFPS);
+    } else if (mState == PlantState::STATE_COBCANNON_LOADING) {
+        PlayBodyReanim("anim_charge", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 12.0f);
+    } else if (mState == PlantState::STATE_COBCANNON_READY) {
+        PlayIdleAnim(12.0f);
+    }
+    aBodyReanim->mAnimTime = theAnimTime;
 }
 
 void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem) {
@@ -3342,6 +3418,9 @@ void Plant::UpdateShooting() {
         }
     } else if (mSeedType == SeedType::SEED_COBCANNON) {
         if (aBodyReanim->mLoopCount > 0) {
+            if (IsRemoteClientOrViewer()) {
+                return;
+            }
             mState = PlantState::STATE_COBCANNON_ARMING;
             mStateCountdown = 3000;
             PlayBodyReanim("anim_unarmed_idle", ReanimLoopType::REANIM_LOOP, 20, aBodyReanim->mDefinition->mFPS);

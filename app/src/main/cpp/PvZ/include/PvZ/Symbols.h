@@ -810,6 +810,7 @@ inline void *Plant_DrawSeedTypeAddr;
 inline void *Plant_GetRefreshTimeAddr;
 inline void *Plant_PlantInitializeAddr;
 inline void *Plant_CobCannonFireAddr;
+inline void *Plant_UpdateCobCannonAddr;
 inline void *Plant_UpdateReanimColorAddr;
 inline void *Plant_DrawAddr;
 inline void *Plant_FindTargetZombieAddr;

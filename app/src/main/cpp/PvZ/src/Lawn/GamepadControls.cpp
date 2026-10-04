@@ -44,7 +44,7 @@ using namespace Sexy;
 
 namespace {
 bool WidgetManagerIsEscDown(Sexy::WidgetManager *widgetManager) {
-    // Mirror original std::map<int,bool> key lookup for VK_ESCAPE (27).
+    // 按原版方式在 std::map<int, bool> 中查找 VK_ESCAPE（27）的按键状态。
     int *manager = reinterpret_cast<int *>(widgetManager);
     int *node = reinterpret_cast<int *>(manager[68]);
     int *candidate = manager + 67;
@@ -432,6 +432,7 @@ void GamepadControls::pickUpCobCannon(Plant *cobCannon) {
             mCobCannonPlantIndexInList = static_cast<int>(mBoard->mPlants.DataArrayGetID(cobCannon));
             mCobCannonAnimCounter = 0;
             mIsCobCannonSelected = true;
+            mBoard->SyncCobCannonSelection(mPlayerIndex);
         }
     }
 }
@@ -601,6 +602,8 @@ void GamepadControls::Update(float a2) {
     if (!isKeyboardTwoPlayerMode && !anApp->CanShopLevel() && mGamepadState == MOVEMENT_STATE_SELECT_SEED && mIsInShopSeedBank) {
         mIsInShopSeedBank = false;
     }
+    // 同时同步原版手柄逻辑中选取、取消、发射及植物删除引起的选取变化。
+    mBoard->SyncCobCannonSelection(mPlayerIndex);
 }
 
 void GamepadControls::ButtonDownFireCobcannonTest() {

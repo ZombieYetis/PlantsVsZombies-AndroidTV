@@ -893,7 +893,7 @@ void LawnApp::UpdateFrames() {
     }
 
     if (netplay::IsSynchronizingSaveGame() && !replayActive) {
-        updateCount = 0; // Keep pumping TCP, but do not advance either saved board.
+        updateCount = 0; // 继续处理 TCP 数据，但暂不推进两端正在同步的 Board。
     }
 
     for (int i = 0; i < updateCount; ++i) {
@@ -921,8 +921,8 @@ void LawnApp::UpdateFrames() {
             mEffectSystem->ProcessDeleteQueue();
         }
 
-        // Coop clients enter the next survival stage only on the host's event.
-        // Running the native check here could increment the stage/profile twice.
+        // 结盟客户端仅在收到主机事件后进入下一轮生存关卡。
+        // 在此执行原版检查会导致轮次或存档记录被重复递增。
         const bool waitForCoopRepick = IsRemoteClientOrViewer() && IsCoopMode() && mBoard != nullptr && mBoard->IsSurvivalStageWithRepick();
         if (!waitForCoopRepick) {
             CheckForGameEnd();

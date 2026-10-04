@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3205;
+inline constexpr uint32_t NETPLAY_VERSION = 3206;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -146,6 +146,8 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_PLANT_WIN, // 植物方通过杀够3只靶子胜利，目前版本由于已同步上级GridItemDie，故不需要同步
     EVENT_SERVER_BOARD_PLANT_IMITATER_MORPH,
     EVENT_SERVER_BOARD_PLANT_BOWLING_SET_ROW,
+    EVENT_SERVER_BOARD_PLANT_COB_CANNON_FIRE,
+    EVENT_SERVER_BOARD_PLANT_COB_CANNON_STATE,
 
     EVENT_SERVER_BOARD_ZOMBIE_DIE,
     EVENT_SERVER_BOARD_ZOMBIE_MIND_CONTROLLED,
@@ -220,7 +222,7 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_PLAY_SOUND,    // 播放音效
     EVENT_SERVER_BOARD_PLAY_SOUND_SR, // 仅供观战/回放解析的音效同步
 
-    EVENT_SERVER_BOARD_TAKE_SUNMONEY, // I16_Event for VS; I16I16_Event for both co-op sun balances (gain or spending).
+    EVENT_SERVER_BOARD_TAKE_SUNMONEY, // 对战使用 I16_Event；结盟使用 I16I16_Event 同步双方阳光余额（增加或扣除）。
     EVENT_SERVER_BOARD_TAKE_DEATHMONEY,
 
     EVENT_SERVER_BOARD_SEEDPACKET_WASPLANTED,
@@ -243,7 +245,9 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_ZOMBIE_WAVES,
     EVENT_SERVER_BOARD_ZOMBIE_WAVE,
 
-    // Local replay only. Never send this event through netplay::PutEvent.
+    EVENT_SERVER_BOARD_GAMEPAD_PICKUP_COB_CANNON,
+
+    // 仅用于本地回放，不能通过 netplay::PutEvent 发送此事件。
     EVENT_LOCAL_BOARD_ACTION,
 
     NUM_EVENT_BOARD,
@@ -314,7 +318,7 @@ struct U8U8_Event : BaseEvent {
     uint8_t data2;
 };
 
-// Fixed-size transport chunks keep save files inside the existing event framing.
+// 使用固定大小的传输分块，让存档文件沿用现有的事件封装格式。
 struct U16U8x240_Event : BaseEvent {
     uint16_t count;
     uint8_t data[240];
@@ -510,7 +514,7 @@ inline int gTcpServerSocket = -1;
 inline bool gTcpConnecting = false; // 正在尝试连接
 inline bool gTcpConnected = false;
 
-// Suppress outgoing pause events while applying remote state or restarting a match.
+// 应用远端状态或重新开始对局时，禁止发送暂停事件。
 inline bool gPauseSyncFromRemote = false;
 inline std::string gMetricsServerIp;
 inline int gMetricsServerPort = 0;

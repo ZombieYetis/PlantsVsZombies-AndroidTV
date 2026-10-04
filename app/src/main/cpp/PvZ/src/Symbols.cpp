@@ -803,6 +803,7 @@ bool LoadGameMain() {
     Plant_GetRefreshTimeAddr = libGameMain.GetSymbol("_ZN5Plant14GetRefreshTimeE8SeedTypeS0_");
     Plant_PlantInitializeAddr = libGameMain.GetSymbol("_ZN5Plant15PlantInitializeEii8SeedTypeS0_i");
     Plant_CobCannonFireAddr = libGameMain.GetSymbol("_ZN5Plant13CobCannonFireEii");
+    Plant_UpdateCobCannonAddr = libGameMain.GetSymbol("_ZN5Plant15UpdateCobCannonEv");
     Plant_DieAddr = libGameMain.GetSymbol("_ZN5Plant3DieEv");
     Plant_ImitaterMorphAddr = libGameMain.GetSymbol("_ZN5Plant13ImitaterMorphEv");
     Plant_SetSleepingAddr = libGameMain.GetSymbol("_ZN5Plant11SetSleepingEb");

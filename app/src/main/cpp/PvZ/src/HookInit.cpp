@@ -76,7 +76,7 @@ void InitHookFunction() {
     homura::HookFunc(LawnApp_InitAddr, &LawnApp::Init, &old_LawnApp_Init);
     homura::HookFunc(LawnApp_IsNightAddr, &LawnApp::IsNight, &old_LawnApp_IsNight);
     homura::HookFunc(LawnApp_IsCoopModeAddr, &LawnApp::IsCoopMode, nullptr);
-    // IsTwinSunbankMode is a 4-byte branch to IsCoopMode. Hooking it overwrites IsPuzzleMode.
+    // IsTwinSunbankMode 仅有 4 字节，直接跳转到 IsCoopMode；Hook 它会覆盖紧邻的 IsPuzzleMode。
     homura::HookFunc(LawnApp_IsFinalBossLevelAddr, &LawnApp::IsFinalBossLevel, nullptr);
     homura::HookFunc(LawnApp_GetCurrentChallengeDefAddr, &LawnApp::GetCurrentChallengeDef, nullptr);
     homura::HookFunc(LawnApp_HardwareInitAddr, &LawnApp::HardwareInit, &old_LawnApp_HardwareInit);
@@ -427,6 +427,7 @@ void InitHookFunction() {
     homura::HookFunc(Plant_UpdateMagnetShroomAddr, &Plant::UpdateMagnetShroom, nullptr);
     homura::HookFunc(Plant_UpdateSquashAddr, &Plant::UpdateSquash, nullptr);
     homura::HookFunc(Plant_CobCannonFireAddr, &Plant::CobCannonFire, nullptr);
+    homura::HookFunc(Plant_UpdateCobCannonAddr, &Plant::UpdateCobCannon, nullptr);
     // homura::HookFunc(Plant_UpdateReanimAddr, Plant_UpdateReanim, &old_Plant_UpdateReanim);
 
 

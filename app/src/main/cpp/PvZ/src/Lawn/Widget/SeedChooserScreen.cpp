@@ -2278,7 +2278,7 @@ void SeedChooserScreen::OnStartButton() {
 
 void SeedChooserScreen::CloseSeedChooser() {
     if (mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN) {
-        // Closing skips UpdateViewLawn's return animation and advice cleanup.
+        // 直接关闭会跳过 UpdateViewLawn 的返回动画和提示清理，需要在此处理。
         mChooseState = SeedChooserState::CHOOSE_NORMAL;
         mViewLawnTime = 0;
         if (mBoard->mHelpIndex == AdviceType::ADVICE_SURVIVE_FLAGS) {
@@ -2286,7 +2286,7 @@ void SeedChooserScreen::CloseSeedChooser() {
         }
     }
     if (mApp->IsCoopMode() && IsRemoteServer()) {
-        // Notify peers only after the host has accepted every repick warning.
+        // 主机确认所有重新选卡的警告后，才通知其他联机端。
         U8U8_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(SeedChooserScreen_Start), 0};
         netplay::PutEvent(event);
     }
@@ -2809,7 +2809,7 @@ void SeedChooserScreen::ProcessCoopServerEvent(const BaseEvent *event) {
     if (event->type == EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS) {
         const auto &buttonEvent = *static_cast<const U8U8_Event *>(event);
         if (buttonEvent.data1 == SeedChooserScreen_Start && buttonEvent.data2 == 0) {
-            // The host already validated the cards; never open a local modal warning.
+            // 主机已经完成卡片校验，客户端不能再弹出本地模态警告。
             for (int index = 0; index < GetSeedStorageCount(); ++index) {
                 LandFlyingSeed(GetChosenSeed(index));
             }
@@ -2842,7 +2842,7 @@ void SeedChooserScreen::ClickedSeedInChooser(ChosenSeed &theChosenSeed, int theP
         return;
     }
 
-    // Keep local chosen-seed payload coherent with index->type mapping.
+    // 保持本地已选卡片数据与索引到植物类型的映射一致。
     selectedSeed.mSeedType = selectedSeedType;
 
     if (mApp->IsCoopMode() && IsOnlineModeActive()) {
