@@ -1275,6 +1275,9 @@ int LawnApp::GetSeedsAvailable(bool theIsZombieChooser) {
 }
 
 bool LawnApp::HasSeedType(SeedType theSeedType, bool theIsZombie) {
+    if (IsCoopMode() && theSeedType < NUM_SEEDS_IN_CHOOSER) {
+        return true;
+    }
     if (IsVSMode()) {
         if (Challenge::msVSShuffleMode) {
             return true;
