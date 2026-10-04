@@ -484,6 +484,7 @@ void Plant::AnimateEndurian() {
     if (mPlantHealth < mPlantMaxHealth / 3) {
         if (aImageOverride != addonImages.IMAGE_REANIM_ENDURIAN_BODY3) {
             aBodyReanim->SetImageOverride("Endurian_body", addonImages.IMAGE_REANIM_ENDURIAN_BODY3);
+            aBodyReanim->SetImageOverride("Endurian_body_upper", addonImages.IMAGE_REANIM_ENDURIAN_BODY_UPPER2);
             aBodyReanim->SetImageOverride("Endurian_stem", addonImages.IMAGE_REANIM_ENDURIAN_STEM2);
             aBodyReanim->SetImageOverride("Endurian_eye", addonImages.IMAGE_REANIM_ENDURIAN_EYE2);
             aBodyReanim->AssignRenderGroupToPrefix("Endurian_eyeball2", RENDER_GROUP_HIDDEN);
