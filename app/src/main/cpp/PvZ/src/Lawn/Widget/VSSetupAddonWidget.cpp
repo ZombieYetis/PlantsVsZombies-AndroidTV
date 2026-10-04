@@ -111,6 +111,14 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
         SetDisable(mGlobalBpButton);
         mBanMode = false;
     }
+
+    if (gIsReplayMode) {
+        // 回放仅展示选项状态，不允许玩家操作扩展控件。
+        Widget *aControls[] = {mGlobalBpButton, mExtraPacketCheckbox, mExtendedSeedsCheckbox, mBanModeCheckbox, mBalancePatchCheckbox, mAISettingsButton};
+        for (Widget *aControl : aControls) {
+            aControl->mDisabled = true;
+        }
+    }
 }
 
 VSSetupAddonWidget::~VSSetupAddonWidget() {
@@ -178,9 +186,9 @@ void VSSetupAddonWidget::UpdateGlobalBpButtonState() const {
         return;
     }
 
-    const bool enabled = !mBanModeCheckbox->mDisabled && mBanMode && mExtendedSeedsMode;
+    const bool enabled = mBanModeCheckbox->mVisible && mBanMode && mExtendedSeedsMode;
     mGlobalBpButton->SetVisible(enabled);
-    mGlobalBpButton->mDisabled = !enabled;
+    mGlobalBpButton->mDisabled = !enabled || gIsReplayMode;
     switch (msGlobalBpMode) {
         case GLOBALBP_BO3:
             mGlobalBpButton->SetLabel("[VS_UI_GLOBAL_BP_BO3]");
