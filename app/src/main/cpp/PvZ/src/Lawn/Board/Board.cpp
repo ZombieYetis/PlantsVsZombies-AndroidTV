@@ -100,6 +100,15 @@ struct ZombieWaveEvent : BaseEvent {
     uint8_t wave;
     uint8_t zombies[MAX_ZOMBIES_IN_WAVE];
 };
+
+struct SunAddEvent : BaseEvent {
+    uint16_t coinID;
+    int16_t x;
+    int16_t y;
+    uint8_t coinType;
+    uint8_t motion;
+    int16_t groundY;
+};
 static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
 static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES < UINT8_MAX);
 
@@ -953,7 +962,7 @@ int Board::GetCurrentPlantCost(SeedType theSeedType, SeedType theImitaterType) {
 void Board::AddSunMoney(int theAmount, int thePlayerIndex) {
     // 结盟客户端的阳光余额以主机同步结果为准。
     // 本地收集动画不能再次增加同一份阳光。
-    if (mApp->IsCoopMode() && IsRemoteClient()) {
+    if (mApp->IsCoopMode() && IsRemoteClientOrViewer()) {
         return;
     }
     // 无限阳光
@@ -967,8 +976,8 @@ void Board::AddSunMoney(int theAmount, int thePlayerIndex) {
         old_Board_AddSunMoney(this, theAmount, thePlayerIndex);
     }
     if (mApp->IsCoopMode() && IsRemoteServer()) {
-        I16I16_Event event = {{EventType::EVENT_SERVER_BOARD_TAKE_SUNMONEY}, int16_t(mSunMoney1), int16_t(mSunMoney2)};
-        netplay::PutEvent(event);
+        I16I16_Event aEvent = {{EventType::EVENT_SERVER_BOARD_TAKE_SUNMONEY}, int16_t(mSunMoney1), int16_t(mSunMoney2)};
+        netplay::PutEvent(aEvent);
     }
 }
 
@@ -1510,6 +1519,23 @@ void Board::GameButtonUp(GamepadButton theButton, int thePlayerIndex, unsigned i
 }
 
 Coin *Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion) {
+    const bool aIsSun = theCoinType == CoinType::COIN_SUN || theCoinType == CoinType::COIN_SMALLSUN || theCoinType == CoinType::COIN_LARGESUN || theCoinType == CoinType::COIN_MINISUN
+        || theCoinType == CoinType::COIN_COOP_DOUBLE_SUN;
+    if (mApp->IsCoopMode() && IsRemoteServer() && aIsSun) {
+        Coin *aCoin = old_Board_AddCoin(this, theX, theY, theCoinType, theCoinMotion);
+        // 除创建参数和收集所需的 ID 外，只同步主机随机生成的落点。
+        SunAddEvent aEvent{};
+        aEvent.type = EventType::EVENT_SERVER_BOARD_COIN_ADD_SUN;
+        aEvent.coinID = uint16_t(mCoins.DataArrayGetID(aCoin));
+        aEvent.x = int16_t(theX);
+        aEvent.y = int16_t(theY);
+        aEvent.coinType = uint8_t(aCoin->mType);
+        aEvent.motion = uint8_t(theCoinMotion);
+        aEvent.groundY = int16_t(aCoin->mGroundY);
+        netplay::PutEvent(aEvent);
+        return aCoin;
+    }
+
     if (IsRemoteServer()) {
         U8U8U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_COIN_ADD}, uint8_t(theCoinType), uint8_t(theCoinMotion), uint16_t(theX), uint16_t(theY)};
         netplay::PutEvent(event);
@@ -2421,6 +2447,33 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_PAUSE: {
             auto *event1 = static_cast<const U8_Event *>(event);
             PauseFromSecondPlayer(event1->data);
+        } break;
+        case EVENT_SERVER_BOARD_COIN_ADD_SUN: {
+            const auto *aEvent = static_cast<const SunAddEvent *>(event);
+            Coin *aCoin = old_Board_AddCoin(this, aEvent->x, aEvent->y, CoinType(aEvent->coinType), CoinMotion(aEvent->motion));
+            aCoin->mGroundY = aEvent->groundY;
+
+            if (!mApp->IsCoopMode()) {
+                break;
+            }
+
+            serverCoinIDMap[aEvent->coinID] = uint16_t(mCoins.DataArrayGetID(aCoin));
+        } break;
+        case EVENT_SERVER_BOARD_COIN_COLLECT: {
+            if (!mApp->IsCoopMode()) {
+                break;
+            }
+            const auto *aEvent = static_cast<const CoinCollectEvent *>(event);
+            const auto aIt = serverCoinIDMap.find(aEvent->coinID);
+            if (aIt == serverCoinIDMap.end()) {
+                break;
+            }
+            Coin *aCoin = mCoins.DataArrayGet(aIt->second);
+            serverCoinIDMap.erase(aIt);
+            if (aCoin == nullptr || aCoin->mDead || aCoin->mIsBeingCollected || (!aCoin->IsSun() && aCoin->mType != CoinType::COIN_COOP_DOUBLE_SUN)) {
+                break;
+            }
+            old_Coin_Collect(aCoin, aEvent->playerIndex);
         } break;
         case EVENT_SERVER_BOARD_COIN_ADD: {
             auto *event1 = static_cast<const U8U8U16U16_Event *>(event);

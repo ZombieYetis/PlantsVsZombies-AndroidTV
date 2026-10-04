@@ -64,7 +64,29 @@ void Coin::CoinInitialize(int theX, int theY, CoinType theCoinType, CoinMotion t
     }
 }
 
+void Coin::Collect(int thePlayerIndex) {
+    const bool aIsCoopSun = mApp->IsCoopMode() && (IsSun() || mType == CoinType::COIN_COOP_DOUBLE_SUN);
+    if (aIsCoopSun && (mDead || mIsBeingCollected || IsRemoteClientOrViewer())) {
+        // 结盟阳光的收集由主机确认，对战保留原来的自动采集逻辑。
+        return;
+    }
+
+    old_Coin_Collect(this, thePlayerIndex);
+
+    if (aIsCoopSun && IsRemoteServer() && mIsBeingCollected) {
+        CoinCollectEvent aEvent{};
+        aEvent.type = EventType::EVENT_SERVER_BOARD_COIN_COLLECT;
+        aEvent.coinID = uint16_t(mBoard->mCoins.DataArrayGetID(this));
+        aEvent.playerIndex = uint8_t(mCollectedByPlayerIndex);
+        netplay::PutEvent(aEvent);
+    }
+}
+
 void Coin::GamepadCursorOver(int thePlayerIndex) {
+    if (mApp->IsCoopMode() && IsSun() && IsRemoteClientOrViewer()) {
+        // 结盟客户端不能独立吸附阳光；收到主机收集事件后再播放收集动画。
+        return;
+    }
     //*((uint32_t *)a + 29) == 16 则意味着是砸罐子种子雨老虎机中的植物卡片
 
     if (!gKeyboardMode && mType == CoinType::COIN_USABLE_SEED_PACKET) {

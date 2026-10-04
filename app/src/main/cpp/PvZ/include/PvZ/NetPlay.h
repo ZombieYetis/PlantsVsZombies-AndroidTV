@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3206;
+inline constexpr uint32_t NETPLAY_VERSION = 3207;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -106,6 +106,7 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_GAMEPAD_PICKUP_SHOVEL,
     EVENT_SERVER_BOARD_GAMEPAD_SET_TOOL,
     EVENT_SERVER_BOARD_GAMEPAD_USE_SHOVEL,
+    EVENT_SERVER_BOARD_GAMEPAD_PICKUP_COB_CANNON,
 
     EVENT_CLIENT_BOARD_PAUSE,
     EVENT_SERVER_BOARD_PAUSE,
@@ -245,9 +246,10 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_ZOMBIE_WAVES,
     EVENT_SERVER_BOARD_ZOMBIE_WAVE,
 
-    EVENT_SERVER_BOARD_GAMEPAD_PICKUP_COB_CANNON,
-
     EVENT_SERVER_BOARD_PROGRESS_METER,
+
+    EVENT_SERVER_BOARD_COIN_ADD_SUN,
+    EVENT_SERVER_BOARD_COIN_COLLECT,
 
     // 仅用于本地回放，不能通过 netplay::PutEvent 发送此事件。
     EVENT_LOCAL_BOARD_ACTION,
@@ -270,6 +272,11 @@ enum EventType : uint8_t {
 struct BaseEvent {
     EventType type;
     uint8_t size;
+};
+
+struct CoinCollectEvent : BaseEvent {
+    uint8_t playerIndex;
+    uint16_t coinID;
 };
 
 union Union32Bit {

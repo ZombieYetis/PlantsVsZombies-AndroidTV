@@ -80,9 +80,7 @@ public:
     void MouseDown(int x, int y, int theClickCount) {
         reinterpret_cast<void (*)(Coin *, int, int, int)>(Coin_MouseDownAddr)(this, x, y, theClickCount);
     }
-    void Collect(int thePlayerIndex) {
-        reinterpret_cast<void (*)(Coin *, int)>(Coin_CollectAddr)(this, thePlayerIndex);
-    }
+    void Collect(int thePlayerIndex);
     void Die() {
         reinterpret_cast<void (*)(Coin *)>(Coin_DieAddr)(this);
     }
@@ -138,6 +136,8 @@ inline bool BanDropCoin;
 
 
 inline void (*old_Coin_CoinInitialize)(Coin *, int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion);
+
+inline void (*old_Coin_Collect)(Coin *coin, int thePlayerIndex);
 
 inline void (*old_Coin_GamepadCursorOver)(Coin *coin, int a2);
 

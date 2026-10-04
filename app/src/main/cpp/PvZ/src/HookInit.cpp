@@ -266,6 +266,7 @@ void InitHookFunction() {
 
 
     homura::HookFunc(Coin_CoinInitializeAddr, &Coin::CoinInitialize, &old_Coin_CoinInitialize);
+    homura::HookFunc(Coin_CollectAddr, &Coin::Collect, &old_Coin_Collect);
     homura::HookFunc(Coin_UpadteAddr, &Coin::Update, &old_Coin_Update);
     homura::HookFunc(Coin_GamepadCursorOverAddr, &Coin::GamepadCursorOver, &old_Coin_GamepadCursorOver);
     homura::HookFunc(Coin_MouseHitTestAddr, &Coin::MouseHitTest, &old_Coin_MouseHitTest);
