@@ -2334,7 +2334,12 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 continue;
             }
 
-            if (mSeedType == SeedType::SEED_THREEPEATER ? abs(aGridY - aRow) > 1 : aGridY != aRow) {
+            if (mSeedType == SeedType::SEED_GLOOMSHROOM) {
+                // 忧郁菇只索敌自身周围 3×3 格，包含上下两行和四个斜角。
+                if (abs(aGridX - mPlantCol) > 1 || abs(aGridY - mRow) > 1) {
+                    continue;
+                }
+            } else if (mSeedType == SeedType::SEED_THREEPEATER ? abs(aGridY - aRow) > 1 : aGridY != aRow) {
                 // 如果是三线射手，则索敌三行; 反之，索敌一行
                 continue;
             }
