@@ -10882,37 +10882,41 @@ void Zombie::BossSpawnContact() {
     }
 
     const bool aIsHardMode = mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD;
-    ZombieType aZombieType;
-    if (mZombieAge < 3500) {
-        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_TRAFFIC_CONE : ZombieType::ZOMBIE_NORMAL;
-    } else if (mZombieAge < 8000) {
-        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_PAIL : ZombieType::ZOMBIE_TRAFFIC_CONE;
-    } else if (mZombieAge < 12500) {
-        aZombieType = aIsHardMode ? ZombieType::ZOMBIE_FOOTBALL : ZombieType::ZOMBIE_PAIL;
-    } else {
-        const ZombieType *aZombieList = aIsHardMode ? gBossZombieListHard : gBossZombieList;
-        int aZombieTypeCount = aIsHardMode ? int(std::size(gBossZombieListHard)) : int(std::size(gBossZombieList));
-        if (mTargetRow == 0) {
-            aZombieTypeCount--;
+    // 困难模式三个阶段每次分别放出两只、三只、四只，普通模式仍放一只。
+    const int aSpawnCount = aIsHardMode ? mBossMode + 2 : 1;
+    for (int i = 0; i < aSpawnCount; ++i) {
+        ZombieType aZombieType;
+        if (mZombieAge < 3500) {
+            aZombieType = aIsHardMode ? ZombieType::ZOMBIE_TRAFFIC_CONE : ZombieType::ZOMBIE_NORMAL;
+        } else if (mZombieAge < 8000) {
+            aZombieType = aIsHardMode ? ZombieType::ZOMBIE_PAIL : ZombieType::ZOMBIE_TRAFFIC_CONE;
+        } else if (mZombieAge < 12500) {
+            aZombieType = aIsHardMode ? ZombieType::ZOMBIE_FOOTBALL : ZombieType::ZOMBIE_PAIL;
+        } else {
+            const ZombieType *aZombieList = aIsHardMode ? gBossZombieListHard : gBossZombieList;
+            int aZombieTypeCount = aIsHardMode ? int(std::size(gBossZombieListHard)) : int(std::size(gBossZombieList));
+            if (mTargetRow == 0) {
+                aZombieTypeCount--;
+            }
+            aZombieType = aZombieList[Rand(aZombieTypeCount)];
         }
-        aZombieType = aZombieList[Rand(aZombieTypeCount)];
-    }
 
-    Zombie *aZombie = mBoard->AddZombieInRow_Origin(aZombieType, mTargetRow, 0, true);
-    aZombie->mPosX = 600.0f;
-    if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
-        U8x5U16UNI32x2_Event event{};
-        event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
-        event.data1[0] = uint8_t(aZombieType);
-        event.data1[1] = uint8_t(mTargetRow);
-        event.data1[2] = 0;
-        event.data1[3] = 1;
-        event.data1[4] = aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool ? aZombie->mBloated : 0;
-        event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
-        event.data3[0].f32 = aZombie->mVelX;
-        event.data3[1].f32 = aZombie->mPosX;
-        netplay::PutEvent(event);
-        netplay::MetricsRecordZombieUsed(int(aZombieType));
+        Zombie *aZombie = mBoard->AddZombieInRow_Origin(aZombieType, mTargetRow, 0, true);
+        aZombie->mPosX = 600.0f;
+        if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
+            U8x5U16UNI32x2_Event event{};
+            event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
+            event.data1[0] = uint8_t(aZombieType);
+            event.data1[1] = uint8_t(mTargetRow);
+            event.data1[2] = 0;
+            event.data1[3] = 1;
+            event.data1[4] = aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool ? aZombie->mBloated : 0;
+            event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
+            event.data3[0].f32 = aZombie->mVelX;
+            event.data3[1].f32 = aZombie->mPosX;
+            netplay::PutEvent(event);
+            netplay::MetricsRecordZombieUsed(int(aZombieType));
+        }
     }
 }
 
