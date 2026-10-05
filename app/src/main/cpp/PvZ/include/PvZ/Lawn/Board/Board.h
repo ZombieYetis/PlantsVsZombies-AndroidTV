@@ -411,6 +411,7 @@ public:
     ReplayControlsWidget *mReplayControlsWidget = nullptr;
     bool mJacksonDanceMode = false;
     bool mZombieWavesReady = true; // 位于原版对象及存档同步的数据区之外。
+    int mButterGloveCooldownCounter[2] = {}; // 困难僵王的黄油手套，双方分别冷却。
 
     Projectile *AddProjectile(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType);
     void SpawnTeleportEffect(float theX, float theY, int theRow);
@@ -746,6 +747,7 @@ public:
     bool IsButterInCursor(int thePlayerIndex) const;
     void SetCoopTool(int thePlayerIndex, GameObjectType theTool);
     void ApplyCoopButter(int thePlayerIndex);
+    void ApplyButterFromGlove(Zombie *theZombie, int thePlayerIndex);
     enum class CoopToolTouch { Down, Drag, Up };
     bool HandleCoopToolTouch(int thePlayerIndex, int x, int y, CoopToolTouch thePhase);
     int PixelToGridXKeepOnBoard(int theX, int theY);

@@ -99,6 +99,7 @@ struct CoopToolState {
 };
 CoopToolState gCoopTools[2];
 bool gLocalLawnViewTouch = false;
+constexpr int kButterGloveCooldown = 10 * 100;
 
 SeedChooserScreen *GetOnlineCoopLawnView(Board *board) {
     SeedChooserScreen *chooser = board->mApp->mSeedChooserScreen;
@@ -682,13 +683,30 @@ void Board::ApplyCoopButter(int thePlayerIndex) {
     auto *controls = mGamepadControls[thePlayerIndex];
     // 最后一个参数用于启用黄油命中检测，不是玩家索引。
     Zombie *zombie = ZombieHitTest(controls->mCursorPositionX, controls->mCursorPositionY, 1);
-    if (zombie != nullptr) {
-        int oldCounter = zombie->mButteredCounter;
-        zombie->AddButter();
-        if (zombie->mButteredCounter != oldCounter) {
-            U16_Event event = {{EVENT_SERVER_BOARD_ZOMBIE_ADD_BUTTER}, uint16_t(mZombies.DataArrayGetID(zombie))};
-            netplay::PutEvent(event);
-        }
+    ApplyButterFromGlove(zombie, thePlayerIndex);
+}
+
+void Board::ApplyButterFromGlove(Zombie *theZombie, int thePlayerIndex) {
+    if (IsRemoteClientOrViewer() || mPaused || mApp->mGameScene != SCENE_PLAYING || theZombie == nullptr) {
+        return;
+    }
+    const bool aHasCooldown = mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD;
+    if (aHasCooldown && mButterGloveCooldownCounter[thePlayerIndex] > 0) {
+        return;
+    }
+
+    const int aOldCounter = theZombie->mButteredCounter;
+    theZombie->AddButter();
+    if (theZombie->mButteredCounter == aOldCounter) {
+        return;
+    }
+    // 成功糊到一个僵尸才消耗使用者的冷却，不影响另一人和玉米投手。
+    if (aHasCooldown) {
+        mButterGloveCooldownCounter[thePlayerIndex] = kButterGloveCooldown;
+    }
+    if (IsRemoteServer()) {
+        U8U16_Event event = {{EVENT_SERVER_BOARD_ZOMBIE_ADD_BUTTER}, uint8_t(thePlayerIndex), uint16_t(mZombies.DataArrayGetID(theZombie))};
+        netplay::PutEvent(event);
     }
 }
 
@@ -2409,9 +2427,13 @@ void Board::processServerEvent(const BaseEvent *event) {
             SetCoopTool(toolEvent->data1, GameObjectType(toolEvent->data2));
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD_BUTTER: {
-            auto *butterEvent = static_cast<const U16_Event *>(event);
+            auto *butterEvent = static_cast<const U8U16_Event *>(event);
+            // 只启动实际使用者的冷却，本地按钮不受另一人的使用影响。
+            if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
+                mButterGloveCooldownCounter[butterEvent->data1] = kButterGloveCooldown;
+            }
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, butterEvent->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, butterEvent->data2, clientZombieID)) {
                 Zombie *zombie = mZombies.DataArrayGet(clientZombieID);
                 if (zombie != nullptr) {
                     if (zombie->mButteredCounter == 0) {
@@ -3932,6 +3954,9 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_START_LEVEL: {
+            for (int &aCooldown : mButterGloveCooldownCounter) {
+                aCooldown = 0;
+            }
             // 与主机端同步置0
             mMainCounter = 0;
             // 重新选卡时保留当前棋盘，以及存活的对象和对应 ID。
@@ -4275,6 +4300,14 @@ void Board::Update() {
     }
     isMainMenu = false;
 
+    if (!mPaused && mApp->mGameScene == SCENE_PLAYING) {
+        for (int &aCooldown : mButterGloveCooldownCounter) {
+            if (aCooldown > 0) {
+                --aCooldown;
+            }
+        }
+    }
+
     if (UsesOnlineCoopTools()) {
         for (int player = 0; player < 2; ++player) {
             ApplyCoopButter(player);
@@ -4290,7 +4323,9 @@ void Board::Update() {
 
     if (!UsesOnlineCoopTools() && requestDrawButterInCursor) {
         Zombie *aZombieUnderButter = ZombieHitTest(mGamepadControls[1]->mCursorPositionX, mGamepadControls[1]->mCursorPositionY, 1);
-        if (aZombieUnderButter != nullptr) {
+        if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
+            ApplyButterFromGlove(aZombieUnderButter, 1);
+        } else if (aZombieUnderButter != nullptr) {
             aZombieUnderButter->AddButter();
         }
     }
@@ -4754,10 +4789,12 @@ void Board::DrawHammerButton(Sexy::Graphics *g, LawnApp *theApp) {
 
 void Board::DrawButterButton(Sexy::Graphics *g, LawnApp *theApp) {
     if (!theApp->IsCoopMode()) {
-        if (!theApp->IsAdventureMode())
+        if (!theApp->IsAdventureMode()) {
             return;
-        if (theApp->mSecondPlayerGamepadIndex == -1)
+        }
+        if (theApp->mSecondPlayerGamepadIndex == -1) {
             return;
+        }
     }
     float tmp = g->mTransY;
     Rect rect = GetButterButtonRect();
@@ -4768,8 +4805,24 @@ void Board::DrawButterButton(Sexy::Graphics *g, LawnApp *theApp) {
         g->SetColor(color);
     }
     // 实现拿着黄油的时候不在栏内绘制黄油
-    if (UsesOnlineCoopTools() || !requestDrawButterInCursor) {
+    // 联机显示本机所操控玩家的冷却；本地触控手套仍由 P2 使用。
+    int aPlayerIndex = 1;
+    if (UsesOnlineCoopTools()) {
+        const int aLocalGamepadIndex = IsRemoteClientOrViewer() ? 1 : 0;
+        aPlayerIndex = mGamepadControls[0]->mGamepadIndex == aLocalGamepadIndex ? 0 : 1;
+    }
+    const int aCooldown = mButterGloveCooldownCounter[aPlayerIndex];
+    const bool aCoolingDown = theApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD && aCooldown > 0;
+    if (UsesOnlineCoopTools() || !requestDrawButterInCursor || aCoolingDown) {
         g->DrawImage(Sexy::IMAGE_BUTTER_ICON, rect.mX - 7, rect.mY - 3);
+    }
+    if (aCoolingDown) {
+        // 与卡槽一样，顶部的暗色遮罩随冷却逐渐缩短。
+        const Color aOldColor = g->GetColor();
+        const int aDarkHeight = (rect.mHeight * aCooldown + kButterGloveCooldown - 1) / kButterGloveCooldown;
+        g->SetColor(Color(0, 0, 0, 128));
+        g->FillRect(Rect(rect.mX, rect.mY, rect.mWidth, aDarkHeight));
+        g->SetColor(aOldColor);
     }
     if (gKeyboardMode) {
         g->DrawImageCel(Sexy::IMAGE_HELP_BUTTONS, rect.mX + 36, rect.mY + 40, 2);
@@ -7223,6 +7276,9 @@ void Board::MapLoadedNetplayIds() {
 }
 
 void Board::StartLevel() {
+    for (int &aCooldown : mButterGloveCooldownCounter) {
+        aCooldown = 0;
+    }
     if (mApp->IsVSMode()) {
         const bool isGlobalBpFirstRound =
             VSSetupAddonWidget::msGlobalBpMode != VSSetupAddonWidget::GLOBALBP_CLOSED && VSSetupAddonWidget::msGlobalBpWins[0] == 0 && VSSetupAddonWidget::msGlobalBpWins[1] == 0;

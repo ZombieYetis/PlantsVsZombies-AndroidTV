@@ -1177,6 +1177,14 @@ void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerI
         return;
     }
 
+    if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD && theButton == Sexy::GamepadButton::GAMEPAD_BUTTON_X) {
+        // 原版手柄直接 ApplyButter，困难僵王统一走各自的手套冷却入口。
+        if (mBoard->mShowButter) {
+            mBoard->ApplyButterFromGlove(mBoard->ZombieHitTest(mCursorPositionX, mCursorPositionY, 1), mPlayerIndex);
+        }
+        return;
+    }
+
     if (!mApp->IsVSMode() || theButton != Sexy::GamepadButton::GAMEPAD_BUTTON_A) {
         return old_GamepadControls_OnButtonDown(this, theButton, thePlayerIndex, unk);
     }
