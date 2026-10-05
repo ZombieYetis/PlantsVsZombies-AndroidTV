@@ -2663,6 +2663,15 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
             }
         } break;
+        case EVENT_SERVER_BOARD_PLANT_SLEEP_STATE: {
+            const auto *sleepEvent = static_cast<const U16U16U8_Event *>(event);
+            uint16_t clientPlantID = 0;
+            if (homura::FindInMap(serverPlantIDMap, sleepEvent->data1, clientPlantID)) {
+                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
+                aPlant->SetSleeping(sleepEvent->data3 != 0);
+                aPlant->mWakeUpCounter = sleepEvent->data2;
+            }
+        } break;
         case EVENT_SERVER_BOARD_PLANT_IMITATER_MORPH: {
             auto *eventMorph = static_cast<const U16_Event *>(event);
             uint16_t clientPlantID = 0;
@@ -5577,6 +5586,11 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount, int thePlayerInd
                 aPlant->SetSleeping(false);
             } else {
                 aPlant->mWakeUpCounter = aWakeUpCounter;
+            }
+            if (IsRemoteServer() && aPlant->mSeedType == SeedType::SEED_GLOOMSHROOM && (aIsAwake || aWakeUpCounter > 0)) {
+                // 必须在 PLANT_ADD 建立客户端 ID 映射后，同步升级继承的最终状态。
+                U16U16U8_Event sleepEvent = {{EventType::EVENT_SERVER_BOARD_PLANT_SLEEP_STATE}, uint16_t(mPlants.DataArrayGetID(aPlant)), uint16_t(aPlant->mWakeUpCounter), uint8_t(aPlant->mIsAsleep)};
+                netplay::PutEvent(sleepEvent);
             }
         }
         aSeedBank->mSeedPackets[aGamepad->mSelectedSeedIndex].Deactivate();

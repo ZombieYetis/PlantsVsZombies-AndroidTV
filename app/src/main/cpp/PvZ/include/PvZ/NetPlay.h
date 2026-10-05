@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3208;
+inline constexpr uint32_t NETPLAY_VERSION = 3209;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -149,6 +149,7 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_PLANT_BOWLING_SET_ROW,
     EVENT_SERVER_BOARD_PLANT_COB_CANNON_FIRE,
     EVENT_SERVER_BOARD_PLANT_COB_CANNON_STATE,
+    EVENT_SERVER_BOARD_PLANT_SLEEP_STATE, // 同步植物醒睡状态及剩余唤醒倒计时。
 
     EVENT_SERVER_BOARD_ZOMBIE_DIE,
     EVENT_SERVER_BOARD_ZOMBIE_MIND_CONTROLLED,
