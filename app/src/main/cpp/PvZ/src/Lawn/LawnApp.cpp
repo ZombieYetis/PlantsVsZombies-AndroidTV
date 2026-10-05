@@ -513,7 +513,7 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
 
         BaseEvent *event = netplay::GetEvent(alignedBuf, clientRecvPtr);
         replay::RecordPacket(ReplayPacketDir::InboundClient, clientRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
-        LOG_DEBUG("event.type = {}", int(event->type));
+        // LOG_DEBUG("event.type = {}", int(event->type));
 
         if (netplay::HandleSaveGameEvent(this, event, false)) {
             offset += event->size;
@@ -582,7 +582,7 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
 
         BaseEvent *event = netplay::GetEvent(alignedBuf, serverRecvPtr);
         replay::RecordPacket(ReplayPacketDir::InboundServer, serverRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
-        LOG_DEBUG("event.type = {}", int(event->type));
+        // LOG_DEBUG("event.type = {}", int(event->type));
 
         if (netplay::HandleSaveGameEvent(this, event, true)) {
             offset += event->size;
