@@ -91,10 +91,6 @@ constexpr uintptr_t kBoardButtonListenerVtableOffset = 0x1FC;
 constexpr uintptr_t kBoardButtonListenerVTableOffset2 = 0x228;
 constexpr uint8_t kNoSelectedSeedIndex = UINT8_MAX;
 
-static_assert(sizeof(ZombieWaveEvent::zombies) == MAX_ZOMBIES_IN_WAVE);
-static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
-static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES < UINT8_MAX);
-
 // 放在 Board 类外，避免改变原版对象的内存布局。
 struct CoopToolState {
     GameObjectType tool = OBJECT_TYPE_NONE;
@@ -3914,20 +3910,20 @@ void Board::processServerEvent(const BaseEvent *event) {
             mFlagRaiseCounter = aEvent->data3;
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WAVES: {
-            const auto *wavesEvent = static_cast<const ZombieWavesEvent *>(event);
-            mNumWaves = wavesEvent->numWaves;
+            const auto *wavesEvent = static_cast<const U8U8x100_Event *>(event);
+            mNumWaves = wavesEvent->data1;
             for (int type = 0; type < 100; ++type) {
-                mZombieAllowed[type] = wavesEvent->zombieAllowed[type] != 0;
+                mZombieAllowed[type] = wavesEvent->data2[type] != 0;
             }
             mZombieWavesReady = mNumWaves == 0;
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WAVE: {
-            const auto *waveEvent = static_cast<const ZombieWaveEvent *>(event);
+            const auto *waveEvent = static_cast<const U8U8x50_Event *>(event);
             for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
-                const uint8_t type = waveEvent->zombies[index];
-                mZombiesInWave[waveEvent->wave][index] = type == UINT8_MAX ? ZombieType::ZOMBIE_INVALID : ZombieType(type);
+                const uint8_t type = waveEvent->data2[index];
+                mZombiesInWave[waveEvent->data1][index] = type == UINT8_MAX ? ZombieType::ZOMBIE_INVALID : ZombieType(type);
             }
-            if (waveEvent->wave + 1 == mNumWaves) {
+            if (waveEvent->data1 + 1 == mNumWaves) {
                 mZombieWavesReady = true;
                 if (mCutScene != nullptr && !mCutScene->mPlacedZombies) {
                     mCutScene->mPreloaded = false;
@@ -5161,15 +5157,19 @@ void Board::PickZombieWaves() {
     old_Board_PickZombieWaves(this);
 
     if (mApp->IsCoopMode() && IsRemoteServer()) {
-        ZombieWavesEvent wavesEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVES}, uint8_t(mNumWaves), {}};
+        static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
+        static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES <= UINT8_MAX);
+
+        U8U8x100_Event wavesEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVES}, uint8_t(mNumWaves)};
         for (int type = 0; type < 100; ++type) {
-            wavesEvent.zombieAllowed[type] = mZombieAllowed[type];
+            wavesEvent.data2[type] = mZombieAllowed[type];
         }
         netplay::PutEvent(wavesEvent);
+
         for (int wave = 0; wave < mNumWaves; ++wave) {
-            ZombieWaveEvent waveEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVE}, uint8_t(wave), {}};
+            U8U8x50_Event waveEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVE}, uint8_t(wave)};
             for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
-                waveEvent.zombies[index] = uint8_t(mZombiesInWave[wave][index]);
+                waveEvent.data2[index] = uint8_t(mZombiesInWave[wave][index]);
             }
             netplay::PutEvent(waveEvent);
         }

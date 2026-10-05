@@ -124,31 +124,35 @@ ZombieDefinition gExtendedZombieDefs[] = {
     {ZOMBIE_SCIENTIST, REANIM_ZOMBIE_SCIENTIST, 2, 33, 10, 2000, "SCIENTIST_ZOMBIE"},
 };
 
-static ZombieType gBossZombieList[] = {ZombieType::ZOMBIE_TRAFFIC_CONE,
-                                       ZombieType::ZOMBIE_PAIL,
-                                       ZombieType::ZOMBIE_FOOTBALL,
-                                       ZombieType::ZOMBIE_POLEVAULTER,
-                                       ZombieType::ZOMBIE_JACK_IN_THE_BOX,
-                                       ZombieType::ZOMBIE_LADDER,
-                                       ZombieType::ZOMBIE_ZAMBONI,
-                                       ZombieType::ZOMBIE_CATAPULT,
-                                       ZombieType::ZOMBIE_POGO,
-                                       ZombieType::ZOMBIE_NEWSPAPER,
-                                       ZombieType::ZOMBIE_DOOR,
-                                       ZombieType::ZOMBIE_GARGANTUAR};
+static constexpr ZombieType gBossZombieList[] = {
+    ZombieType::ZOMBIE_TRAFFIC_CONE,
+    ZombieType::ZOMBIE_PAIL,
+    ZombieType::ZOMBIE_FOOTBALL,
+    ZombieType::ZOMBIE_POLEVAULTER,
+    ZombieType::ZOMBIE_JACK_IN_THE_BOX,
+    ZombieType::ZOMBIE_LADDER,
+    ZombieType::ZOMBIE_ZAMBONI,
+    ZombieType::ZOMBIE_CATAPULT,
+    ZombieType::ZOMBIE_POGO,
+    ZombieType::ZOMBIE_NEWSPAPER,
+    ZombieType::ZOMBIE_DOOR,
+    ZombieType::ZOMBIE_GARGANTUAR,
+};
 
-static ZombieType gBossZombieListHard[] = {ZombieType::ZOMBIE_TRAFFIC_CONE,
-                                           ZombieType::ZOMBIE_PAIL,
-                                           ZombieType::ZOMBIE_FOOTBALL,
-                                           ZombieType::ZOMBIE_SUPER_FAN_IMP,
-                                           ZombieType::ZOMBIE_GIGA_POLEVAULTER,
-                                           ZombieType::ZOMBIE_JACK_IN_THE_BOX,
-                                           ZombieType::ZOMBIE_GIGA_FOOTBALL,
-                                           ZombieType::ZOMBIE_ZAMBONI,
-                                           ZombieType::ZOMBIE_CATAPULT,
-                                           ZombieType::ZOMBIE_POGO,
-                                           ZombieType::ZOMBIE_SUNDAY_EDITION,
-                                           ZombieType::ZOMBIE_GIGA_GARGANTUAR};
+static constexpr ZombieType gBossZombieListHard[] = {
+    ZombieType::ZOMBIE_TRAFFIC_CONE,
+    ZombieType::ZOMBIE_PAIL,
+    ZombieType::ZOMBIE_FOOTBALL,
+    ZombieType::ZOMBIE_SUPER_FAN_IMP,
+    ZombieType::ZOMBIE_GIGA_POLEVAULTER,
+    ZombieType::ZOMBIE_JACK_IN_THE_BOX,
+    ZombieType::ZOMBIE_GIGA_FOOTBALL,
+    ZombieType::ZOMBIE_ZAMBONI,
+    ZombieType::ZOMBIE_CATAPULT,
+    ZombieType::ZOMBIE_POGO,
+    ZombieType::ZOMBIE_SUNDAY_EDITION,
+    ZombieType::ZOMBIE_GIGA_GARGANTUAR,
+};
 
 ZombieDefinition &GetZombieDefinition(ZombieType theZombieType) {
     if (theZombieType == ZOMBIE_TRASHCAN) {

@@ -274,14 +274,14 @@ struct BaseEvent {
     uint8_t size;
 };
 
-struct ZombieWavesEvent : BaseEvent {
-    uint8_t numWaves;
-    uint8_t zombieAllowed[100];
+struct U8U8x100_Event : BaseEvent {
+    uint8_t data1;
+    uint8_t data2[100];
 };
 
-struct ZombieWaveEvent : BaseEvent {
-    uint8_t wave;
-    uint8_t zombies[50];
+struct U8U8x50_Event : BaseEvent {
+    uint8_t data1;
+    uint8_t data2[50];
 };
 
 union Union32Bit {
