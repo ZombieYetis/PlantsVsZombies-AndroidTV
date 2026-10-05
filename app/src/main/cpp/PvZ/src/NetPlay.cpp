@@ -153,13 +153,14 @@ void netplay::MetricsResetSettlementEvents() {
 }
 
 void netplay::MetricsRecordSeedEvent(bool zombieSide, bool banEvent, int seedType) {
-    // BP analytics is only meaningful in Custom Battle mode.
-    if (gMetricsBattleType != 10) {
+    // 仅记录自定义对战的选卡和禁卡，其他模式不计入对战统计。
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode() || gMetricsBattleType != 10) {
         return;
     }
 
-    if (seedType < 0)
+    if (seedType < 0) {
         return;
+    }
     settleEvents.push_back(SettleEvent{settleSeq++, zombieSide ? 'Z' : 'P', banEvent ? 'B' : 'K', seedType});
 }
 
@@ -179,23 +180,43 @@ void netplay::MetricsSetVsBackground(int background) {
     gMetricsVsBackground = background;
 }
 void netplay::MetricsRecordPlantUsed(int seedType) {
-    if (seedType >= 0)
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
+    if (seedType >= 0) {
         gMetricsPlantUseCount[seedType]++;
+    }
 }
 void netplay::MetricsRecordZombieUsed(int zombieType) {
-    if (zombieType >= 0)
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
+    if (zombieType >= 0) {
         gMetricsZombieUseCount[zombieType]++;
+    }
 }
 void netplay::MetricsRecordMowerLoss() {
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
     gMetricsMowerLoss++;
 }
 void netplay::MetricsRecordTargetLoss() {
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
     gMetricsTargetLoss++;
 }
 void netplay::MetricsRecordGraveLoss() {
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
     gMetricsGraveLoss++;
 }
 void netplay::MetricsRecordSunflowerLoss() {
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return;
+    }
     gMetricsSunflowerLoss++;
 }
 
@@ -242,6 +263,10 @@ static bool SendSettlementPayloadBlocking(const std::string &serverIp, int serve
 }
 
 bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
+    // 非对战模式不能构造或上传对战结算数据。
+    if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
+        return false;
+    }
     if (gMetricsServerIp.empty() || gMetricsServerPort <= 0) {
         LOG_WARN("[SETTLE] endpoint not ready ip='{}' port={}", gMetricsServerIp, gMetricsServerPort);
         return false;
