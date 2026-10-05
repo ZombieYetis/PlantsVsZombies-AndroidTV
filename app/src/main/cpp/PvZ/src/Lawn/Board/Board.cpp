@@ -4861,7 +4861,7 @@ void Board::DrawShovel(Sexy::Graphics *g) {
 void Board::Draw(Sexy::Graphics *g) {
     old_Board_Draw(this, g);
 
-    if (mApp->IsVSMode()) {
+    if (mApp->IsVSMode() || mApp->IsCoopMode()) {
         Color aColor = Color(0, 205, 0, 255);
 
         if (gIsReplayMode) {
