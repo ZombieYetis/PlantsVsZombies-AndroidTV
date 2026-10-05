@@ -2130,14 +2130,15 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
                     netplay::PutEvent(event);
                 }
             } else {
-                U8x5U16UNI32x2_Event event{};
+                U8x4U16UNI32x2_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_ADD;
                 event.data1[0] = uint8_t(theZombieType);
                 event.data1[1] = uint8_t(theRow);
                 event.data1[2] = int8_t(theFromWave);
+                // 标志位：bit 0 为 theIsRustle，bit 1 为非水路普僵的 mBloated。
                 event.data1[3] = uint8_t(theIsRustle);
                 if (theZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                    event.data1[4] = aZombie->mBloated;
+                    event.data1[3] |= uint8_t(aZombie->mBloated) << 1;
                 }
 
                 event.data2 = uint16_t(mZombies.DataArrayGetID(aZombie));
@@ -2900,11 +2901,11 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD: {
-            auto *eventZombieAdd = static_cast<const U8x5U16UNI32x2_Event *>(event);
+            auto *eventZombieAdd = static_cast<const U8x4U16UNI32x2_Event *>(event);
             auto aZombieType = ZombieType(eventZombieAdd->data1[0]);
             uint8_t aRow = eventZombieAdd->data1[1];
             auto aFromWave = int8_t(eventZombieAdd->data1[2]);
-            uint8_t aIsRustle = eventZombieAdd->data1[3];
+            const bool aIsRustle = (eventZombieAdd->data1[3] & 1) != 0;
             if (aZombieType == ZombieType::ZOMBIE_BACKUP_DANCER) // 移除主机生成时向客机同步传递的舞伴
                 return;
             Zombie *aZombie = AddZombieInRow_Origin(aZombieType, aRow, aFromWave, aIsRustle);
@@ -2913,7 +2914,7 @@ void Board::processServerEvent(const BaseEvent *event) {
             aZombie->ApplySyncedSpeed(aVelX, short(aZombie->mAnimTicksPerFrame));
             aZombie->mPosX = eventZombieAdd->data3[1].f32;
             if (aZombie->mZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                aZombie->mBloated = eventZombieAdd->data1[4];
+                aZombie->mBloated = (eventZombieAdd->data1[3] & 2) != 0;
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD: {

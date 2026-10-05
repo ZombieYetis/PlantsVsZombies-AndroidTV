@@ -10904,13 +10904,15 @@ void Zombie::BossSpawnContact() {
         Zombie *aZombie = mBoard->AddZombieInRow_Origin(aZombieType, mTargetRow, 0, true);
         aZombie->mPosX = 600.0f;
         if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
-            U8x5U16UNI32x2_Event event{};
+            U8x4U16UNI32x2_Event event{};
             event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
             event.data1[0] = uint8_t(aZombieType);
             event.data1[1] = uint8_t(mTargetRow);
             event.data1[2] = 0;
             event.data1[3] = 1;
-            event.data1[4] = aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool ? aZombie->mBloated : 0;
+            if (aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
+                event.data1[3] |= uint8_t(aZombie->mBloated) << 1;
+            }
             event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
             event.data3[0].f32 = aZombie->mVelX;
             event.data3[1].f32 = aZombie->mPosX;
