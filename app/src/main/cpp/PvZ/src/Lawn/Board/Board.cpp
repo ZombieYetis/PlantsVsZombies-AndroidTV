@@ -2995,11 +2995,11 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
 
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE: {
-            auto *eventBungeeDropZombie = static_cast<const U16UNI32UNI32_Event *>(event);
-            int gridX = eventBungeeDropZombie->data2.u8x4.u8_1;
-            int gridY = eventBungeeDropZombie->data2.u8x4.u8_2;
-            uint16_t serverBungeeZombieID = eventBungeeDropZombie->data2.u16x2.u16_1;
-            uint16_t serverDroppedZombieID = eventBungeeDropZombie->data2.u16x2.u16_2;
+            auto *eventBungeeDropZombie = static_cast<const U8U8U16U16_Event *>(event);
+            int gridX = eventBungeeDropZombie->data1;
+            int gridY = eventBungeeDropZombie->data2;
+            uint16_t serverBungeeZombieID = eventBungeeDropZombie->data3;
+            uint16_t serverDroppedZombieID = eventBungeeDropZombie->data4;
             uint16_t clientDroppedZombieID = 0;
 
             Zombie *aBungeeZombie = AddZombie_Origin(ZombieType::ZOMBIE_BUNGEE, Zombie::ZOMBIE_WAVE_VS, false);

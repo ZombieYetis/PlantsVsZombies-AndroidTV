@@ -8651,18 +8651,19 @@ void Zombie::SetupLostArmReanim() {
 }
 
 void Zombie::BungeeDropZombie(Zombie *theDroppedZombie, int theGridX, int theGridY) {
-    if (IsRemoteClientOrViewer())
+    if (IsRemoteClientOrViewer()) {
         return;
+    }
 
     BungeeDropZombie_Origin(theDroppedZombie, theGridX, theGridY);
 
     if (IsRemoteServer()) {
-        U16UNI32UNI32_Event event{};
+        U8U8U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE;
-        event.data2.u16x2.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2.u16x2.u16_2 = uint16_t(mBoard->mZombies.DataArrayGetID(theDroppedZombie));
-        event.data2.u8x4.u8_1 = uint8_t(theGridX);
-        event.data2.u8x4.u8_2 = uint8_t(theGridY);
+        event.data1 = uint8_t(theGridX);
+        event.data2 = uint8_t(theGridY);
+        event.data3 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.data4 = uint16_t(mBoard->mZombies.DataArrayGetID(theDroppedZombie));
         netplay::PutEvent(event);
     }
 }
