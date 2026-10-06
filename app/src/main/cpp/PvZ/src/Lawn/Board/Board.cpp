@@ -5221,7 +5221,7 @@ void Board::PickZombieWaves() {
 
     if (mApp->IsCoopMode() && IsRemoteServer()) {
         static_assert(MAX_ZOMBIE_WAVES <= UINT8_MAX);
-        static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES <= UINT8_MAX);
+        static_assert(ZombieType::EXTENDED_NUM_ZOMBIE_TYPES < UINT8_MAX); // '<' for ZombieType::ZOMBIE_INVALID
 
         U8U8x100_Event wavesEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVES}, uint8_t(mNumWaves)};
         for (int type = 0; type < 100; ++type) {
