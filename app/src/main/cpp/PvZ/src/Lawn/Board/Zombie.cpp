@@ -7797,8 +7797,12 @@ bool Zombie::CanTargetPlant(Plant *thePlant, ZombieAttackType theAttackType) {
     }
 
     if (thePlant->mSeedType == SeedType::SEED_CELERY_STALKER) {
-        return IsGargantuar() || mZombieType == ZombieType::ZOMBIE_DOG || theAttackType == ZombieAttackType::ATTACKTYPE_DRIVE_OVER
+        const bool aCanTargetCeleryStalker = IsGargantuar() || mZombieType == ZombieType::ZOMBIE_DOG || theAttackType == ZombieAttackType::ATTACKTYPE_DRIVE_OVER
             || (theAttackType != ZombieAttackType::ATTACKTYPE_LADDER && !thePlant->IsCeleryStalkerLow());
+        if (!aCanTargetCeleryStalker) {
+            return false;
+        }
+        // 允许攻击时继续检查同格植物优先级，避免绕过南瓜保护。
     }
 
     if (thePlant->IsSpiky()) {
