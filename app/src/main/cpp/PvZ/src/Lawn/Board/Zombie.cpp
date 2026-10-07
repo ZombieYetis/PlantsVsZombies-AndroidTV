@@ -6190,8 +6190,13 @@ void Zombie::MowDown() {
 }
 
 void Zombie::MowDown_Original() {
-    if (mDead || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_MOWERED || mZombieType == ZombieType::ZOMBIE_BOSS)
+    if (mDead || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_MOWERED || mZombieType == ZombieType::ZOMBIE_BOSS) {
         return;
+    }
+
+    // 小推车压死僵尸不结算阳光豆
+    mSunBeanSun = 0;
+    mSunBeanDamageRemainder = 0;
 
     if (mZombieType == ZombieType::ZOMBIE_CATAPULT) {
         mApp->AddTodParticle(mPosX + 80.0f, mPosY + 60.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_CATAPULT_EXPLOSION);
