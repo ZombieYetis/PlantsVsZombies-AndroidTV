@@ -43,14 +43,10 @@
 
 #include <numbers>
 
-/**
- * @brief Homura 模块的初始化函数.
- *
- * Java 层已指定模块加载顺序: 先 libGameMain.so, 后 libHomura.so.<br/>
- * <br/>
- * constructor(102) -> call after some variables are initialized
- */
-[[gnu::constructor(102)]] static void LibMain() {
+// 模块的初始化函数.
+// Java 层已指定模块加载顺序: 先 libGameMain.so, 后 libHomura.so.
+// [[gnu::constructor]]: https://clang.llvm.org/docs/AttributeReference.html#constructor-destructor
+[[gnu::constructor(101)]] static void LibMain() {
     homura::RegisterExceptionHandler();
     homura::RegisterAccessViolationHandler();
 

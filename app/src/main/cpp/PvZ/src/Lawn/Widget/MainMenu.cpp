@@ -81,7 +81,7 @@ void MainMenu::Update() {
     requestDrawButterInCursor = false;
 
     if (!isPatched) {
-        patchlist::autoPickupSeedPacketDisable.Modify();
+        GetPatchList().autoPickupSeedPacketDisable.Modify();
         isPatched = true;
     }
 

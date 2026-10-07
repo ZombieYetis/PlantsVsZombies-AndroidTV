@@ -1358,7 +1358,7 @@ bool Board::KeyDown(KeyCode theKey) {
     // 用于切换键盘模式，自动开关砸罐子老虎机种子雨关卡内的"自动拾取植物卡片"功能
     if (theKey >= 37 && theKey <= 40) {
         if (!gKeyboardMode) {
-            patchlist::autoPickupSeedPacketDisable.Restore();
+            GetPatchList().autoPickupSeedPacketDisable.Restore();
         }
         gKeyboardMode = true;
         requestDrawShovelInCursor = false;
@@ -5870,7 +5870,7 @@ void Board::__MouseDown(int x, int y, int theClickCount) {
     // yy = y;
     // LOGD("%d %d",x,y);
     if (gKeyboardMode) {
-        patchlist::autoPickupSeedPacketDisable.Modify();
+        GetPatchList().autoPickupSeedPacketDisable.Modify();
     }
     gKeyboardMode = false;
     SeedBank *aSeedBank = mGamepadControls[0]->GetSeedBank();
@@ -6593,7 +6593,7 @@ void Board::MouseDownSecond(int x, int y, int theClickCount) {
     gTouchLastXSecond = x;
     gTouchLastYSecond = y;
     if (gKeyboardMode) {
-        patchlist::autoPickupSeedPacketDisable.Modify();
+        GetPatchList().autoPickupSeedPacketDisable.Modify();
     }
     gKeyboardMode = false;
 
