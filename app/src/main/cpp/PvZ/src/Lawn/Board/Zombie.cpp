@@ -4110,7 +4110,14 @@ void Zombie::ZombieImpThrown(Zombie *theThrowerZombie, float theOffsetDistance) 
 
         const int aFlightFrames = std::max(1, int(std::ceil(aThrowingDistance / GIGA_IMP_FLY_SPEED)));
         const auto aFrames = float(aFlightFrames);
-        mVelZ = (THOWN_ZOMBIE_GRAVITY * aFrames * (aFrames + 1.0f) * 0.5f - mAltitude) / aFrames;
+        float aGroundHeightDifference = 0.0f;
+        if (mBoard->StageHasRoof()) {
+            // 按整数帧后的实际落点补偿屋顶坡度，避免滞空延长后飞入小推车。
+            const float aLandingX = mPosX - mVelX * aFrames;
+            const float aLandingY = mBoard->GetPosYBasedOnRow(aLandingX + 40.0f, mRow) - 30.0f;
+            aGroundHeightDifference = aLandingY - mPosY;
+        }
+        mVelZ = (THOWN_ZOMBIE_GRAVITY * aFrames * (aFrames + 1.0f) * 0.5f - mAltitude - aGroundHeightDifference) / aFrames;
 
         PlayZombieReanim("anim_thrown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
         UpdateReanim();
