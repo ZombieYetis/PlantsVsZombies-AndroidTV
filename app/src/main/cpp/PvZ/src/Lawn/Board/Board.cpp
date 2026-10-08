@@ -938,6 +938,37 @@ void Board::DrawFadeOut(Sexy::Graphics *g) {
     g->FillRect(fullScreenRect);
 }
 
+SeedType Board::GetAvailableUpgradeSeedInCursor(int thePlayerIndex) {
+    GamepadControls *aControls = mGamepadControls[thePlayerIndex];
+    if (aControls == nullptr || aControls->mGamepadIndex == -1 || aControls->mGamepadState != BaseGamepadControls::MOVEMENT_STATE_PLANT_CURSOR) {
+        return SeedType::SEED_NONE;
+    }
+
+    SeedType aSeedType = GetSeedTypeInCursor(thePlayerIndex);
+    if (!Plant::IsUpgrade(aSeedType)) {
+        return SeedType::SEED_NONE;
+    }
+
+    SeedBank *aSeedBank = aControls->GetSeedBank();
+    int aSelectedIndex = aControls->mSelectedSeedIndex;
+    if (aSeedBank == nullptr || aSelectedIndex < 0 || aSelectedIndex >= aSeedBank->mNumPackets || aSelectedIndex >= 10) {
+        return SeedType::SEED_NONE;
+    }
+
+    SeedPacket &aSeedPacket = aSeedBank->mSeedPackets[aSelectedIndex];
+    SeedType aPacketType = aSeedPacket.mPacketType == SeedType::SEED_IMITATER ? aSeedPacket.mImitaterType : aSeedPacket.mPacketType;
+    if (aPacketType != aSeedType || !aSeedPacket.mActive || aSeedPacket.mRefreshing) {
+        return SeedType::SEED_NONE;
+    }
+
+    // 按当前卡槽的实际价格和该玩家的阳光余额判断，包括无尽模式的紫卡涨价。
+    int aCost = GetCurrentPlantCost(aSeedPacket.mPacketType, aSeedPacket.mImitaterType);
+    if (!CanTakeSunMoney(aCost, thePlayerIndex)) {
+        return SeedType::SEED_NONE;
+    }
+    return aSeedType;
+}
+
 int Board::GetCurrentPlantCost(SeedType theSeedType, SeedType theImitaterType) {
     // 无限阳光
     if (infiniteSun && !IsOnlineServerModeActive() && !gIsReplayMode)

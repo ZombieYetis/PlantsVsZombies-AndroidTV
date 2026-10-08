@@ -581,6 +581,7 @@ public:
     SeedType GetSeedTypeInCursor(int thePlayerIndex) {
         return reinterpret_cast<SeedType (*)(Board *, int)>(Board_GetSeedTypeInCursorAddr)(this, thePlayerIndex);
     }
+    SeedType GetAvailableUpgradeSeedInCursor(int thePlayerIndex);
     void TryToSaveGame() {
         reinterpret_cast<void (*)(Board *)>(Board_TryToSaveGameAddr)(this);
     }

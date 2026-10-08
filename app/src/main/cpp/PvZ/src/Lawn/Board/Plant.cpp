@@ -22,6 +22,7 @@
 #include "PvZ/GlobalVariable.h"
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/Board/Challenge.h"
+#include "PvZ/Lawn/Board/CursorObject.h"
 #include "PvZ/Lawn/Board/CutScene.h"
 #include "PvZ/Lawn/Board/GridItem.h"
 #include "PvZ/Lawn/Board/OpeningEncounter.h"
@@ -317,29 +318,52 @@ bool Plant::IsLowProfile() const {
 }
 
 void Plant::UpdateReanimColor() {
-    // 修复玩家选中但不拿起(gameState为1就是选中但不拿起，为7就是选中且拿起)某个紫卡植物时，相应的可升级绿卡植物也会闪烁的BUG。
-    if (mBoard == nullptr) {
-        old_Plant_UpdateReanimColor(this);
-        return;
-    }
-    SeedType aSeedType = mSeedType;
-    if (!Plant::IsUpgrade(mSeedType)) {
-        old_Plant_UpdateReanimColor(this);
-        return;
-    }
-    if (mSeedType == SeedType::SEED_EXPLODE_O_NUT) {
-        old_Plant_UpdateReanimColor(this);
-        return;
-    }
-    GamepadControls *gamePad = mBoard->mGamepadControls[0];
-    if (gamePad->mGamepadState != BaseGamepadControls::MOVEMENT_STATE_PLANT_CURSOR) {
-        mSeedType = SeedType::SEED_PEASHOOTER;
-        old_Plant_UpdateReanimColor(this);
-        mSeedType = aSeedType;
+    // 保留原版的受击、高亮和模仿者着色，仅补充升级基底的卡槽可用性判断。
+    old_Plant_UpdateReanimColor(this);
+    if (mBoard == nullptr || !IsOnBoard()) {
         return;
     }
 
-    old_Plant_UpdateReanimColor(this);
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    if (aBodyReanim == nullptr) {
+        return;
+    }
+
+    SeedType aCursorSeedType = mBoard->GetSeedTypeInCursor(0);
+    SeedType aCursorSeedType2 = mBoard->GetSeedTypeInCursor(1);
+    bool aCobCannonBase = mSeedType == SeedType::SEED_KERNELPULT && (aCursorSeedType == SeedType::SEED_COBCANNON || aCursorSeedType2 == SeedType::SEED_COBCANNON);
+    if (!IsPartOfUpgradableTo(aCursorSeedType) && !IsPartOfUpgradableTo(aCursorSeedType2) && !aCobCannonBase) {
+        return;
+    }
+
+    // 与 PC 一样，手套拿起植物时保留灰色显示，优先于升级提示。
+    CursorObject *aCursor = mBoard->mCursorObject[0];
+    if (aCursor->mCursorType == CursorType::CURSOR_TYPE_PLANT_FROM_GLOVE) {
+        Plant *aPlant = mBoard->mPlants.DataArrayTryToGet(static_cast<uint32_t>(aCursor->mGlovePlantID));
+        if (aPlant != nullptr && aPlant->mPlantCol == mPlantCol && aPlant->mRow == mRow) {
+            return;
+        }
+    }
+
+    // PC 在拿起卡片前检查冷却和阳光；TV 允许直接拿起，因此在着色时补上同等条件。
+    SeedType aSeedType = mBoard->GetAvailableUpgradeSeedInCursor(0);
+    SeedType aSeedType2 = mBoard->GetAvailableUpgradeSeedInCursor(1);
+    Color aColorOverride(255, 255, 255);
+    if ((IsPartOfUpgradableTo(aSeedType) && mBoard->CanPlantAt(mPlantCol, mRow, aSeedType) == PlantingReason::PLANTING_OK)
+        || (IsPartOfUpgradableTo(aSeedType2) && mBoard->CanPlantAt(mPlantCol, mRow, aSeedType2) == PlantingReason::PLANTING_OK)) {
+        aColorOverride = GetFlashingColor(mBoard->mMainCounter, 90);
+    } else if (mSeedType == SeedType::SEED_KERNELPULT
+               && ((aSeedType == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, aSeedType) == PlantingReason::PLANTING_OK)
+                   || (aSeedType2 == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, aSeedType2) == PlantingReason::PLANTING_OK))) {
+        aColorOverride = GetFlashingColor(mBoard->mMainCounter, 90);
+    } else if (mSeedType == SeedType::SEED_EXPLODE_O_NUT) {
+        aColorOverride = Color(255, 64, 64);
+    }
+
+    if (aBodyReanim->mColorOverride != aColorOverride) {
+        aBodyReanim->mColorOverride = aColorOverride;
+        aBodyReanim->PropogateColorToAttachments();
+    }
 }
 
 bool Plant::IsOnBoard() const {
@@ -1059,16 +1083,17 @@ void Plant::Draw(Sexy::Graphics *g) {
         SeedType seedType = SeedType::SEED_NONE;
         SeedType seedType2 = SeedType::SEED_NONE;
         if (mBoard != nullptr) {
-            seedType = mBoard->GetSeedTypeInCursor(0);
-            seedType2 = mBoard->GetSeedTypeInCursor(1);
+            seedType = mBoard->GetAvailableUpgradeSeedInCursor(0);
+            seedType2 = mBoard->GetAvailableUpgradeSeedInCursor(1);
         }
         if ((IsPartOfUpgradableTo(seedType) && mBoard->CanPlantAt(mPlantCol, mRow, seedType) == PlantingReason::PLANTING_OK)
             || (IsPartOfUpgradableTo(seedType2) && mBoard->CanPlantAt(mPlantCol, mRow, seedType2) == PlantingReason::PLANTING_OK)) {
             g->SetColorizeImages(true);
             Color color = GetFlashingColor(mBoard->mMainCounter, 90);
             g->SetColor(color);
-        } else if ((seedType == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, seedType) == PlantingReason::PLANTING_OK)
-                   || (seedType2 == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, seedType2) == PlantingReason::PLANTING_OK)) {
+        } else if (mSeedType == SeedType::SEED_KERNELPULT
+                   && ((seedType == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, seedType) == PlantingReason::PLANTING_OK)
+                       || (seedType2 == SeedType::SEED_COBCANNON && mBoard->CanPlantAt(mPlantCol - 1, mRow, seedType2) == PlantingReason::PLANTING_OK))) {
             g->SetColorizeImages(true);
             Color color = GetFlashingColor(mBoard->mMainCounter, 90);
             g->SetColor(color);
