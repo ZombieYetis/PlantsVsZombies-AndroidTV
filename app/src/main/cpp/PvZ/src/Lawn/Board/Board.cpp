@@ -482,7 +482,7 @@ void Board::TeleportZombie(Zombie *theZombie, float theDestX) {
 
     Zombie *aPartner = nullptr;
     if (theZombie->mZombieType == ZombieType::ZOMBIE_DOGWALKER || theZombie->mZombieType == ZombieType::ZOMBIE_DOG) {
-        aPartner = theZombie->GetDogPartner();
+        aPartner = ZombieTryToGet(theZombie->mRelatedZombieID);
         if (aPartner != nullptr && aPartner->IsDeadOrDying()) {
             aPartner = nullptr;
         }
@@ -2215,6 +2215,9 @@ Zombie *Board::AddZombieInRow_Origin(ZombieType theZombieType, int theRow, int t
         if (aZombieDog != nullptr) {
             aZombieDog->mPosX = aZombie->mPosX + (aZombie->IsWalkingBackwards() ? 80.0f : -80.0f);
             aZombieDog->mRelatedZombieID = ZombieGetID(aZombie);
+            aZombieDog->mVelX = aZombie->mVelX;
+            aZombieDog->mAnimTicksPerFrame = aZombie->mAnimTicksPerFrame;
+            aZombieDog->UpdateAnimSpeed();
             aZombieDog->mRenderOrder = aZombie->mRenderOrder + 1;
             aZombie->mRelatedZombieID = ZombieGetID(aZombieDog);
         }

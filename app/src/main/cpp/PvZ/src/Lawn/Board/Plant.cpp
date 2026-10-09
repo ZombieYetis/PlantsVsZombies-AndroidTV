@@ -897,6 +897,17 @@ void Plant::UpdateSweetPotato() {
             continue;
         }
 
+        // 主人或狗被甜薯吸引时，都由狗记住目标，避免普通追猎将组合拉回其他行。
+        Zombie *aDog = nullptr;
+        if (aZombie->mZombieType == ZombieType::ZOMBIE_DOG) {
+            aDog = aZombie;
+        } else if (aZombie->mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+            aDog = mBoard->ZombieTryToGet(aZombie->mRelatedZombieID);
+        }
+        if (aDog != nullptr && aDog->mZombiePhase == ZombiePhase::PHASE_DOG_WALKING) {
+            aDog->mTargetPlantID = mBoard->PlantGetID(this);
+        }
+
         aZombie->StopEating();
         aZombie->StartWalkAnim(20);
         aZombie->SetRow(mRow);

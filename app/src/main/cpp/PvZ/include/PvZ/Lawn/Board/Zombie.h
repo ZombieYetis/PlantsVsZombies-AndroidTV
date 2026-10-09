@@ -432,9 +432,6 @@ public:
     void InterruptLightning();
     void InterruptSuperNovaDestroy();
     void UpdateGigaImp();
-    Zombie *GetDogPartner() const;
-    void CheckDogPartnerDeath();
-    void HandleDogPartnerLost();
     void UpdateDogWalker();
     void UpdateZombieDog();
     void UpdateZombieTeleportation();
@@ -455,8 +452,6 @@ public:
     void LaunchTrafficCone(Zombie *theTarget);
     bool IsValidTeleportationTarget();
     void ApplyTrafficCone();
-    Plant *FindDogTarget();
-    void SetDogPairRow(int theRow);
     void UpdateZombieGargantuar();
     void ZombieImpThrown(Zombie *theThrowerZombie, float theOffsetDistance);
     void ZombieImpKicked(float theKickingDistance);

@@ -368,6 +368,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 
         case ZombieType::ZOMBIE_DOGWALKER:
             mBodyHealth = 500;
+            mHasObject = true; // 尚未断绳，避免断绳动画结束后重复触发。
             mVariant = false;
             mZombieAttackRect = Rect(20, 0, 50, 115);
             ReanimShowTrack("Zombie_dogwalker_rope2_2", RENDER_GROUP_HIDDEN);
@@ -468,7 +469,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 
 void Zombie::CheckIfPreyCaught() {
     if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-        Zombie *aPartner = GetDogPartner();
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
         if (aPartner != nullptr) {
             const bool aChangingRow = IsChangingRow() || aPartner->IsChangingRow();
             if (aChangingRow) {
@@ -651,12 +652,6 @@ void Zombie::UpdateActions() {
     }
     if (mZombieType == ZombieType::ZOMBIE_GIGA_IMP) {
         UpdateGigaImp();
-    }
-    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-        UpdateDogWalker();
-    }
-    if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        UpdateZombieDog();
     }
     if (mZombieType == ZombieType::ZOMBIE_TELEPORTATION) {
         UpdateZombieTeleportation();
@@ -1249,8 +1244,10 @@ void Zombie::UpdatePlaying() {
         return;
     }
 
-    if ((mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) && mRelatedZombieID != ZombieID::ZOMBIEID_NULL) {
-        CheckDogPartnerDeath();
+    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+        UpdateDogWalker();
+    } else if (mZombieType == ZombieType::ZOMBIE_DOG) {
+        UpdateZombieDog();
     }
 
     if (mZombieType == ZombieType::ZOMBIE_EXPLORER) {
@@ -1302,72 +1299,6 @@ void Zombie::UpdatePlaying() {
     }
 }
 
-Zombie *Zombie::GetDogPartner() const {
-    if (mBoard == nullptr || mRelatedZombieID == ZombieID::ZOMBIEID_NULL) {
-        return nullptr;
-    }
-
-    Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
-    if (aPartner == nullptr) {
-        return nullptr;
-    }
-
-    const bool aValidPair = (mZombieType == ZombieType::ZOMBIE_DOGWALKER && aPartner->mZombieType == ZombieType::ZOMBIE_DOG)
-        || (mZombieType == ZombieType::ZOMBIE_DOG && aPartner->mZombieType == ZombieType::ZOMBIE_DOGWALKER);
-    return aValidPair ? aPartner : nullptr;
-}
-
-void Zombie::HandleDogPartnerLost() {
-    Zombie *aPartner = GetDogPartner();
-    if (aPartner != nullptr) {
-        aPartner->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
-    }
-    mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
-
-    if (IsDeadOrDying()) {
-        return;
-    }
-
-    StopEating();
-    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-        if (mZombiePhase == ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK) {
-            return;
-        }
-        mZombiePhase = ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK;
-        ReanimShowTrack("Zombie_dogwalker_rope2_2", RENDER_GROUP_NORMAL);
-        PlayZombieReanim("anim_ropebreak", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 18.0f);
-        return;
-    }
-
-    if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        mZombiePhase = ZombiePhase::PHASE_DOG_RUNNING;
-        StartWalkAnim(20);
-    }
-}
-
-void Zombie::CheckDogPartnerDeath() {
-    if (mRelatedZombieID == ZombieID::ZOMBIEID_NULL) {
-        return;
-    }
-
-    Zombie *aPartner = GetDogPartner();
-    if (aPartner == nullptr || aPartner->IsDeadOrDying() || !aPartner->mHasHead) {
-        HandleDogPartnerLost();
-        return;
-    }
-
-    if (aPartner->mMindControlled != mMindControlled) {
-        Zombie *aWalker = mZombieType == ZombieType::ZOMBIE_DOGWALKER ? this : aPartner;
-        Zombie *aDog = mZombieType == ZombieType::ZOMBIE_DOG ? this : aPartner;
-
-        aWalker->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
-        aDog->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
-
-        aWalker->HandleDogPartnerLost();
-        aDog->HandleDogPartnerLost();
-    }
-}
-
 void Zombie::UpdateDogWalker() {
     if (mZombiePhase == ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK) {
         Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
@@ -1379,8 +1310,21 @@ void Zombie::UpdateDogWalker() {
         return;
     }
 
-    Zombie *aDog = GetDogPartner();
-    if (aDog == nullptr || aDog->IsDeadOrDying()) {
+    if (!mHasObject || mZombiePhase != ZombiePhase::PHASE_ZOMBIE_NORMAL) {
+        return;
+    }
+
+    Zombie *aDog = mBoard->ZombieTryToGet(mRelatedZombieID);
+    if (aDog == nullptr || aDog->IsDeadOrDying() || !aDog->mHasHead || aDog->mMindControlled != mMindControlled) {
+        if (aDog != nullptr) {
+            aDog->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+        }
+        mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+        mHasObject = false;
+        StopEating();
+        mZombiePhase = ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK;
+        ReanimShowTrack("Zombie_dogwalker_rope2_2", RENDER_GROUP_NORMAL);
+        PlayZombieReanim("anim_ropebreak", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 18.0f);
         return;
     }
 
@@ -1389,17 +1333,67 @@ void Zombie::UpdateDogWalker() {
     }
 }
 
-Plant *Zombie::FindDogTarget() {
+void Zombie::UpdateZombieDog() {
+    if (mZombiePhase != ZombiePhase::PHASE_DOG_WALKING) {
+        return;
+    }
+
+    Zombie *aWalker = mBoard->ZombieTryToGet(mRelatedZombieID);
+    if (aWalker == nullptr || aWalker->IsDeadOrDying() || !aWalker->mHasHead || aWalker->mMindControlled != mMindControlled) {
+        if (aWalker != nullptr) {
+            aWalker->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+        }
+        mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+        StopEating();
+        mZombiePhase = ZombiePhase::PHASE_DOG_RUNNING;
+        StartWalkAnim(20);
+        return;
+    }
+
+    if (IsRemoteClientOrViewer() || IsImmobilizied()) {
+        return;
+    }
+
+    if (mIsEating || aWalker->mIsEating) {
+        mPhaseCounter = 300;
+        return;
+    }
+
+    if (aWalker->IsImmobilizied() || (aWalker->mYuckyFace && aWalker->mYuckyFaceCounter <= 169)) {
+        return;
+    }
+
+    const bool aChangingRow = IsChangingRow() || aWalker->IsChangingRow();
+    if (aChangingRow) {
+        // 由追猎目标引发的换行完成前保持完整的 300 帧回程等待。
+        if (mPhaseCounter > 0) {
+            mPhaseCounter = 300;
+        }
+        return;
+    }
+
     const int aRowCount = mBoard->StageHas6Rows() ? 6 : 5;
     const int aHomeRow = ClampInt(mTargetRow, 0, aRowCount - 1);
-
     const Rect aDogRect = GetZombieRect();
     const int aDogCenterX = aDogRect.mX + aDogRect.mWidth / 2;
     const int aDogCenterY = aDogRect.mY + aDogRect.mHeight / 2;
     const int aDogCol = mBoard->PixelToGridX(aDogCenterX, aDogCenterY);
     const int aFrontCol = aDogCol + (IsWalkingBackwards() ? 1 : -1);
 
-    Plant *aBestPlant = nullptr;
+    // 甜薯主动吸引成功后优先保持该目标，不受普通追猎的出生行范围限制。
+    Plant *aSweetPotato = mBoard->mPlants.DataArrayTryToGet(mTargetPlantID);
+    if (aSweetPotato != nullptr && !aSweetPotato->NotOnGround() && aSweetPotato->mSeedType == SeedType::SEED_SWEET_POTATO && aSweetPotato->mRow == mRow
+        && (aSweetPotato->mPlantCol == aDogCol || aSweetPotato->mPlantCol == aFrontCol) && mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) == nullptr) {
+        float aPlantCenterX = aSweetPotato->mX + aSweetPotato->mWidth * 0.5f;
+        float aForwardDistance = IsWalkingBackwards() ? (aPlantCenterX - aDogCenterX) : (aDogCenterX - aPlantCenterX);
+        if (aForwardDistance >= -20.0f) {
+            mPhaseCounter = 300;
+            return;
+        }
+    }
+    mTargetPlantID = PlantID::PLANTID_NULL;
+
+    Plant *aTarget = nullptr;
     float aBestDistance = 1.0e30f;
     bool aBestIsSweetPotato = false;
 
@@ -1432,96 +1426,48 @@ Plant *Zombie::FindDogTarget() {
 
         const float aDistance = std::max(0.0f, aForwardDistance);
         const bool aIsSweetPotato = aPlant->mSeedType == SeedType::SEED_SWEET_POTATO && mBoard->GetLadderAt(aPlant->mPlantCol, aPlant->mRow) == nullptr;
-        if (aBestPlant == nullptr || (aIsSweetPotato && !aBestIsSweetPotato)
-            || (aIsSweetPotato == aBestIsSweetPotato && (aDistance < aBestDistance || (std::fabs(aDistance - aBestDistance) < 0.01f && aPlant->mRow == mRow && aBestPlant->mRow != mRow)))) {
-            aBestPlant = aPlant;
+        if (aTarget == nullptr || (aIsSweetPotato && !aBestIsSweetPotato)
+            || (aIsSweetPotato == aBestIsSweetPotato && (aDistance < aBestDistance || (std::fabs(aDistance - aBestDistance) < 0.01f && aPlant->mRow == mRow && aTarget->mRow != mRow)))) {
+            aTarget = aPlant;
             aBestDistance = aDistance;
             aBestIsSweetPotato = aIsSweetPotato;
         }
     }
 
-    return aBestPlant;
-}
+    int aNewRow = mRow;
+    if (aTarget != nullptr) {
+        // 追猎期间刷新回程倒计时
+        mPhaseCounter = 300;
+        if (aBestIsSweetPotato) {
+            mTargetPlantID = mBoard->PlantGetID(aTarget);
+        }
+        aNewRow = aTarget->mRow;
+    } else if (mRow == aHomeRow) {
+        mPhaseCounter = -1;
+        return;
+    } else if (mPhaseCounter < 0) {
+        // 外部换行后等待 300 帧再回到出生行。
+        mPhaseCounter = 300;
+        return;
+    } else if (mPhaseCounter == 0) {
+        aNewRow = aHomeRow;
+        mPhaseCounter = -1;
+    }
 
-void Zombie::SetDogPairRow(int theRow) {
-    const int aRowCount = mBoard->StageHas6Rows() ? 6 : 5;
-    if (theRow < 0 || theRow >= aRowCount || theRow == mRow) {
+    if (aNewRow == mRow) {
         return;
     }
 
     StopEating();
-    Zombie *aPartner = GetDogPartner();
-    if (aPartner != nullptr && !aPartner->IsDeadOrDying()) {
-        aPartner->StopEating();
-    }
-
-    // Zombie::SetRow() 已负责同步仍存活的狗/主人，避免双方重复调用
-    // SetRow() 导致同一帧内重复刷新行坐标。
-    SetRow(theRow);
-
+    aWalker->StopEating();
+    // SetRow 已负责带另一方换行，客户端仍通过原有事件执行。
+    SetRow(aNewRow);
     if (IsRemoteServer()) {
         U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SET_ROW;
         event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = uint16_t(theRow);
+        event.data2 = uint16_t(aNewRow);
         netplay::PutEvent(event);
-    }
-}
-
-void Zombie::UpdateZombieDog() {
-    Zombie *aWalker = GetDogPartner();
-    if (aWalker == nullptr) {
-        return;
-    }
-
-    if (IsRemoteClientOrViewer()) {
-        return;
-    }
-
-    if (mIsEating || aWalker->mIsEating) {
-        mPhaseCounter = 300;
-        return;
-    }
-
-    if (aWalker->IsImmobilizied() || (aWalker->mYuckyFace && aWalker->mYuckyFaceCounter <= 169)) {
-        return;
-    }
-
-    const bool aChangingRow = IsChangingRow() || aWalker->IsChangingRow();
-    if (aChangingRow) {
-        // 由追猎目标引发的换行完成前保持完整的 300 帧回程等待。
-        if (mPhaseCounter > 0) {
-            mPhaseCounter = 300;
-        }
-        return;
-    }
-
-    const int aRowCount = mBoard->StageHas6Rows() ? 6 : 5;
-    const int aHomeRow = ClampInt(mTargetRow, 0, aRowCount - 1);
-    Plant *aTarget = FindDogTarget();
-    if (aTarget != nullptr) {
-        // 只要追猎范围内仍有目标，就持续刷新回程倒计时。
-        mPhaseCounter = 300;
-        if (aTarget->mRow != mRow) {
-            SetDogPairRow(aTarget->mRow);
-        }
-        return;
-    }
-
-    if (mRow == aHomeRow) {
-        mPhaseCounter = -1;
-        return;
-    }
-
-    // 大蒜等外部机制将组合移离出生行时，首次稳定到达新行后才启动 300 帧等待，不会在没有追猎目标时立即折返。
-    if (mPhaseCounter < 0) {
-        mPhaseCounter = 300;
-        return;
-    }
-
-    if (mPhaseCounter == 0) {
-        SetDogPairRow(aHomeRow);
-        mPhaseCounter = -1;
     }
 }
 
@@ -5577,7 +5523,7 @@ void Zombie::StartEating() {
             syncEatingPosition(this);
 
             if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-                Zombie *aPartner = GetDogPartner();
+                Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
                 if (aPartner != nullptr && aPartner->mHasHead && !aPartner->IsDeadOrDying() && aPartner->mMindControlled == mMindControlled) {
                     syncEatingPosition(aPartner);
                 }
@@ -5672,10 +5618,10 @@ void Zombie::EatPlant(Plant *thePlant) {
         }
 
         if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-            Zombie *aPartner = GetDogPartner();
+            Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
             if (aPartner != nullptr) {
-                HandleDogPartnerLost();
-                aPartner->HandleDogPartnerLost();
+                mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+                aPartner->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
                 return;
             }
         }
@@ -6434,9 +6380,9 @@ void Zombie::DieNoLoot_Origin() {
     }
 
     if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-        Zombie *aPartner = GetDogPartner();
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
         if (aPartner != nullptr && !aPartner->IsDeadOrDying()) {
-            aPartner->HandleDogPartnerLost();
+            aPartner->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
         }
         mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
     }
@@ -8355,7 +8301,7 @@ void Zombie::SetRow(int theRow) {
         return;
     }
 
-    Zombie *aPartner = GetDogPartner();
+    Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
     if (aPartner != nullptr && !aPartner->IsDeadOrDying() && aPartner->mRow != theRow) {
         aPartner->SetRow(theRow);
     }
@@ -8401,12 +8347,10 @@ void Zombie::StartMindControlled_Origin() {
 
         mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
     } else if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-        Zombie *aPartner = GetDogPartner();
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
         if (aPartner != nullptr) {
-            Zombie *aWalker = mZombieType == ZombieType::ZOMBIE_DOGWALKER ? this : aPartner;
-            Zombie *aDog = mZombieType == ZombieType::ZOMBIE_DOG ? this : aPartner;
-            aWalker->HandleDogPartnerLost();
-            aDog->HandleDogPartnerLost();
+            aPartner->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
+            mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
         } else {
             mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
         }
@@ -8708,7 +8652,17 @@ void Zombie::PickRandomSpeed() {
     if (IsRemoteClientOrViewer())
         return;
 
-    if (mZombiePhase == ZombiePhase::PHASE_SNORKEL_WALKING_IN_POOL || (IsFlying() && mApp->IsVSMode())) {
+    if (mZombieType == ZombieType::ZOMBIE_DOG) {
+        Zombie *aWalker = mBoard->ZombieTryToGet(mRelatedZombieID);
+        if (mZombiePhase == ZombiePhase::PHASE_DOG_RUNNING) {
+            mVelX = RandRangeFloat(0.89f, 0.91f);
+        } else if (aWalker != nullptr) {
+            mVelX = aWalker->mVelX;
+            mAnimTicksPerFrame = aWalker->mAnimTicksPerFrame;
+        } else {
+            mVelX = 0.45f;
+        }
+    } else if (mZombiePhase == ZombiePhase::PHASE_SNORKEL_WALKING_IN_POOL || (IsFlying() && mApp->IsVSMode())) {
         mVelX = 0.3f;
     } else if (mZombiePhase == ZombiePhase::PHASE_DIGGER_WALKING) { // 矿工行走
         if (mApp->IsIZombieLevel()) {
@@ -8732,8 +8686,7 @@ void Zombie::PickRandomSpeed() {
         mVelX = RandRangeFloat(0.66f, 0.68f);
     } else if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING || mZombieType == ZombieType::ZOMBIE_SQUASH_HEAD) {
         mVelX = RandRangeFloat(0.79f, 0.81f);
-    } else if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD || mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING || mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING_WITHOUT_DOLPHIN
-               || mZombiePhase == ZombiePhase::PHASE_DOG_RUNNING) {
+    } else if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD || mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING || mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING_WITHOUT_DOLPHIN) {
         mVelX = RandRangeFloat(0.89f, 0.91f);
     } else if (mZombiePhase == ZombiePhase::PHASE_FOOTBALL_CHARGING) {
         mVelX = 1.5f;
@@ -8777,15 +8730,6 @@ float Zombie::ZombieTargetLeadX(float theTime) {
         aSpeed = -aSpeed;
     }
     bool aMovementBlocked = ZombieNotWalking();
-
-    if (!aMovementBlocked && (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG)) {
-        Zombie *aWalker = mZombieType == ZombieType::ZOMBIE_DOGWALKER ? this : GetDogPartner();
-        Zombie *aDog = mZombieType == ZombieType::ZOMBIE_DOG ? this : GetDogPartner();
-
-        if (aWalker != nullptr && aDog != nullptr && !aWalker->IsDeadOrDying() && !aDog->IsDeadOrDying() && aWalker->mMindControlled == aDog->mMindControlled) {
-            aMovementBlocked = aWalker->ZombieNotWalking() || aDog->ZombieNotWalking();
-        }
-    }
 
     if (aMovementBlocked) {
         aSpeed = 0.0f;
@@ -9007,6 +8951,15 @@ void Zombie::HitIceTrap() {
 
         mIceTrapCounter = aIceTrapCounter;
 
+        if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
+            Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
+            if (aPartner != nullptr && !aPartner->IsDeadOrDying()) {
+                aPartner->mIceTrapCounter = mIceTrapCounter;
+                aPartner->ApplyChill(true);
+                aPartner->UpdateAnimSpeed();
+            }
+        }
+
         StopZombieSound();
         if (mZombieType == ZombieType::ZOMBIE_BALLOON) {
             BalloonPropellerHatSpin(false);
@@ -9035,6 +8988,15 @@ void Zombie::ApplySyncedIceTrap(int theIceTrapCounter) {
 
     mIceTrapCounter = theIceTrapCounter;
 
+    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
+        if (aPartner != nullptr && !aPartner->IsDeadOrDying()) {
+            aPartner->mIceTrapCounter = mIceTrapCounter;
+            aPartner->ApplyChill(true);
+            aPartner->UpdateAnimSpeed();
+        }
+    }
+
     StopZombieSound();
     if (mZombieType == ZombieType::ZOMBIE_BALLOON) {
         BalloonPropellerHatSpin(false);
@@ -9050,6 +9012,20 @@ void Zombie::ApplySyncedIceTrap(int theIceTrapCounter) {
 bool Zombie::ZombieNotWalking() {
     if (mIsEating || IsImmobilizied()) {
         return true;
+    }
+
+    if ((mZombieType == ZombieType::ZOMBIE_DOGWALKER && mHasObject) || mZombiePhase == ZombiePhase::PHASE_DOG_WALKING) {
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
+        if (aPartner != nullptr && !aPartner->IsDeadOrDying() && aPartner->mMindControlled == mMindControlled) {
+            if (aPartner->mIsEating || aPartner->IsImmobilizied()) {
+                return true;
+            }
+            bool aChangingRow = IsChangingRow() || aPartner->IsChangingRow();
+            bool aGarlicChangingRow = (mYuckyFace && mYuckyFaceCounter >= 170) || (aPartner->mYuckyFace && aPartner->mYuckyFaceCounter >= 170);
+            if (aChangingRow && !aGarlicChangingRow) {
+                return true;
+            }
+        }
     }
 
     if (mZombiePhase == ZombiePhase::PHASE_JACK_IN_THE_BOX_POPPING || mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MADDENING || mZombiePhase == ZombiePhase::PHASE_GARGANTUAR_THROWING
@@ -9220,17 +9196,6 @@ void Zombie::UpdateZombieWalking() {
     if (ZombieNotWalking())
         return;
 
-    // 绳子未断时由遛狗僵尸统一决定组合的水平位移。
-    // 狗保留自己的动画，但不再独立消费 _ground 位移，避免减速/恢复
-    // 多次切换后两条动画曲线的微小差异不断累积成位置偏差。
-    if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        Zombie *aWalker = GetDogPartner();
-        if (aWalker != nullptr && !aWalker->IsDeadOrDying() && aWalker->mMindControlled == mMindControlled) {
-            return;
-        }
-    }
-
-    const float aOldPosX = mPosX;
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim) {
         float aSpeed = NAN;
@@ -9281,38 +9246,6 @@ void Zombie::UpdateZombieWalking() {
             }
         }
 
-        if (mZombieType == ZombieType::ZOMBIE_DOGWALKER || mZombieType == ZombieType::ZOMBIE_DOG) {
-            Zombie *aLeader = nullptr;
-            if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-                aLeader = this;
-            } else {
-                aLeader = mBoard->ZombieTryToGet(mRelatedZombieID);
-            }
-
-            if (aLeader && !aLeader->IsDeadOrDying()) {
-                if (aLeader->IsImmobilizied() || aLeader->mIsEating) {
-                    aSpeed = 0;
-                }
-
-                if (aLeader->mRelatedZombieID != ZombieID::ZOMBIEID_NULL) {
-                    Zombie *aDog = mBoard->ZombieTryToGet(aLeader->mRelatedZombieID);
-                    if (aDog && aDog != this && !aDog->IsDeadOrDying()) {
-                        if (aDog->ZombieNotWalking())
-                            aSpeed = 0;
-                    }
-                }
-            }
-
-            Zombie *aPartner = GetDogPartner();
-            if (aPartner != nullptr) {
-                const bool aChangingRow = IsChangingRow() || aPartner->IsChangingRow();
-                const bool aGarlicChangingRow = (mYuckyFace && mYuckyFaceCounter >= 170) || (aPartner->mYuckyFace && aPartner->mYuckyFaceCounter >= 170);
-                if (aChangingRow && !aGarlicChangingRow) {
-                    aSpeed = 0;
-                }
-            }
-        }
-
         if (IsWalkingBackwards()) {
             mPosX += aSpeed;
         } else if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN) {
@@ -9343,7 +9276,7 @@ void Zombie::UpdateZombieWalking() {
         bool doWalk = false;
         if (mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_IN_VAULT || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || mZombieType == ZombieType::ZOMBIE_DANCER
             || mZombieType == ZombieType::ZOMBIE_BACKUP_DANCER || mZombieType == ZombieType::ZOMBIE_BOBSLED || mZombieType == ZombieType::ZOMBIE_POGO || mZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER
-            || mZombieType == ZombieType::ZOMBIE_BALLOON) {
+            || mZombieType == ZombieType::ZOMBIE_BALLOON || mZombieType == ZombieType::ZOMBIE_DOG) {
             doWalk = true;
         } else if (mZombieType == ZombieType::ZOMBIE_SNORKEL && mInPool) {
             doWalk = true;
@@ -9364,18 +9297,6 @@ void Zombie::UpdateZombieWalking() {
             } else {
                 mPosX -= aSpeed;
             }
-        }
-    }
-
-    // 主人本帧实际走了多少，狗就走多少。这里同步的是最终世界位移，
-    // 而不是 mVelX 或动画速率，因此 _ground 曲线、冰冻倍率和动画相位
-    // 都只由主人结算一次，不会产生累计误差。
-    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-        Zombie *aDog = GetDogPartner();
-        if (aDog != nullptr && !aDog->IsDeadOrDying() && aDog->mMindControlled == mMindControlled) {
-            const float aDeltaX = mPosX - aOldPosX;
-            aDog->mPosX += aDeltaX;
-            aDog->mX = int(aDog->mPosX);
         }
     }
 }
