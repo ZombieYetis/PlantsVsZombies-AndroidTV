@@ -66,8 +66,6 @@ inline void *Board_IsScaryPotterDaveTalkingAddr;
 inline void *Board_DrawZenButtonsAddr;
 inline void *Board_DrawShovelAddr;
 inline void *Board_DrawGameObjectsAddr;
-inline void *Board_StageIsNightAddr;
-inline void *Board_StageHasPoolAddr;
 inline void *Board_StageHasZombieWalkInFromRightAddr;
 inline void *Board_StageHas6RowsAddr;
 inline void *Board_ClearCursorAddr;

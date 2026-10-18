@@ -1982,12 +1982,14 @@ bool Board::StageIsNight() const {
     // 关系到天上阳光掉落与否。
     return mBackground == BackgroundType::BACKGROUND_2_NIGHT         //
         || mBackground == BackgroundType::BACKGROUND_4_FOG           //
+        || mBackground == BackgroundType::BACKGROUND_6_BOSS          //
         || mBackground == BackgroundType::BACKGROUND_MUSHROOM_GARDEN //
-        || mBackground == BackgroundType::BACKGROUND_6_BOSS;
+        || mBackground == BackgroundType::BACKGROUND_ZOMBIQUARIUM;
 }
 
 bool Board::StageHasPool() const {
-    // Note: BACKGROUND_ZOMBIQUARIUM 有泳池行, 但不是泳池关卡.
+    // 关系到泳池特有的僵尸，如救生圈僵尸、海豚僵尸、潜水僵尸在本关出现与否。
+    // Zombiquarium 有泳池行，但不是泳池关卡。
     return mBackground == BackgroundType::BACKGROUND_3_POOL || mBackground == BackgroundType::BACKGROUND_4_FOG;
 }
 

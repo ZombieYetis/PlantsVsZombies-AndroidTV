@@ -55,8 +55,6 @@ bool LoadGameMain() {
     Board_DrawZenButtonsAddr = GetLibGameMain().GetSymbol("_ZN5Board14DrawZenButtonsEPN4Sexy8GraphicsE");
     Board_DrawShovelAddr = GetLibGameMain().GetSymbol("_ZN5Board10DrawShovelEPN4Sexy8GraphicsE");
     Board_DrawGameObjectsAddr = GetLibGameMain().GetSymbol("_ZN5Board15DrawGameObjectsEPN4Sexy8GraphicsE");
-    Board_StageIsNightAddr = GetLibGameMain().GetSymbol("_ZN5Board12StageIsNightEv");
-    Board_StageHasPoolAddr = GetLibGameMain().GetSymbol("_ZN5Board12StageHasPoolEv");
     Board_StageHasZombieWalkInFromRightAddr = GetLibGameMain().GetSymbol("_ZN5Board29StageHasZombieWalkInFromRightEv");
     Board_StageHas6RowsAddr = GetLibGameMain().GetSymbol("_ZN5Board13StageHas6RowsEv");
     Board_ClearCursorAddr = GetLibGameMain().GetSymbol("_ZN5Board11ClearCursorEi");
