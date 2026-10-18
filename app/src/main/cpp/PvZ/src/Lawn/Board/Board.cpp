@@ -4068,6 +4068,10 @@ void Board::processServerEvent(const BaseEvent *event) {
 }
 
 static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType theSeedType, bool theIsImitaterPlant) {
+    if (theCol > 9) {
+        return; // 僵尸出生点
+    }
+
     const int aColsCount = (theSeedType == SeedType::SEED_COBCANNON) ? 8 : 9; // 玉米加农炮不种在九列
     const int aWidth = (theSeedType == SeedType::SEED_COBCANNON) ? 2 : 1;     // 玉米加农炮宽度两列
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
@@ -4128,12 +4132,13 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
     // 僵尸出生线
     if (aIsOutside) {
         if (aIsAllRow) {
-            for (int row = 0; row < aRowsCount; ++row) {
-                theBoard->AddZombieInRow(theZombieType, row, theBoard->mCurrentWave, true);
+            // Use `MAX_GRID_SIZE_Y` instead of `aRowsCount`, for BACKGROUND_ZOMBIQUARIUM
+            for (int row = 0; row < MAX_GRID_SIZE_Y; ++row) {
+                if (theBoard->RowCanHaveZombieType(row, theZombieType)) /* 多行收紧限制 */ {
+                    theBoard->AddZombieInRow(theZombieType, row, theBoard->mCurrentWave, true);
+                }
             }
-        }
-        // Note: Use `MAX_GRID_SIZE_Y` instead of `aRowsCount`, for BACKGROUND_ZOMBIQUARIUM
-        else if (theRow < MAX_GRID_SIZE_Y) {
+        } else if (theRow < MAX_GRID_SIZE_Y) {
             theBoard->AddZombieInRow(theZombieType, theRow, theBoard->mCurrentWave, true);
         }
     }
@@ -4168,6 +4173,10 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
 }
 
 static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
+    if (theCol > 9) {
+        return; // 僵尸出生点
+    }
+
     const int aColsCount = 9;
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
@@ -4175,8 +4184,18 @@ static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
     const bool aIsAllRow = theRow == 6;
 
     bool aGridBad[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
+    for (int aGridX = 0; aGridX < MAX_GRID_SIZE_X; ++aGridX) {
+        for (int aGridY = 0; aGridY < MAX_GRID_SIZE_Y; ++aGridY) {
+            const GridSquareType aGridSquareType = theBoard->mGridSquareType[aGridX][aGridY];
+            if (aGridSquareType != GridSquareType::GRIDSQUARE_GRASS && aGridSquareType != GridSquareType::GRIDSQUARE_HIGH_GROUND) {
+                aGridBad[aGridX][aGridY] = true;
+            }
+        }
+    }
     for (GridItem *aGridItem = nullptr; theBoard->IterateGridItems(aGridItem);) {
-        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE) {
+        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || //
+            aGridItem->mGridItemType == GridItemType::GRIDITEM_CRATER ||     //
+            aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER) {
             if (IsValidGrid(aGridItem->mGridX, aGridItem->mGridY)) {
                 aGridBad[aGridItem->mGridX][aGridItem->mGridY] = true;
             }
@@ -4216,6 +4235,10 @@ static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
 }
 
 static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
+    if (theCol > 9) {
+        return; // 僵尸出生点
+    }
+
     const int aColsCount = 9;
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
@@ -4224,9 +4247,9 @@ static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
 
     bool aGridGood[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
     for (Plant *aPlant = nullptr; theBoard->IteratePlants(aPlant);) {
-        if ((!aIsAllCol && !aIsAllRow) // 单格放置放宽限制, 有植物就行
+        if ((!aIsAllCol && !aIsAllRow) // 单格放宽限制, 有植物就行
             || (aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
-            || (aPlant->IsSpiky() && theBoard->GetFlowerPotAt(aPlant->mPlantCol, aPlant->mRow) != nullptr) // 原版特性
+            || (aPlant->IsSpiky() && (theBoard->IsPoolSquare(aPlant->mPlantCol, aPlant->mRow) || theBoard->GetFlowerPotAt(aPlant->mPlantCol, aPlant->mRow) != nullptr)) // 原版特性
         ) {
             if (IsValidGrid(aPlant->mPlantCol, aPlant->mRow)) {
                 aGridGood[aPlant->mPlantCol][aPlant->mRow] = true;
