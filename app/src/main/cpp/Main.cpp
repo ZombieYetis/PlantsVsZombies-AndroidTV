@@ -473,10 +473,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_android_support_Preferences_Changes(J
             gCheatZombiesToSpawn[ZombieType::ZOMBIE_SUPER_FAN_IMP] = boolean; // 粉丝小鬼僵尸
             break;
         case 241:
-            choiceSpawnMode = value; // 刷怪模式
+            gCheatZombieSpawnMode = value; // 刷怪模式
             break;
         case 242:
-            buttonSetSpawn = boolean; // 设置出怪
+            gCheatSetZombieSpawn = boolean; // 设置出怪
             break;
         default:
             break;

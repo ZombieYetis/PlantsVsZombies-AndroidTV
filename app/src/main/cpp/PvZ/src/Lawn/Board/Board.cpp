@@ -72,6 +72,7 @@
 #include <ctime>
 
 #include <algorithm>
+#include <concepts>
 #include <numbers>
 #include <unordered_map>
 #include <vector>
@@ -4067,6 +4068,36 @@ void Board::processServerEvent(const BaseEvent *event) {
     }
 }
 
+static void CheatPlaceImpl(int theCol, int theColsCount, int theRow, int theRowsCount, std::invocable<int /*theCol*/, int /*theRow*/> auto &&thePlaceFunc, int theWidth = 1) {
+    const bool aIsAllCol = theCol == 9;
+    const bool aIsAllRow = theRow == 6;
+
+    // 全场
+    if (aIsAllCol && aIsAllRow) {
+        for (int col = 0; col < theColsCount; col += theWidth) {
+            for (int row = 0; row < theRowsCount; ++row) {
+                thePlaceFunc(col, row);
+            }
+        }
+    }
+    // 单行
+    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
+        for (int col = 0; col < theColsCount; col += theWidth) {
+            thePlaceFunc(col, theRow);
+        }
+    }
+    // 单列
+    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
+        for (int row = 0; row < theRowsCount; ++row) {
+            thePlaceFunc(theCol, row);
+        }
+    }
+    // 单格
+    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
+        thePlaceFunc(theCol, theRow);
+    }
+}
+
 static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType theSeedType, bool theIsImitaterPlant) {
     if (theCol > 9) {
         return; // 僵尸出生点
@@ -4077,9 +4108,6 @@ static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType th
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
     const bool aIsIZMode = theBoard->mApp->IsIZombieLevel();
 
-    const bool aIsAllCol = theCol == 9;
-    const bool aIsAllRow = theRow == 6;
-
     auto PlacePlant = [theBoard, theSeedType, theIsImitaterPlant, aIsIZMode](int theCol, int theRow) {
         Plant *aPlant = theBoard->AddPlant(theCol, theRow, theSeedType, (theIsImitaterPlant ? SeedType::SEED_IMITATER : SeedType::SEED_NONE), 0, true);
         if (theIsImitaterPlant) {
@@ -4089,31 +4117,7 @@ static void CheatPlacePlant(Board *theBoard, int theCol, int theRow, SeedType th
             theBoard->mChallenge->IZombieSetupPlant(aPlant);
         }
     };
-
-    // 全场
-    if (aIsAllCol && aIsAllRow) {
-        for (int col = 0; col < aColsCount; col += aWidth) {
-            for (int row = 0; row < aRowsCount; ++row) {
-                PlacePlant(col, row);
-            }
-        }
-    }
-    // 单行
-    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
-        for (int col = 0; col < aColsCount; col += aWidth) {
-            PlacePlant(col, theRow);
-        }
-    }
-    // 单列
-    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
-        for (int row = 0; row < aRowsCount; ++row) {
-            PlacePlant(theCol, row);
-        }
-    }
-    // 单格
-    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
-        PlacePlant(theCol, theRow);
-    }
+    CheatPlaceImpl(theCol, aColsCount, theRow, aRowsCount, PlacePlant, aWidth);
 }
 
 static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType theZombieType) {
@@ -4126,7 +4130,6 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
     const bool aIsOutside = theCol == 10;
-    const bool aIsAllCol = theCol == 9;
     const bool aIsAllRow = theRow == 6;
 
     // 僵尸出生线
@@ -4141,34 +4144,16 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
         } else if (theRow < MAX_GRID_SIZE_Y) {
             theBoard->AddZombieInRow(theZombieType, theRow, theBoard->mCurrentWave, true);
         }
+        return;
     }
-    // 全场
-    else if (aIsAllCol && aIsAllRow) {
-        for (int col = 0; col < aColsCount; ++col) {
-            for (int row = 0; row < aRowsCount; ++row) {
-                theBoard->mChallenge->IZombiePlaceZombie(theZombieType, col, row);
-            }
-        }
-    }
-    // 单行
-    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
-        for (int col = 0; col < aColsCount; ++col) {
-            theBoard->mChallenge->IZombiePlaceZombie(theZombieType, col, theRow);
-        }
-    }
-    // 单列
-    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
-        for (int row = 0; row < aRowsCount; ++row) {
-            theBoard->mChallenge->IZombiePlaceZombie(theZombieType, theCol, row);
-        }
-    }
-    // 单格
-    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
+
+    auto PlaceZombie = [theBoard, theZombieType](int theCol, int theRow) { //
         theBoard->mChallenge->IZombiePlaceZombie(theZombieType, theCol, theRow);
-    }
+    };
+    CheatPlaceImpl(theCol, aColsCount, theRow, aRowsCount, PlaceZombie);
 }
 
-[[nodiscard]] static bool IsValidGrid(int theGridX, int theGridY) {
+[[nodiscard]] static constexpr bool IsValidGrid(int theGridX, int theGridY) noexcept {
     return 0 <= theGridX && theGridX < MAX_GRID_SIZE_X && 0 <= theGridY && theGridY < MAX_GRID_SIZE_Y;
 }
 
@@ -4179,9 +4164,6 @@ static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
 
     const int aColsCount = 9;
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
-
-    const bool aIsAllCol = theCol == 9;
-    const bool aIsAllRow = theRow == 6;
 
     bool aGridBad[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
     for (int aGridX = 0; aGridX < MAX_GRID_SIZE_X; ++aGridX) {
@@ -4207,31 +4189,7 @@ static void CheatPlaceGraveStone(Board *theBoard, int theCol, int theRow) {
             theBoard->mChallenge->GraveDangerSpawnGraveAt(theCol, theRow);
         }
     };
-
-    // 全场
-    if (aIsAllCol && aIsAllRow) {
-        for (int col = 0; col < aColsCount; ++col) {
-            for (int row = 0; row < aRowsCount; ++row) {
-                PlaceGrave(col, row);
-            }
-        }
-    }
-    // 单行
-    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
-        for (int col = 0; col < aColsCount; ++col) {
-            PlaceGrave(col, theRow);
-        }
-    }
-    // 单列
-    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
-        for (int row = 0; row < aRowsCount; ++row) {
-            PlaceGrave(theCol, row);
-        }
-    }
-    // 单格
-    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
-        PlaceGrave(theCol, theRow);
-    }
+    CheatPlaceImpl(theCol, aColsCount, theRow, aRowsCount, PlaceGrave);
 }
 
 static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
@@ -4242,12 +4200,11 @@ static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
     const int aColsCount = 9;
     const int aRowsCount = theBoard->StageHas6Rows() ? 6 : 5;
 
-    const bool aIsAllCol = theCol == 9;
-    const bool aIsAllRow = theRow == 6;
+    const bool aIsSingleGrid = (theCol < 9 && theRow < 6);
 
     bool aGridGood[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
     for (Plant *aPlant = nullptr; theBoard->IteratePlants(aPlant);) {
-        if ((!aIsAllCol && !aIsAllRow) // 单格放宽限制, 有植物就行
+        if (aIsSingleGrid // 单格放宽限制, 有植物就行
             || (aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
             || (aPlant->IsSpiky() && (theBoard->IsPoolSquare(aPlant->mPlantCol, aPlant->mRow) || theBoard->GetFlowerPotAt(aPlant->mPlantCol, aPlant->mRow) != nullptr)) // 原版特性
         ) {
@@ -4269,34 +4226,10 @@ static void CheatPlaceLadder(Board *theBoard, int theCol, int theRow) {
             theBoard->AddALadder(theCol, theRow);
         }
     };
-
-    // 全场
-    if (aIsAllCol && aIsAllRow) {
-        for (int col = 0; col < aColsCount; ++col) {
-            for (int row = 0; row < aRowsCount; ++row) {
-                PlaceLadder(col, row);
-            }
-        }
-    }
-    // 单行
-    else if (aIsAllCol && theRow < MAX_GRID_SIZE_Y) {
-        for (int col = 0; col < aColsCount; ++col) {
-            PlaceLadder(col, theRow);
-        }
-    }
-    // 单列
-    else if (theCol < MAX_GRID_SIZE_X && aIsAllRow) {
-        for (int row = 0; row < aRowsCount; ++row) {
-            PlaceLadder(theCol, row);
-        }
-    }
-    // 单格
-    else if (theCol < MAX_GRID_SIZE_X && theRow < MAX_GRID_SIZE_Y) {
-        PlaceLadder(theCol, theRow);
-    }
+    CheatPlaceImpl(theCol, aColsCount, theRow, aRowsCount, PlaceLadder);
 }
 
-static void CheatSetZombieSpawn(Board *theBoard, const bool (&theZombiesToSpawn)[ZombieType::EXTENDED_NUM_ZOMBIE_TYPES]) {
+static void CheatSetZombieSpawn(Board *theBoard, int theSpawnMode, const bool (&theZombiesToSpawn)[ZombieType::EXTENDED_NUM_ZOMBIE_TYPES]) {
     int typesCount = 0;                                   // 已选僵尸种类数
     int typesList[ZombieType::EXTENDED_NUM_ZOMBIE_TYPES]; // 已选僵尸种类列表
 
@@ -4314,7 +4247,7 @@ static void CheatSetZombieSpawn(Board *theBoard, const bool (&theZombiesToSpawn)
     }
 
     // 自然出怪
-    if (choiceSpawnMode == 1) {
+    if (theSpawnMode == 1) {
         // 清空出怪列表
         for (int wave = 0, numWaves = theBoard->mNumWaves; wave < numWaves; ++wave) {
             for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
@@ -4331,7 +4264,7 @@ static void CheatSetZombieSpawn(Board *theBoard, const bool (&theZombiesToSpawn)
         theBoard->PickZombieWaves(); // 由游戏生成出怪列表
     }
     // 极限出怪
-    else if (choiceSpawnMode == 2) {
+    else if (theSpawnMode == 2) {
         int indexInLevel = 0;
         // 均匀填充出怪列表
         for (int wave = 0, numWaves = theBoard->mNumWaves; wave < numWaves; ++wave) {
@@ -4647,11 +4580,11 @@ void Board::Update() {
     }
 
     // 出怪设置
-    if (buttonSetSpawn) {
-        if (choiceSpawnMode > 0 && !IsOnlineServerModeActive() && !gIsReplayMode) {
-            CheatSetZombieSpawn(this, gCheatZombiesToSpawn);
+    if (gCheatSetZombieSpawn) {
+        if (gCheatZombieSpawnMode > 0 && !IsOnlineServerModeActive() && !gIsReplayMode) {
+            CheatSetZombieSpawn(this, gCheatZombieSpawnMode, gCheatZombiesToSpawn);
         }
-        buttonSetSpawn = false;
+        gCheatSetZombieSpawn = false;
     }
 
     UpdateButtons();

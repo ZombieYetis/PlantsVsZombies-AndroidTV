@@ -881,8 +881,8 @@ inline bool layChoseFormation;
 inline bool layPastedFormation;
 inline bool noFog;
 inline bool gCheatZombiesToSpawn[ZombieType::EXTENDED_NUM_ZOMBIE_TYPES]; // 僵尸选中情况
-inline int choiceSpawnMode;                                              // 刷怪模式
-inline bool buttonSetSpawn;                                              // 设置出怪
+inline int gCheatZombieSpawnMode;                                        // 刷怪模式
+inline bool gCheatSetZombieSpawn;                                        // 设置出怪
 inline int targetSeedBank;
 inline int choiceSeedPacketIndex;
 inline SeedType choiceSeedType = SeedType::SEED_NONE;
