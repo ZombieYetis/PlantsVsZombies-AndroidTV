@@ -25,6 +25,7 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -38,6 +39,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.provider.OpenableColumns;
 import android.net.Uri;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -1416,6 +1418,30 @@ public class EnhanceActivity extends MainActivity {
         }
     }
 
+    private String getReplayImportFileName(Uri uri) {
+        String name = null;
+        if ("content".equals(uri.getScheme())) {
+            // Document URI segments can be opaque IDs, even after the file is renamed.
+            try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (index >= 0) {
+                        name = cursor.getString(index);
+                    }
+                }
+            } catch (RuntimeException e) {
+                Log.w("EnhanceActivity", "Failed to query replay file name", e);
+            }
+        } else if ("file".equals(uri.getScheme())) {
+            name = uri.getLastPathSegment();
+        }
+        if (name == null || name.isEmpty()) {
+            return "imported_replay.rpl";
+        }
+        // Keep provider-supplied names inside the replay directory.
+        return name.replace('/', '_').replace('\\', '_');
+    }
+
     private void handleReplayImport(Uri uri) {
         if (mReplayImportTargetDir == null || mReplayImportTargetDir.isEmpty()) {
             nativeOnReplayImportFinished(false, "target dir missing");
@@ -1427,15 +1453,7 @@ public class EnhanceActivity extends MainActivity {
             return;
         }
 
-        String name = "imported_replay.pvrp";
-        String last = uri.getLastPathSegment();
-        if (last != null) {
-            int cut = last.lastIndexOf('/');
-            name = cut >= 0 ? last.substring(cut + 1) : last;
-            if (name.isEmpty()) {
-                name = "imported_replay.pvrp";
-            }
-        }
+        String name = getReplayImportFileName(uri);
         final String lowerName = name.toLowerCase(Locale.ROOT);
         if (!lowerName.endsWith(".rpl")) {
             Toast.makeText(this, getString(R.string.replay_import_only_rpl), Toast.LENGTH_SHORT).show();

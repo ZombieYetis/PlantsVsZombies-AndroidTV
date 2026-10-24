@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <cctype>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -317,7 +318,9 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
         if (ec || !entry.is_regular_file()) {
             continue;
         }
-        if (entry.path().extension() != ".rpl") {
+        std::string extension = entry.path().extension().string();
+        std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (extension != ".rpl") {
             continue;
         }
         std::ifstream in(entry.path(), std::ios::binary);
