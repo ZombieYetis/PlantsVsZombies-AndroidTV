@@ -880,19 +880,24 @@ Rect GridItem::GetItemRect() const {
     if (mGridItemType == GRIDITEM_POLE) {
         return {int(mPosX), int(mPosY), 30, 160};
     }
-    if (mApp->IsVSMode()) {
-        if (mGridItemType == GRIDITEM_MP_BURIAL_MOUND || mGridItemType == GRIDITEM_GRAVESTONE) {
-            return {mBoard->GridToPixelX(mGridX, mGridY), mBoard->GridToPixelY(mGridX, mGridY), IMAGE_TOMBSTONES->GetCelWidth(), IMAGE_TOMBSTONES->GetCelHeight()};
-        }
-        if (mGridItemType == GRIDITEM_MP_TARGET_ZOMBIE) {
-            return {mBoard->GridToPixelX(mGridX, mGridY) + mBoard->GridCellWidth(mGridX, mGridY) / 2,
-                    mBoard->GridToPixelY(mGridX, mGridY),
-                    IMAGE_MP_TARGET->GetCelWidth(),
-                    IMAGE_MP_TARGET->GetCelHeight()};
-        }
+    if (mGridItemType == GRIDITEM_MP_TARGET_ZOMBIE) {
+        return {
+            mBoard->GridToPixelX(mGridX, mGridY) + mBoard->GridCellWidth(mGridX, mGridY) / 2, mBoard->GridToPixelY(mGridX, mGridY), IMAGE_MP_TARGET->GetCelWidth(), IMAGE_MP_TARGET->GetCelHeight()};
     }
 
     return {mBoard->GridToPixelX(mGridX, mGridY), mBoard->GridToPixelY(mGridX, mGridY), 63, 80};
+}
+
+Rect GridItem::GetDebugDrawRect() const {
+    if (mGridItemType == GRIDITEM_MP_BURIAL_MOUND || mGridItemType == GRIDITEM_GRAVESTONE) {
+        return {mBoard->GridToPixelX(mGridX, mGridY), mBoard->GridToPixelY(mGridX, mGridY), IMAGE_TOMBSTONES->GetCelWidth(), IMAGE_TOMBSTONES->GetCelHeight()};
+    }
+    if (mGridItemType == GRIDITEM_MP_TARGET_ZOMBIE) {
+        return {
+            mBoard->GridToPixelX(mGridX, mGridY) + mBoard->GridCellWidth(mGridX, mGridY) / 2, mBoard->GridToPixelY(mGridX, mGridY), IMAGE_MP_TARGET->GetCelWidth(), IMAGE_MP_TARGET->GetCelHeight()};
+    }
+
+    return GetItemRect();
 }
 
 void GridItem::TakeDamage(int theDamage, unsigned int theDamageFlags) {

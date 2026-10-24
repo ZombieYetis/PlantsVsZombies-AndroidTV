@@ -117,6 +117,7 @@ public:
     void TakeDamage(int theDamage, unsigned int theDamageFlags);
     void TakeDamage_Origin(int theDamage, unsigned int theDamageFlags);
     Sexy::Rect GetItemRect() const;
+    Sexy::Rect GetDebugDrawRect() const;
 
 protected:
     friend void InitHookFunction();

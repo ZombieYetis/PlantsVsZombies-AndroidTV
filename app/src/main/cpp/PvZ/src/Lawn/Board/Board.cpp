@@ -900,7 +900,7 @@ void Board::DrawDebugObjectRects(Sexy::Graphics *g) {
                     case GRIDITEM_MP_BURIAL_MOUND:
                     case GRIDITEM_GRAVESTONE: {
                         g->SetColor(Color{0, 255, 0});
-                        g->DrawRect(aGridItem->GetItemRect());
+                        g->DrawRect(aGridItem->GetDebugDrawRect());
                     } break;
                     default:
                         break;
