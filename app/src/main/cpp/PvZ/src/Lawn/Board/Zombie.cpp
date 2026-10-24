@@ -3367,10 +3367,13 @@ void Zombie::UpdateGigaGargantuar() {
         }
     };
 
-    auto findLightningMainTarget = [this]() -> LightningMainTarget {
+    // 中场 mPosX 约为 400，与第五列植物中心重合；索敌和电束统一从身体碰撞框中心起算。
+    const Rect aLightningSourceRect = GetZombieRect();
+    const int aLightningOriginX = aLightningSourceRect.mX + aLightningSourceRect.mWidth / 2;
+
+    auto findLightningMainTarget = [this, aLightningOriginX]() -> LightningMainTarget {
         LightningMainTarget aBestTarget{};
 
-        const int aLightningOriginX = static_cast<int>(mPosX);
         int aBestDistance = INT_MAX;
 
         if (!mMindControlled) {
@@ -3608,7 +3611,6 @@ void Zombie::UpdateGigaGargantuar() {
         const bool aSpawnHitEffect = aLightningElapsedTicks == 1 || (aLightningElapsedTicks > 0 && aLightningElapsedTicks % GIGA_LIGHTNING_HIT_EFFECT_INTERVAL == 0);
 
         LightningMainTarget aMainTarget = refreshLightningMainTarget();
-        const int aLightningOriginX = mX;
 
         auto isInsideLightningRange = [this, &aMainTarget, aLightningOriginX](int theCenterX) -> bool {
             if (mMindControlled) {
@@ -3660,10 +3662,13 @@ void Zombie::UpdateGigaGargantuar() {
 
                 const bool aInsideLightningBeam = std::abs(aPlant->mRow - mRow) <= 1 && isInsideLightningRange(aCenterX);
 
+                // 行范围已限制为上下各一行，植物主目标的溅射按列补齐 3x3，避免碰撞框中心偏移导致漏伤。
+                const bool aInsidePlantTargetSplash = aMainTarget.mPlant != nullptr && std::abs(aPlant->mPlantCol - aMainTarget.mPlant->mPlantCol) <= 1;
+
                 // 如果主目标是僵尸，则以该僵尸为中心产生范围溅射
                 const bool aInsideZombieTargetSplash = aMainTarget.mZombie != nullptr && GetCircleRectOverlap(aMainTarget.mCenterX, aMainTarget.mCenterY, JackInTheBoxZombieRadius, aPlantRect);
 
-                if (!aInsideLightningBeam && !aInsideZombieTargetSplash) {
+                if (!aInsideLightningBeam && !aInsidePlantTargetSplash && !aInsideZombieTargetSplash) {
                     continue;
                 }
 
