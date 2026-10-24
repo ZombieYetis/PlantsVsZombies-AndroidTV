@@ -814,6 +814,7 @@ bool LoadGameMain() {
     Plant_UpdateReanimColorAddr = GetLibGameMain().GetSymbol("_ZN5Plant17UpdateReanimColorEv");
     Plant_DrawAddr = GetLibGameMain().GetSymbol("_ZN5Plant4DrawEPN4Sexy8GraphicsE");
     Plant_FindTargetZombieAddr = GetLibGameMain().GetSymbol("_ZN5Plant16FindTargetZombieEi11PlantWeapon");
+    Plant_FindStarFruitTargetAddr = GetLibGameMain().GetSymbol("_ZN5Plant19FindStarFruitTargetEv");
     Plant_FindTargetGridItemAddr = GetLibGameMain().GetSymbol("_ZN5Plant18FindTargetGridItemEi11PlantWeapon");
     Plant_GetImageAddr = GetLibGameMain().GetSymbol("_ZN5Plant8GetImageE8SeedType");
     Plant_GetPlantRectAddr = GetLibGameMain().GetSymbol("_ZN5Plant12GetPlantRectEv");

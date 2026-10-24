@@ -813,6 +813,7 @@ inline void *Plant_UpdateCobCannonAddr;
 inline void *Plant_UpdateReanimColorAddr;
 inline void *Plant_DrawAddr;
 inline void *Plant_FindTargetZombieAddr;
+inline void *Plant_FindStarFruitTargetAddr;
 inline void *Plant_FindTargetGridItemAddr;
 inline void *Plant_GetImageAddr;
 inline void *Plant_GetPlantRectAddr;

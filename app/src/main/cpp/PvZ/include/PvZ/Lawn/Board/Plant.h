@@ -293,6 +293,7 @@ public:
     void DoSpecial_Origin();
     void IceAZombie(Zombie *theZombie);
     Zombie *FindTargetZombie(int theRow, PlantWeapon thePlantWeapon);
+    bool FindStarFruitTarget();
     GridItem *FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon);
     void Die();
     void Die_Origin();

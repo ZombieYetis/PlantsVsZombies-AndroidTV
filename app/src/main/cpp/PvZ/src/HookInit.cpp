@@ -409,6 +409,7 @@ void InitHookFunction() {
     homura::HookFunc(Plant_SetSleepingAddr, &Plant::SetSleeping, &old_Plant_SetSleeping);
     homura::HookFunc(Plant_UpdateReanimColorAddr, &Plant::UpdateReanimColor, &old_Plant_UpdateReanimColor);
     homura::HookFunc(Plant_FindTargetZombieAddr, &Plant::FindTargetZombie, nullptr);
+    homura::HookFunc(Plant_FindStarFruitTargetAddr, &Plant::FindStarFruitTarget, nullptr);
     homura::HookFunc(Plant_FindTargetGridItemAddr, &Plant::FindTargetGridItem, nullptr);
     homura::HookFunc(Plant_GetCostAddr, &Plant::GetCost, &old_Plant_GetCost);
     homura::HookFunc(Plant_DieAddr, &Plant::Die, nullptr);

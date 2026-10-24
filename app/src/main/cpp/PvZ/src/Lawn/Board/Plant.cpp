@@ -2302,6 +2302,83 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
     return aBestZombie;
 }
 
+bool Plant::FindStarFruitTarget() {
+    if (mRecentlyEatenCountdown > 0) {
+        return true;
+    }
+
+    const int aDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
+    const int aCenterX = mX + 40;
+    const int aCenterY = mY + 40;
+    const auto aCanHitDiagonal = [](float theAngle, int theRowDistance) {
+        if (theRowDistance <= 1) {
+            return (theAngle > 20.0f && theAngle < 40.0f) || (theAngle > -45.0f && theAngle < -25.0f);
+        }
+        return (theAngle > 25.0f && theAngle < 35.0f) || (theAngle > -38.0f && theAngle < -28.0f);
+    };
+
+    Zombie *aZombie = nullptr;
+    while (mBoard->IterateZombies(aZombie)) {
+        Rect aZombieRect = aZombie->GetZombieRect();
+        if (!aZombie->EffectedByDamage(aDamageRangeFlags)) {
+            continue;
+        }
+
+        if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && mPlantCol > 4) {
+            return true;
+        }
+        if (aZombie->mRow == mRow) {
+            if (aCenterX > aZombieRect.mX + aZombieRect.mWidth) {
+                return true;
+            }
+            continue;
+        }
+
+        if (aZombie->mZombieType == ZombieType::ZOMBIE_DIGGER) {
+            aZombieRect.mWidth += 10;
+        }
+        const float aDeltaX = aZombieRect.mX + aZombieRect.mWidth / 2 - aCenterX;
+        const float aDeltaY = aZombieRect.mY + aZombieRect.mHeight / 2 - aCenterY;
+        const float aLeadX = aZombie->ZombieTargetLeadX(std::sqrt(aDeltaX * aDeltaX + aDeltaY * aDeltaY) * 0.3003f);
+        const int aHitX = static_cast<int>(aLeadX - aZombieRect.mWidth / 2);
+        if (aCenterX > aHitX && aCenterX < aHitX + aZombieRect.mWidth) {
+            return true;
+        }
+
+        const float aAngle = std::atan2(aDeltaY, static_cast<float>(aHitX + aZombieRect.mWidth / 2 - aCenterX)) * 57.296f;
+        if (aCanHitDiagonal(aAngle, std::abs(aZombie->mRow - mRow))) {
+            return true;
+        }
+    }
+
+    if (!mApp->IsVSMode()) {
+        return false;
+    }
+
+    GridItem *aGridItem = nullptr;
+    while (mBoard->IterateGridItems(aGridItem)) {
+        if (aGridItem->mGridItemType != GridItemType::GRIDITEM_GRAVESTONE && aGridItem->mGridItemType != GridItemType::GRIDITEM_MP_BURIAL_MOUND
+            && aGridItem->mGridItemType != GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
+            continue;
+        }
+
+        const int aPixelX = mBoard->GridToPixelX(aGridItem->mGridX, aGridItem->mGridY);
+        const int aPixelY = mBoard->GridToPixelY(aGridItem->mGridX, aGridItem->mGridY);
+        const int aCellWidth = mBoard->GridCellWidth(aPixelX, aPixelY);
+        const int aCellHeight = mBoard->GridCellWidth(aPixelX, aPixelY);
+        if (aCenterX > aPixelX && aCenterX < aPixelX + aCellWidth) {
+            return true;
+        }
+
+        const float aAngle = std::atan2(static_cast<float>(aPixelY + aCellHeight / 2 - aCenterY), static_cast<float>(aPixelX + aCellWidth / 2 - aCenterX)) * 57.296f;
+        if (aCanHitDiagonal(aAngle, std::abs(aGridItem->mGridY - mRow))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
     // 对战模式专用，植物索敌僵尸墓碑和靶子僵尸。
     // 原版函数BUG：植物还会索敌梯子和毁灭菇弹坑，故重写以修复BUG。
