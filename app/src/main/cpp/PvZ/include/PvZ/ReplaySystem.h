@@ -41,6 +41,7 @@ struct ReplayMetaInfo {
     std::string hostName;
     std::string guestName;
     std::string winnerName;
+    std::string winnerCamp;
     std::string mapName;
     std::string createdAt;
     std::string hostCamp;

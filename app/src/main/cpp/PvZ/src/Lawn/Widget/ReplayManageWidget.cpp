@@ -138,8 +138,8 @@ public:
                 zombiePlayer = item.hostName.c_str();
             }
             const bool versionMismatch = item.netplayVersion != NETPLAY_VERSION;
-            bool plantWin = item.winnerName == plantPlayer;
-            bool zombieWin = item.winnerName == zombiePlayer;
+            const bool plantWin = item.winnerCamp == "Plant";
+            const bool zombieWin = item.winnerCamp == "Zombie";
 
             if (mOwner != nullptr && index == mOwner->mSelectedReplayIndex) {
                 g->SetColor(Color(255, 238, 120, 80));

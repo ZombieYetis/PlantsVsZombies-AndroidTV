@@ -69,7 +69,7 @@ std::string BuildMetaText(const ReplayMetaInfo &meta) {
     return "host=" + meta.hostName + "\n" + "guest=" + meta.guestName + "\n" + "winner=" + meta.winnerName + "\n" + "map=" + meta.mapName + "\n" + "vs_background=" + std::to_string(meta.vsBackground)
         + "\n" + "created_at=" + meta.createdAt + "\n" + "host_camp=" + meta.hostCamp + "\n" + "guest_camp=" + meta.guestCamp + "\n" + "plant_deck=" + meta.plantDeck + "\n"
         + "zombie_deck=" + meta.zombieDeck + "\n" + "duration_ticks=" + std::to_string(meta.durationTicks) + "\n" + "board_tick=" + std::to_string(meta.boardTicks) + "\n"
-        + "netplay_version=" + std::to_string(NETPLAY_VERSION) + "\n";
+        + "netplay_version=" + std::to_string(NETPLAY_VERSION) + "\n" + "winner_camp=" + meta.winnerCamp + "\n";
 }
 
 std::string ReadMetaValue(const std::string &meta, const char *key) {
@@ -85,6 +85,69 @@ std::string ReadMetaValue(const std::string &meta, const char *key) {
         value.pop_back();
     }
     return value;
+}
+
+std::string ReadLegacyWinnerCamp(std::istream &in, const ReplayMetaInfo &info) {
+    // Names only identify a winner when exactly one player matches.
+    const bool hostWon = !info.winnerName.empty() && info.winnerName == info.hostName;
+    const bool guestWon = !info.winnerName.empty() && info.winnerName == info.guestName;
+    if (hostWon != guestWon) {
+        const std::string &camp = hostWon ? info.hostCamp : info.guestCamp;
+        if (camp == "Plant" || camp == "Zombie") {
+            return camp;
+        }
+    }
+
+    // Event IDs may change between protocol versions. Do not guess the winner
+    // of an incompatible replay or one without an explicit result event.
+    if (info.netplayVersion != NETPLAY_VERSION) {
+        return {};
+    }
+    std::vector<std::byte> data;
+    for (std::size_t i = 0; i < info.packetCount; ++i) {
+        std::uint8_t dir = 0;
+        std::uint32_t tick = 0;
+        std::uint32_t len = 0;
+        in.read(reinterpret_cast<char *>(&dir), sizeof(dir));
+        in.read(reinterpret_cast<char *>(&tick), sizeof(tick));
+        in.read(reinterpret_cast<char *>(&len), sizeof(len));
+        if (!in.good() || dir > static_cast<std::uint8_t>(ReplayPacketDir::InboundServer) || len > 1024 * 1024) {
+            return {};
+        }
+        data.resize(len);
+        in.read(reinterpret_cast<char *>(data.data()), static_cast<std::streamsize>(len));
+        if (!in.good()) {
+            return {};
+        }
+        std::size_t offset = 0;
+        while (offset < data.size()) {
+            if (data.size() - offset < sizeof(BaseEvent)) {
+                return {};
+            }
+            BaseEvent event;
+            std::memcpy(&event, data.data() + offset, sizeof(event));
+            if (event.size < sizeof(BaseEvent) || event.size > data.size() - offset) {
+                return {};
+            }
+            if (event.type == EVENT_SERVER_BOARD_ZOMBIE_WIN && event.size >= sizeof(U16_Event)) {
+                return "Zombie";
+            }
+            if (event.type == EVENT_SERVER_BOARD_PLANT_WIN && event.size >= sizeof(U16_Event)) {
+                return "Plant";
+            }
+            if (event.type == EVENT_SERVER_BOARD_CONCEDE || event.type == EVENT_CLIENT_BOARD_CONCEDE) {
+                const std::string &losingCamp = event.type == EVENT_SERVER_BOARD_CONCEDE ? info.hostCamp : info.guestCamp;
+                if (losingCamp == "Plant") {
+                    return "Zombie";
+                }
+                if (losingCamp == "Zombie") {
+                    return "Plant";
+                }
+            }
+            offset += event.size;
+        }
+    }
+    return {};
 }
 
 void CopyNameToGlobal(char *dst, std::size_t dstLen, const std::string &src) {
@@ -282,6 +345,7 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
         info.hostName = ReadMetaValue(meta, "host");
         info.guestName = ReadMetaValue(meta, "guest");
         info.winnerName = ReadMetaValue(meta, "winner");
+        info.winnerCamp = ReadMetaValue(meta, "winner_camp");
         info.mapName = ReadMetaValue(meta, "map");
         info.vsBackground = std::atoi(ReadMetaValue(meta, "vs_background").c_str());
         info.createdAt = ReadMetaValue(meta, "created_at");
@@ -296,6 +360,9 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
         }
         info.netplayVersion = std::atoi(ReadMetaValue(meta, "netplay_version").c_str());
         info.packetCount = packetCount;
+        if (info.winnerCamp != "Plant" && info.winnerCamp != "Zombie") {
+            info.winnerCamp = ReadLegacyWinnerCamp(in, info);
+        }
         infos.push_back(std::move(info));
     }
     std::sort(infos.begin(), infos.end(), [](const ReplayMetaInfo &a, const ReplayMetaInfo &b) { return a.fileName > b.fileName; });

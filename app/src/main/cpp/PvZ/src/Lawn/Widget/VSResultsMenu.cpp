@@ -437,9 +437,10 @@ bool VSResultsMenu::SaveReplay() {
     }
     meta.hostCamp = CampNameFromSide(hostCampSide);
     meta.guestCamp = CampNameFromSide(guestCampSide);
-    if (winnerSide == hostCampSide) {
+    meta.winnerCamp = CampNameFromSide(winnerSide);
+    if (winnerSide >= 0 && winnerSide == hostCampSide) {
         meta.winnerName = meta.hostName;
-    } else if (winnerSide == guestCampSide) {
+    } else if (winnerSide >= 0 && winnerSide == guestCampSide) {
         meta.winnerName = meta.guestName;
     } else {
         meta.winnerName = "Unknown";
