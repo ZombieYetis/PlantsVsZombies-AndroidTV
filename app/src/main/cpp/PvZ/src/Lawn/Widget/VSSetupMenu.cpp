@@ -845,7 +845,8 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
                 netplay::PutEvent(syncEvent);
             }
 
-            if (moveOnly) {
+            // 回放只用主机广播推进选卡/禁卡；客户端请求仍更新光标，避免提前切换回合。
+            if (moveOnly || gIsReplayMode) {
                 break;
             }
 
