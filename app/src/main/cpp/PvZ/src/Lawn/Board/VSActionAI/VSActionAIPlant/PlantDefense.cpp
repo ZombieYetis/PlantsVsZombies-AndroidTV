@@ -249,7 +249,8 @@ std::optional<VSAction> PlantAIPlanning::TryFallbackPlant(const VSGameState &sta
         const SeedType seed = static_cast<SeedType>(card.seedType);
         if (seed == SeedType::SEED_SUNFLOWER || seed == SeedType::SEED_SUNSHROOM || seed == SeedType::SEED_IMP_PEAR || seed == SeedType::SEED_INSTANT_COFFEE || seed == SeedType::SEED_PUMPKINSHELL
             || seed == SeedType::SEED_ICEBERG_LETTUCE || seed == SeedType::SEED_TORCHWOOD || seed == SeedType::SEED_GARLIC || seed == SeedType::SEED_HYPNOSHROOM || seed == SeedType::SEED_POTATOMINE
-            || seed == SeedType::SEED_SWEET_POTATO || seed == SeedType::SEED_SPIKEWEED || seed == SeedType::SEED_SPIKEROCK || seed == SeedType::SEED_CHILLY_PEPPER || seed == SeedType::SEED_UMBRELLA) {
+            || seed == SeedType::SEED_SWEET_POTATO || seed == SeedType::SEED_SPIKEWEED || seed == SeedType::SEED_SPIKEROCK || seed == SeedType::SEED_CHILLY_PEPPER || seed == SeedType::SEED_UMBRELLA
+            || seed == SeedType::SEED_BLOVER) {
             continue;
         }
         const bool emergencySeed =
