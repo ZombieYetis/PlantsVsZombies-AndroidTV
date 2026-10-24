@@ -472,6 +472,8 @@ void VSResultsMenu::ButtonDepress(int theId) {
         return;
 
     if (theId == VSResultsMenu::VSResultsMenu_Play_Again && mIsReplaySession) {
+        // 即使回放已自然结束，返回管理时也要清理会话状态。
+        gLawnApp->ClearSecondPlayer();
         gChallengeScreenOpenReplayManage = true;
         gLawnApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_VS);
         gLawnApp->KillVSResultsScreen();

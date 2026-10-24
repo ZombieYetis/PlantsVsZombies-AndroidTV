@@ -49,10 +49,13 @@ void NewOptionsDialog::ButtonDepress(int theId) {
         return;
     }
     if (theId == 5 && gIsReplayMode) {
+        LawnApp *aApp = mApp;
+        aApp->KillNewOptionsDialog();
+        aApp->KillBoard();
+        // 在大厅初始化控件前完整清理回放状态。
+        aApp->ClearSecondPlayer();
         gChallengeScreenOpenReplayManage = true;
-        mApp->KillNewOptionsDialog();
-        mApp->KillBoard();
-        mApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_VS);
+        aApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_VS);
         return;
     }
     if (theId == NewOptionsDialog_Restart && mApp->IsCoopMode() && IsOnlineModeActive()) {
