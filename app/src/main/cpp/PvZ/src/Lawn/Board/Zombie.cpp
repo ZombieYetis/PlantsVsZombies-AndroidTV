@@ -122,6 +122,7 @@ ZombieDefinition gExtendedZombieDefs[] = {
     {ZOMBIE_SUPER_NOVA_GARGANTUAR, REANIM_SUPER_NOVA_GARGANTUAR, 10, 48, 15, 1500, "SUPER_NOVA_GARGANTUAR"},
     {ZOMBIE_CROSSING_GUARD, REANIM_ZOMBIE_CROSSING_GUARD, 4, 36, 10, 1000, "CROSSING_GUARD_ZOMBIE"},
     {ZOMBIE_SCIENTIST, REANIM_ZOMBIE_SCIENTIST, 2, 33, 10, 2000, "SCIENTIST_ZOMBIE"},
+    {ZOMBIE_GRAVEDIGGER, REANIM_ZOMBIE_GRAVEDIGGER, 4, 43, 10, 1000, "GRAVEDIGGER_ZOMBIE"},
 };
 
 static constexpr ZombieType gBossZombieList[] = {
@@ -400,6 +401,21 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
             mPhaseCounter = 500;
             break;
 
+        case ZombieType::ZOMBIE_GRAVEDIGGER:
+            mBodyHealth = 270;
+            mHelmType = HelmType::HELMTYPE_GRAVEDIGGER;
+            mHelmHealth = 100;
+            mHasObject = true;
+            // 低9位记录本行已使用的列，高位保存记录所属行。
+            mSummonCounter = mRow << MAX_GRID_SIZE_X;
+            mTargetCol = -1;
+            mTargetRow = -1;
+            mVariant = false;
+            mZombieAttackRect = Rect(20, 0, 50, 115);
+            ReanimShowPrefix("anim_hair", RENDER_GROUP_HIDDEN);
+            StartWalkAnim(0);
+            break;
+
         case ZombieType::ZOMBIE_SCIENTIST:
             mBodyHealth = 500;
             mVariant = false;
@@ -494,9 +510,9 @@ void Zombie::CheckIfPreyCaught() {
         || mZombiePhase == ZombiePhase::PHASE_SNORKEL_WALKING || mZombiePhase == ZombiePhase::PHASE_LADDER_PLACING || mZombiePhase == ZombiePhase::PHASE_FOOTBALL_CHARGING
         || mZombiePhase == ZombiePhase::PHASE_FOOTBALL_TACKLING || mZombiePhase == ZombiePhase::PHASE_FOOTBALL_KICKING || mZombiePhase == ZombiePhase::PHASE_IMP_POPPING
         || mZombiePhase == ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK || mZombiePhase == ZombiePhase::PHASE_TELEPORTATION_SHOOTING || mZombiePhase == ZombiePhase::PHASE_CROSSING_GUARD_THROWING
-        || mZombieType == ZombieType::ZOMBIE_SCIENTIST || mZombieHeight == ZombieHeight::HEIGHT_GETTING_BUNGEE_DROPPED || mZombieHeight == ZombieHeight::HEIGHT_UP_LADDER
-        || mZombieHeight == ZombieHeight::HEIGHT_IN_TO_POOL || mZombieHeight == ZombieHeight::HEIGHT_OUT_OF_POOL || IsTangleKelpTarget() || mZombieHeight == ZombieHeight::HEIGHT_FALLING || !mHasHead
-        || IsFlying()) {
+        || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE || mZombieType == ZombieType::ZOMBIE_SCIENTIST
+        || mZombieHeight == ZombieHeight::HEIGHT_GETTING_BUNGEE_DROPPED || mZombieHeight == ZombieHeight::HEIGHT_UP_LADDER || mZombieHeight == ZombieHeight::HEIGHT_IN_TO_POOL
+        || mZombieHeight == ZombieHeight::HEIGHT_OUT_OF_POOL || IsTangleKelpTarget() || mZombieHeight == ZombieHeight::HEIGHT_FALLING || !mHasHead || IsFlying()) {
         return;
     }
 
@@ -664,6 +680,243 @@ void Zombie::UpdateActions() {
     }
     if (mZombieType == ZombieType::ZOMBIE_SCIENTIST) {
         UpdateZombieScientist();
+    }
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+        UpdateZombieGraveDigger();
+    }
+}
+
+bool Zombie::HasGraveDiggerUsedCell(int theGridX) const {
+    if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X) {
+        return true;
+    }
+    return (mSummonCounter >> MAX_GRID_SIZE_X) == mRow && (mSummonCounter & (1 << theGridX)) != 0;
+}
+
+void Zombie::MarkGraveDiggerCellUsed(int theGridX) {
+    if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X) {
+        return;
+    }
+    if ((mSummonCounter >> MAX_GRID_SIZE_X) != mRow) {
+        // 换行后只保留新行的触发记录。
+        mSummonCounter = mRow << MAX_GRID_SIZE_X;
+    }
+    mSummonCounter |= 1 << theGridX;
+}
+
+bool Zombie::FindGraveDiggerTarget(int &theGridX, int &theGridY) {
+    int aGravesInRow[MAX_GRID_SIZE_Y] = {};
+    bool aReserved[MAX_GRID_SIZE_X][MAX_GRID_SIZE_Y] = {};
+    GridItem *aGrave = nullptr;
+    while (mBoard->IterateGridItems(aGrave)) {
+        if (!aGrave->mDead && aGrave->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE && aGrave->mGridY >= 0 && aGrave->mGridY < MAX_GRID_SIZE_Y) {
+            ++aGravesInRow[aGrave->mGridY];
+        }
+    }
+    Zombie *aDigger = nullptr;
+    while (mBoard->IterateZombies(aDigger)) {
+        if (aDigger != this && !aDigger->IsDeadOrDying() && aDigger->mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && aDigger->mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING
+            && aDigger->mHasHead && aDigger->mHasObject && aDigger->mTargetCol >= 0 && aDigger->mTargetCol < MAX_GRID_SIZE_X && aDigger->mTargetRow >= 0 && aDigger->mTargetRow < MAX_GRID_SIZE_Y) {
+            aReserved[aDigger->mTargetCol][aDigger->mTargetRow] = true;
+        }
+    }
+    Projectile *aBone = nullptr;
+    while (mBoard->IterateProjectiles(aBone)) {
+        if (!aBone->mDead && aBone->mProjectileType == ProjectileType::PROJECTILE_BONE && aBone->mHitTorchwoodGridX >= 0 && aBone->mHitTorchwoodGridX < MAX_GRID_SIZE_X && aBone->mCobTargetRow >= 0
+            && aBone->mCobTargetRow < MAX_GRID_SIZE_Y) {
+            aReserved[aBone->mHitTorchwoodGridX][aBone->mCobTargetRow] = true;
+        }
+    }
+
+    theGridX = -1;
+    theGridY = -1;
+    int aBestGraveCount = MAX_GRAVE_STONES + 1;
+    int aBestRowDistance = MAX_GRID_SIZE_Y;
+    const int aRowCount = mBoard->StageHas6Rows() ? 6 : 5;
+    for (int aRow = 0; aRow < aRowCount; ++aRow) {
+        const int aRowDistance = abs(aRow - mRow);
+        for (int aCol = MAX_GRID_SIZE_X - 1; aCol >= 0; --aCol) {
+            if (aReserved[aCol][aRow] || !mBoard->CanGraveDiggerPlaceGraveAt(aCol, aRow)) {
+                continue;
+            }
+            // 依次比较该行墓碑数、与自身的行距、格子是否更靠右。
+            if (theGridX == -1 || aGravesInRow[aRow] < aBestGraveCount || (aGravesInRow[aRow] == aBestGraveCount && aRowDistance < aBestRowDistance)
+                || (aGravesInRow[aRow] == aBestGraveCount && aRowDistance == aBestRowDistance && aCol > theGridX)) {
+                theGridX = aCol;
+                theGridY = aRow;
+                aBestGraveCount = aGravesInRow[aRow];
+                aBestRowDistance = aRowDistance;
+            }
+            // 从右向左搜索，每行只需比较第一个可用格子。
+            break;
+        }
+    }
+    return theGridX != -1;
+}
+
+void Zombie::SetGraveDiggerPhase(ZombiePhase thePhase, int theGridX, int theGridY) {
+    if (thePhase != ZombiePhase::PHASE_ZOMBIE_NORMAL && thePhase != ZombiePhase::PHASE_GRAVEDIGGER_DIGGING && thePhase != ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE) {
+        return;
+    }
+    if (mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
+        FinishZombieRiseFromGrave();
+    }
+    StopEating();
+    mZombiePhase = thePhase;
+    mTargetCol = theGridX;
+    mTargetRow = theGridY;
+    mPhaseCounter = 0;
+    if (thePhase == ZombiePhase::PHASE_ZOMBIE_NORMAL) {
+        StartWalkAnim(10);
+    } else {
+        PlayZombieReanim("anim_dig", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 20.0f);
+    }
+    if (IsRemoteServer()) {
+        U16x4_Event event{};
+        event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE;
+        event.data[0] = uint16_t(mBoard->ZombieGetID(this));
+        event.data[1] = uint16_t(thePhase);
+        event.data[2] = uint16_t(theGridX);
+        event.data[3] = uint16_t(theGridY);
+        netplay::PutEvent(event);
+    }
+}
+
+void Zombie::LaunchBone(int theGridX, int theGridY) {
+    if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X || theGridY < 0 || theGridY >= (mBoard->StageHas6Rows() ? 6 : 5)) {
+        return;
+    }
+    Projectile *aBone = mBoard->AddProjectile(int(mPosX + 40.0f), int(mPosY + 90.0f - mAltitude), mRenderOrder + 1, mRow, ProjectileType::PROJECTILE_BONE);
+    if (aBone == nullptr) {
+        return;
+    }
+    if (theGridY == mRow) {
+        // 本行自建墓碑的目标列不再触发技能，避免之后走过去拆掉它。
+        MarkGraveDiggerCellUsed(theGridX);
+    }
+    aBone->mHitTorchwoodGridX = theGridX;
+    aBone->mCobTargetRow = theGridY;
+    aBone->mPosX -= aBone->mWidth * 0.5f;
+    aBone->mPosY -= aBone->mHeight;
+    aBone->mPosZ = -20.0f;
+    aBone->mShadowY = aBone->mPosY + aBone->mHeight;
+    mApp->PlayFoley(FoleyType::FOLEY_THROW);
+    if (IsRemoteServer()) {
+        U16x4_Event event{};
+        event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_BONE;
+        event.data[0] = uint16_t(mBoard->ZombieGetID(this));
+        event.data[1] = uint16_t(theGridX);
+        event.data[2] = uint16_t(theGridY);
+        netplay::PutEvent(event);
+    }
+}
+
+void Zombie::ApplyGraveDiggerDig() {
+    if (IsRemoteClientOrViewer() || mTargetCol < 0 || mTargetCol >= MAX_GRID_SIZE_X || mTargetRow < 0 || mTargetRow >= MAX_GRID_SIZE_Y) {
+        return;
+    }
+    int aCol = mTargetCol;
+    int aRow = mTargetRow;
+    mTargetCol = -1; // 每次挖掘动画只结算一次。
+    if (mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE) {
+        GridItem *aGrave = mBoard->GetGraveStoneAt(aCol, aRow);
+        if (aGrave == nullptr || aGrave->mDead) {
+            return;
+        }
+        // 骷髅僵尸尚未实装，暂时使用普僵。
+        Zombie *aZombie = mBoard->AddZombieInRow(ZombieType::ZOMBIE_NORMAL, aRow, mFromWave, false);
+        if (aZombie == nullptr) {
+            return;
+        }
+        aGrave->GridItemDie();
+        aZombie->mMindControlled = mMindControlled;
+        if (IsRemoteServer()) {
+            U16x4_Event event{};
+            event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_SPAWN;
+            event.data[0] = uint16_t(mBoard->ZombieGetID(aZombie));
+            event.data[1] = uint16_t(aCol);
+            event.data[2] = uint16_t(aRow);
+            event.data[3] = uint16_t(mMindControlled);
+            netplay::PutEvent(event);
+        }
+        // 先同步召唤物的阵营，出土位置和动画由已有的出土事件同步。
+        aZombie->RiseFromGrave(aCol, aRow);
+    } else if (mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING) {
+        if (!mBoard->CanGraveDiggerPlaceGraveAt(aCol, aRow) && !FindGraveDiggerTarget(aCol, aRow)) {
+            return;
+        }
+        const int aCurrentCol = mBoard->PixelToGridX(int(mPosX + 40.0f), int(mPosY));
+        if (aCol == aCurrentCol && aRow == mRow) {
+            MarkGraveDiggerCellUsed(aCol);
+            mBoard->AddAGraveStone(aCol, aRow);
+            mApp->PlayFoley(FoleyType::FOLEY_GRAVESTONE_RUMBLE);
+            if (IsRemoteServer()) {
+                U8_Event event = {{EventType::EVENT_SERVER_BOARD_PLAY_FOLEY}, uint8_t(FoleyType::FOLEY_GRAVESTONE_RUMBLE)};
+                netplay::PutEvent(event);
+            }
+        } else {
+            LaunchBone(aCol, aRow);
+        }
+    }
+}
+
+void Zombie::UpdateZombieGraveDigger() {
+    if (!IsOnBoard() || mApp->mGameScene != GameScenes::SCENE_PLAYING || IsDeadOrDying()) {
+        return;
+    }
+    const bool aDigging = mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE;
+    if (!mHasObject || !mHasHead || mInPool || mZombieHeight != ZombieHeight::HEIGHT_ZOMBIE_NORMAL) {
+        if (aDigging && !IsRemoteClientOrViewer()) {
+            SetGraveDiggerPhase(ZombiePhase::PHASE_ZOMBIE_NORMAL);
+        }
+        return;
+    }
+    if (IsImmobilizied() || IsChangingRow() || (mYuckyFace && mYuckyFaceCounter <= 169)) {
+        return;
+    }
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    if (aBodyReanim == nullptr) {
+        return;
+    }
+    if (aDigging && aBodyReanim->ShouldTriggerTimedEvent(0.45f)) {
+        mApp->AddTodParticle(mPosX, mPosY + 140.0f, mRenderOrder + 4, ParticleEffect::PARTICLE_GRAVE_BUSTER_DIE);
+        mApp->PlayFoley(FoleyType::FOLEY_USE_SHOVEL);
+    }
+    // 客户端随已同步的动画播放表现，技能结算和状态切换由主机处理。
+    if (IsRemoteClientOrViewer()) {
+        return;
+    }
+    if (aDigging) {
+        if (mTargetCol >= 0 && aBodyReanim->ShouldTriggerTimedEvent(0.74f)) {
+            ApplyGraveDiggerDig();
+        }
+        if (aBodyReanim->mLoopCount > 0) {
+            SetGraveDiggerPhase(ZombiePhase::PHASE_ZOMBIE_NORMAL);
+        }
+        return;
+    }
+    if (mZombiePhase != ZombiePhase::PHASE_ZOMBIE_NORMAL) {
+        return;
+    }
+    // 坐标转换会将右侧场外位置截断为第九列，先确认脚下已进入草坪。
+    if (mPosX + 40.0f >= mBoard->GridToPixelX(MAX_GRID_SIZE_X, mRow)) {
+        return;
+    }
+    const int aCol = mBoard->PixelToGridX(int(mPosX + 40.0f), int(mPosY));
+    if (aCol < 0 || aCol >= MAX_GRID_SIZE_X) {
+        return;
+    }
+    if (HasGraveDiggerUsedCell(aCol)) {
+        return;
+    }
+    MarkGraveDiggerCellUsed(aCol);
+    if (mBoard->GetGraveStoneAt(aCol, mRow) != nullptr) {
+        SetGraveDiggerPhase(ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE, aCol, mRow);
+    } else {
+        int aTargetCol, aTargetRow;
+        if (FindGraveDiggerTarget(aTargetCol, aTargetRow)) {
+            SetGraveDiggerPhase(ZombiePhase::PHASE_GRAVEDIGGER_DIGGING, aTargetCol, aTargetRow);
+        }
     }
 }
 
@@ -4942,6 +5195,7 @@ void Zombie::UpdateDeath() {
                 break;
 
             case ZombieType::ZOMBIE_LADDER:
+            case ZombieType::ZOMBIE_GRAVEDIGGER:
                 aFallTime = 0.62f;
                 break;
 
@@ -5543,7 +5797,9 @@ void Zombie::StartEating_Origin() {
     if (mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING)
         return;
 
-    if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING) {
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+        PlayZombieReanim(mHasObject ? "anim_eat" : "anim_eat2", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
+    } else if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING) {
         PlayZombieReanim("anim_laddereat", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
     } else if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD) {
         PlayZombieReanim("anim_eat_nopaper", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
@@ -7113,6 +7369,9 @@ void Zombie::DropHead_Origin(unsigned int theDamageFlags) {
                 aParticle->OverrideImage(nullptr, addonImages.IMAGE_ZOMBIE_CROSSING_GUARD_HEAD);
             } else if (mZombieType == ZombieType::ZOMBIE_SCIENTIST) {
                 aParticle->OverrideImage(nullptr, addonImages.IMAGE_ZOMBIE_SCIENTIST_HEAD);
+            } else if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+                ReanimShowPrefix("Zombie_gravedigger_mustache", RENDER_GROUP_HIDDEN);
+                aParticle->OverrideImage(nullptr, addonImages.IMAGE_ZOMBIE_GRAVEDIGGER_HEAD);
             }
         }
         return;
@@ -7283,6 +7542,39 @@ void Zombie::BreakRope() {
     }
 }
 
+void Zombie::DiggerLoseAxe() {
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+        if (!mHasObject) {
+            return;
+        }
+        mHasObject = false;
+        ReanimShowPrefix("Zombie_gravedigger_shovel", RENDER_GROUP_HIDDEN);
+        if (mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE) {
+            SetGraveDiggerPhase(ZombiePhase::PHASE_ZOMBIE_NORMAL);
+            return;
+        }
+        if (mIsEating) {
+            PlayZombieReanim("anim_eat2", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
+            PickRandomSpeed();
+        } else {
+            StartWalkAnim(20);
+        }
+        return;
+    }
+    if (mZombiePhase == PHASE_DIGGER_TUNNELING) {
+        mPhaseCounter = 200;
+        mZombiePhase = PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE;
+        SetAnimRate(0.0f);
+        UpdateAnimSpeed();
+        AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_DIGGER_TUNNEL, nullptr);
+        StopZombieSound();
+    }
+
+    mHasObject = false;
+    ReanimShowTrack("Zombie_digger_pickaxe", -1);
+    ReanimShowTrack("Zombie_digger_dirt", -1);
+}
+
 void Zombie::DropPole() {
     if (mZombieType == ZombieType::ZOMBIE_POLEVAULTER || mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER) {
         ReanimShowPrefix("Zombie_polevaulter_innerarm", RENDER_GROUP_HIDDEN);
@@ -7333,6 +7625,13 @@ void Zombie::DropHelm(unsigned int theDamageFlags) {
         ReanimShowPrefix("anim_hair", RENDER_GROUP_NORMAL);
         //        aEffect = ParticleEffect::PARTICLE_ZOMBIE_GIGA_HELMET;
         aEffect = ParticleEffect::PARTICLE_ZOMBIE_PAIL;
+    } else if (mHelmType == HelmType::HELMTYPE_GRAVEDIGGER) {
+        GetTrackPosition("Zombie_gravedigger_hardhat", aPosX, aPosY);
+        ReanimShowPrefix("Zombie_gravedigger_hardhat", RENDER_GROUP_HIDDEN);
+        if (mHasHead) {
+            ReanimShowPrefix("anim_hair", RENDER_GROUP_NORMAL);
+        }
+        aEffect = ParticleEffect::PARTICLE_ZOMBIE_HEADLIGHT;
     } else if (mHelmType == HelmType::HELMTYPE_CROSSING_GUARD) {
         GetTrackPosition("Zombie_crossing_guard_hardhat", aPosX, aPosY);
         ReanimShowPrefix("Zombie_crossing_guard_hardhat", RENDER_GROUP_HIDDEN);
@@ -7348,6 +7647,8 @@ void Zombie::DropHelm(unsigned int theDamageFlags) {
                 aParticle->OverrideImage(nullptr, addonImages.IMAGE_REANIM_ZOMBIE_GIGA_FOOTBALL_HELMET3);
             } else if (mHelmType == HelmType::HELMTYPE_CROSSING_GUARD) {
                 aParticle->OverrideImage(nullptr, addonImages.IMAGE_REANIM_ZOMBIE_CROSSING_GUARD_HAT);
+            } else if (mHelmType == HelmType::HELMTYPE_GRAVEDIGGER) {
+                aParticle->OverrideImage(nullptr, addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT3);
             }
         }
     }
@@ -7465,6 +7766,10 @@ void Zombie::SetupReanimForLostArm(unsigned int theDamageFlags) {
             ReanimShowPrefix("Zombie_scientist_outerarm_lower", RENDER_GROUP_HIDDEN);
             ReanimShowPrefix("Zombie_scientist_outerarm_hand", RENDER_GROUP_HIDDEN);
             break;
+        case ZombieType::ZOMBIE_GRAVEDIGGER:
+            ReanimShowPrefix("Zombie_gravedigger_outerarm_lower", RENDER_GROUP_HIDDEN);
+            ReanimShowPrefix("Zombie_gravedigger_outerarm_hand", RENDER_GROUP_HIDDEN);
+            break;
         default:
             ReanimShowPrefix("Zombie_outerarm_lower", RENDER_GROUP_HIDDEN);
             ReanimShowPrefix("Zombie_outerarm_hand", RENDER_GROUP_HIDDEN);
@@ -7530,6 +7835,10 @@ void Zombie::SetupReanimForLostArm(unsigned int theDamageFlags) {
                 GetTrackPosition("Zombie_scientist_outerarm_lower", aPosX, aPosY);
                 aBodyReanim->SetImageOverride("Zombie_scientist_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_SCIENTIST_OUTERARM_UPPER2);
                 break;
+            case ZombieType::ZOMBIE_GRAVEDIGGER:
+                GetTrackPosition("Zombie_gravedigger_outerarm_lower", aPosX, aPosY);
+                aBodyReanim->SetImageOverride("Zombie_gravedigger_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_OUTERARM_UPPER2);
+                break;
             default:
                 GetTrackPosition("Zombie_outerarm_lower", aPosX, aPosY);
                 aBodyReanim->SetImageOverride("Zombie_outerarm_upper", IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER2);
@@ -7578,6 +7887,9 @@ void Zombie::SetupReanimForLostArm(unsigned int theDamageFlags) {
                     break;
                 case ZombieType::ZOMBIE_SCIENTIST:
                     aParticle->OverrideImage(nullptr, addonImages.IMAGE_REANIM_ZOMBIE_SCIENTIST_HAND);
+                    break;
+                case ZombieType::ZOMBIE_GRAVEDIGGER:
+                    aParticle->OverrideImage(nullptr, addonImages.IMAGE_ZOMBIE_GRAVEDIGGER_ARM);
                     break;
                 case ZombieType::ZOMBIE_SUNDAY_EDITION:
                     aParticle->OverrideImage(nullptr, addonImages.IMAGE_REANIM_ZOMBIE_SUNDAY_EDITION_LEFTARM_LOWER);
@@ -8127,6 +8439,10 @@ int Zombie::TakeHelmDamage(int theDamage, unsigned int theDamageFlags) {
             aBodyReanim->SetImageOverride("zombie_football_helmet", addonImages.IMAGE_REANIM_ZOMBIE_GIGA_FOOTBALL_HELMET2);
         } else if (mHelmType == HelmType::HELMTYPE_GIGA_FOOTBALL && aDamageIndexAfterDamage == 2) {
             aBodyReanim->SetImageOverride("zombie_football_helmet", addonImages.IMAGE_REANIM_ZOMBIE_GIGA_FOOTBALL_HELMET3);
+        } else if (mHelmType == HelmType::HELMTYPE_GRAVEDIGGER && aDamageIndexAfterDamage == 1) {
+            aBodyReanim->SetImageOverride("Zombie_gravedigger_hardhat", addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT2);
+        } else if (mHelmType == HelmType::HELMTYPE_GRAVEDIGGER && aDamageIndexAfterDamage == 2) {
+            aBodyReanim->SetImageOverride("Zombie_gravedigger_hardhat", addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT3);
         }
     }
     return aDamageRemaining;
@@ -8229,6 +8545,9 @@ void Zombie::AttachShield() {
 }
 
 void Zombie::PlayZombieReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate) {
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && !mHasObject && strcmp(theTrackName, "anim_death") == 0) {
+        theTrackName = "anim_death2";
+    }
     old_Zombie_PlayZombieReanim(this, theTrackName, theLoopType, theBlendTime, theAnimRate);
 }
 
@@ -8238,7 +8557,9 @@ void Zombie::StartWalkAnim(int theBlendTime) {
         return;
 
     PickRandomSpeed();
-    if (mZombieType == ZombieType::ZOMBIE_DOG && mZombiePhase == ZombiePhase::PHASE_DOG_RUNNING) {
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+        PlayZombieReanim(mHasObject ? "anim_walk" : "anim_walk2", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
+    } else if (mZombieType == ZombieType::ZOMBIE_DOG && mZombiePhase == ZombiePhase::PHASE_DOG_RUNNING) {
         PlayZombieReanim("anim_run", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
     } else if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING) {
         PlayZombieReanim("anim_ladderwalk", ReanimLoopType::REANIM_LOOP, theBlendTime, 0.0f);
@@ -8520,6 +8841,10 @@ void Zombie::SetupLostArmReanim() {
             ReanimShowPrefix("Zombie_crossing_guard_outerarm_lower", RENDER_GROUP_HIDDEN);
             ReanimShowPrefix("Zombie_crossing_guard_outerarm_hand", RENDER_GROUP_HIDDEN);
             break;
+        case ZombieType::ZOMBIE_GRAVEDIGGER:
+            ReanimShowPrefix("Zombie_gravedigger_outerarm_lower", RENDER_GROUP_HIDDEN);
+            ReanimShowPrefix("Zombie_gravedigger_outerarm_hand", RENDER_GROUP_HIDDEN);
+            break;
         default:
             ReanimShowPrefix("Zombie_outerarm_lower", -1);
             ReanimShowPrefix("Zombie_outerarm_hand", -1);
@@ -8602,6 +8927,9 @@ void Zombie::SetupLostArmReanim() {
                 break;
             case ZombieType::ZOMBIE_CROSSING_GUARD:
                 aBodyReanim->SetImageOverride("Zombie_crossing_guard_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_CROSSING_GUARD_OUTERARM_UPPER2);
+                break;
+            case ZombieType::ZOMBIE_GRAVEDIGGER:
+                aBodyReanim->SetImageOverride("Zombie_gravedigger_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_OUTERARM_UPPER2);
                 break;
             default:
                 aBodyReanim->SetImageOverride("Zombie_outerarm_upper", Sexy::IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER2);
@@ -8690,7 +9018,7 @@ void Zombie::PickRandomSpeed() {
         mVelX = RandRangeFloat(0.89f, 0.91f);
     } else if (mZombiePhase == ZombiePhase::PHASE_FOOTBALL_CHARGING) {
         mVelX = 1.5f;
-    } else if (mZombieType == ZombieType::ZOMBIE_CROSSING_GUARD) {
+    } else if (mZombieType == ZombieType::ZOMBIE_CROSSING_GUARD || mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
         mVelX = 0.12f;
     } else {
         mVelX = RandRangeFloat(0.23f, 0.37f); // 普僵
@@ -8791,8 +9119,8 @@ void Zombie::ApplyBurn() {
         || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISING
         || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISE_WITHOUT_AXE || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_MOWERED || mInPool) {
         DieWithLoot();
-    } else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mZombieType == ZOMBIE_CROSSING_GUARD || mZombieType == ZOMBIE_DOG || Zombie::IsZombotany(mZombieType)
-               || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
+    } else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mZombieType == ZOMBIE_CROSSING_GUARD || mZombieType == ZOMBIE_GRAVEDIGGER || mZombieType == ZOMBIE_DOG
+               || Zombie::IsZombotany(mZombieType) || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
         SetAnimRate(0.0f);
         Reanimation *aHeadReanim = mApp->ReanimationTryToGet(mSpecialHeadReanimID);
         if (aHeadReanim) {
@@ -9043,7 +9371,7 @@ bool Zombie::ZombieNotWalking() {
         || mZombiePhase == ZombiePhase::PHASE_GIGA_GARGANTUAR_LIGHTNING_PREPARING || mZombiePhase == ZombiePhase::PHASE_GIGA_GARGANTUAR_LIGHTNING_ATTACK
         || mZombiePhase == ZombiePhase::PHASE_GIGA_GARGANTUAR_LIGHTNING_END || mZombiePhase == ZombiePhase::PHASE_DOGWALKER_ROPE_BREAK || mZombiePhase == ZombiePhase::PHASE_TELEPORTATION_SHOOTING
         || mZombiePhase == ZombiePhase::PHASE_SUPER_NOVA_GARGANTUAR_DESTROY || mZombiePhase == ZombiePhase::PHASE_CROSSING_GUARD_THROWING || mZombiePhase == ZombiePhase::PHASE_SCIENTIST_WAITING
-        || mZombiePhase == ZombiePhase::PHASE_SCIENTIST_SHOOTING) {
+        || mZombiePhase == ZombiePhase::PHASE_SCIENTIST_SHOOTING || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_DIGGING || mZombiePhase == ZombiePhase::PHASE_GRAVEDIGGER_BREAKING_GRAVE) {
         return true;
     }
 

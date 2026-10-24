@@ -151,7 +151,11 @@ enum MagnetItemType {
     MAGNET_ITEM_SILVER_COIN,
     MAGNET_ITEM_GOLD_COIN,
     MAGNET_ITEM_DIAMOND,
-    MAGNET_ITEM_PICK_AXE
+    MAGNET_ITEM_PICK_AXE,
+    MAGNET_ITEM_TRASHCAN_1,
+    MAGNET_ITEM_TRASHCAN_2,
+    MAGNET_ITEM_TRASHCAN_3,
+    MAGNET_ITEM_GRAVEDIGGER_SHOVEL,
 };
 
 class MagnetItem {
@@ -227,9 +231,7 @@ public:
     bool IsPartOfUpgradableTo(SeedType theUpgradedType) {
         return reinterpret_cast<bool (*)(Plant *, SeedType)>(Plant_IsPartOfUpgradableToAddr)(this, theUpgradedType);
     }
-    void DrawMagnetItems(Sexy::Graphics *g) {
-        reinterpret_cast<void (*)(Plant *, Sexy::Graphics *)>(Plant_DrawMagnetItemsAddr)(this, g);
-    }
+    void DrawMagnetItems(Sexy::Graphics *g);
     void RemoveEffects() {
         reinterpret_cast<void (*)(Plant *)>(Plant_RemoveEffectsAddr)(this);
     }
@@ -252,9 +254,7 @@ public:
     bool IsUpgradableTo(SeedType theUpgradedType) {
         return reinterpret_cast<bool (*)(Plant *, SeedType)>(Plant_IsUpgradableToAddr)(this, theUpgradedType);
     }
-    void MagnetShroomAttactItem(Zombie *theZombie) {
-        reinterpret_cast<void (*)(Plant *, Zombie *)>(Plant_MagnetShroomAttactItemAddr)(this, theZombie);
-    }
+    void MagnetShroomAttactItem(Zombie *theZombie);
     MagnetItem *GetFreeMagnetItem() {
         return reinterpret_cast<MagnetItem *(*)(Plant *)>(Plant_GetFreeMagnetItemAddr)(this);
     }

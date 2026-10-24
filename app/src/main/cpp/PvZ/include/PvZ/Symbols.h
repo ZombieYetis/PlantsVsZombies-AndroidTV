@@ -457,6 +457,7 @@ inline void *Zombie_ApplyBurnAddr;
 inline void *Zombie_ApplyChillAddr;
 inline void *Zombie_DrawAddr;
 inline void *Zombie_DrawShadowAddr;
+inline void *Zombie_DiggerLoseAxeAddr;
 inline void *Zombie_SetupDrawZombieWonAddr;
 inline void *Zombie_UpdateYetiAddr;
 inline void *Zombie_UpdateZombieFlyerAddr;

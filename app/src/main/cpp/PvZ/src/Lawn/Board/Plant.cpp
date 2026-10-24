@@ -2527,6 +2527,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_DANCER:
         case SeedType::SEED_ZOMBIE_DIGGER:
         case SeedType::SEED_ZOMBIE_LADDER:
+        case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
         case SeedType::SEED_ZOMBIE_JACKSON:
@@ -2567,6 +2568,7 @@ static int GetVSRefreshTimeDefault(SeedType theSeedType) {
             case SeedType::SEED_ZOMBIE_DIGGER:
             case SeedType::SEED_ZOMBIE_BUNGEE:
             case SeedType::SEED_ZOMBIE_LADDER:
+            case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
             case SeedType::SEED_ZOMBIE_BOBSLED:
             case SeedType::SEED_ZOMBIE_YETI:
             case SeedType::SEED_ZOMBIE_IMP:
@@ -3111,6 +3113,205 @@ void Plant::SetImitaterFilterEffect() {
     Reanimation *mHeadReanim3 = mApp->ReanimationTryToGet(mHeadReanimID3);
     if (mHeadReanim3 != nullptr)
         mHeadReanim3->mFilterEffect = aFilterEffect;
+}
+
+void Plant::MagnetShroomAttactItem(Zombie *theZombie) {
+    mState = STATE_MAGNETSHROOM_SUCKING;
+    mStateCountdown = 1500;
+    PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 12.0f);
+    mApp->PlayFoley(FOLEY_MAGNETSHROOM);
+
+    MagnetItem *aItem = GetFreeMagnetItem();
+    if (theZombie->mHelmType == HELMTYPE_PAIL) {
+        int aDamageIndex = theZombie->GetHelmDamageIndex();
+        theZombie->mHelmHealth = 0;
+        theZombie->mHelmType = HELMTYPE_NONE;
+        theZombie->GetTrackPosition("anim_bucket", aItem->mPosX, aItem->mPosY);
+        theZombie->ReanimShowPrefix("anim_bucket", -1);
+        theZombie->ReanimShowPrefix("anim_hair", 0);
+        aItem->mPosX -= float(IMAGE_REANIM_ZOMBIE_BUCKET1->mWidth / 2);
+        aItem->mPosY -= float(IMAGE_REANIM_ZOMBIE_BUCKET1->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 25.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 20.0f;
+        aItem->mItemType = MagnetItemType(aDamageIndex + 1);
+    } else if (theZombie->mHelmType == HELMTYPE_FOOTBALL) {
+        int aDamageIndex = theZombie->GetHelmDamageIndex();
+        theZombie->mHelmHealth = 0;
+        theZombie->mHelmType = HELMTYPE_NONE;
+        theZombie->GetTrackPosition("zombie_football_helmet", aItem->mPosX, aItem->mPosY);
+        theZombie->ReanimShowPrefix("zombie_football_helmet", -1);
+        theZombie->ReanimShowPrefix("anim_hair", 0);
+        aItem->mPosX = theZombie->mPosX + 37.0f;
+        aItem->mPosY = theZombie->mPosY - 60.0f;
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 20.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 20.0f;
+        aItem->mItemType = MagnetItemType(aDamageIndex + 4);
+    } else if (theZombie->mShieldType == SHIELDTYPE_DOOR) {
+        int aDamageIndex = theZombie->GetShieldDamageIndex();
+        theZombie->DetachShield();
+        theZombie->mZombiePhase = PHASE_ZOMBIE_NORMAL;
+        if (theZombie->mIsEating == 0)
+            theZombie->StartWalkAnim(0);
+        theZombie->GetTrackPosition("anim_screendoor", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX -= float(IMAGE_REANIM_ZOMBIE_SCREENDOOR1->mWidth / 2);
+        aItem->mPosY -= float(IMAGE_REANIM_ZOMBIE_SCREENDOOR1->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 30.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f);
+        aItem->mItemType = MagnetItemType(aDamageIndex + 7);
+    } else if (theZombie->mShieldType == SHIELDTYPE_TRASHCAN) {
+        int aDamageIndex = theZombie->GetShieldDamageIndex();
+        theZombie->DetachShield();
+        theZombie->mZombiePhase = PHASE_ZOMBIE_NORMAL;
+        if (theZombie->mIsEating == 0)
+            theZombie->StartWalkAnim(0);
+        theZombie->GetTrackPosition("anim_screendoor", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX -= float(IMAGE_REANIM_ZOMBIE_TRASHCAN1->mWidth / 2);
+        aItem->mPosY -= float(IMAGE_REANIM_ZOMBIE_TRASHCAN1->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 30.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f);
+        aItem->mItemType = MagnetItemType(aDamageIndex + MAGNET_ITEM_TRASHCAN_1);
+    } else if (theZombie->mShieldType == SHIELDTYPE_LADDER) {
+        int aDamageIndex = theZombie->GetShieldDamageIndex();
+        theZombie->DetachShield();
+        aItem->mPosX = theZombie->mPosX + 31.0f - float(IMAGE_REANIM_ZOMBIE_LADDER_5->GetCelWidth() / 2);
+        aItem->mPosY = theZombie->mPosY + 20.0f - float(IMAGE_REANIM_ZOMBIE_LADDER_5->GetCelHeight() / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 30.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f);
+        aItem->mItemType = MagnetItemType(aDamageIndex + MAGNET_ITEM_LADDER_1);
+    } else if (theZombie->mZombieType == ZOMBIE_POGO) {
+        theZombie->PogoBreak(0x10u);
+        theZombie->GetTrackPosition("Zombie_pogo_stick", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX = (aItem->mPosX + 40.0f) - float(IMAGE_REANIM_ZOMBIE_POGO_STICKDAMAGE1->mWidth / 2);
+        aItem->mPosY = (aItem->mPosY + 84.0f) - float(IMAGE_REANIM_ZOMBIE_POGO_STICKDAMAGE1->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 44.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 10.0f;
+        aItem->mItemType = theZombie->mHasArm ? MAGNET_ITEM_POGO_1 : MAGNET_ITEM_POGO_3;
+    } else if (theZombie->mZombiePhase == PHASE_JACK_IN_THE_BOX_RUNNING) {
+        theZombie->StopZombieSound();
+        theZombie->PickRandomSpeed();
+        theZombie->mZombiePhase = PHASE_ZOMBIE_NORMAL;
+        theZombie->ReanimShowTrack("Zombie_jackbox_box", -1);
+        theZombie->ReanimShowTrack("Zombie_jackbox_handle", -1);
+        theZombie->GetTrackPosition("Zombie_jackbox_box", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX -= float(IMAGE_REANIM_ZOMBIE_JACKBOX_BOX->mWidth / 2);
+        aItem->mPosY -= float(IMAGE_REANIM_ZOMBIE_JACKBOX_BOX->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 20.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 15.0f;
+        aItem->mItemType = MAGNET_ITEM_JACK_IN_THE_BOX;
+    } else if (theZombie->mZombieType == ZOMBIE_GRAVEDIGGER) {
+        theZombie->GetTrackPosition("Zombie_gravedigger_shovel", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX -= addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_SHOVEL->GetCelWidth() * 0.4f;
+        aItem->mPosY -= addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_SHOVEL->GetCelHeight() * 0.4f;
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 30.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 15.0f;
+        aItem->mItemType = MAGNET_ITEM_GRAVEDIGGER_SHOVEL;
+        theZombie->DiggerLoseAxe();
+    } else if (theZombie->mZombieType == ZOMBIE_DIGGER) {
+        theZombie->DiggerLoseAxe();
+        theZombie->GetTrackPosition("Zombie_digger_pickaxe", aItem->mPosX, aItem->mPosY);
+        aItem->mPosX -= float(IMAGE_REANIM_ZOMBIE_DIGGER_PICKAXE->mWidth / 2);
+        aItem->mPosY -= float(IMAGE_REANIM_ZOMBIE_DIGGER_PICKAXE->mHeight / 2);
+        aItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 45.0f;
+        aItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f) + 15.0f;
+        aItem->mItemType = MAGNET_ITEM_PICK_AXE;
+    }
+}
+
+void Plant::DrawMagnetItems(Sexy::Graphics *g) {
+    float aHeightOffset = PlantDrawHeightOffset(mBoard, this, mSeedType, mPlantCol, mRow);
+    for (const MagnetItem &aItem : mMagnetItems) {
+        Sexy::Image *aImage = nullptr;
+        int aCelCol = 0;
+        bool aScaleItem = true;
+        switch (aItem.mItemType) {
+            case MAGNET_ITEM_NONE:
+                continue;
+            case MAGNET_ITEM_PAIL_1:
+                aImage = IMAGE_REANIM_ZOMBIE_BUCKET1;
+                break;
+            case MAGNET_ITEM_PAIL_2:
+                aImage = IMAGE_REANIM_ZOMBIE_BUCKET2;
+                break;
+            case MAGNET_ITEM_PAIL_3:
+                aImage = IMAGE_REANIM_ZOMBIE_BUCKET3;
+                break;
+            case MAGNET_ITEM_FOOTBALL_HELMET_1:
+                aImage = IMAGE_REANIM_ZOMBIE_FOOTBALL_HELMET;
+                break;
+            case MAGNET_ITEM_FOOTBALL_HELMET_2:
+                aImage = IMAGE_REANIM_ZOMBIE_FOOTBALL_HELMET2;
+                break;
+            case MAGNET_ITEM_FOOTBALL_HELMET_3:
+                aImage = IMAGE_REANIM_ZOMBIE_FOOTBALL_HELMET3;
+                break;
+            case MAGNET_ITEM_DOOR_1:
+                aImage = IMAGE_REANIM_ZOMBIE_SCREENDOOR1;
+                break;
+            case MAGNET_ITEM_DOOR_2:
+                aImage = IMAGE_REANIM_ZOMBIE_SCREENDOOR2;
+                break;
+            case MAGNET_ITEM_DOOR_3:
+                aImage = IMAGE_REANIM_ZOMBIE_SCREENDOOR3;
+                break;
+            case MAGNET_ITEM_TRASHCAN_1:
+                aImage = IMAGE_REANIM_ZOMBIE_TRASHCAN1;
+                break;
+            case MAGNET_ITEM_TRASHCAN_2:
+                aImage = IMAGE_REANIM_ZOMBIE_TRASHCAN2;
+                break;
+            case MAGNET_ITEM_TRASHCAN_3:
+                aImage = IMAGE_REANIM_ZOMBIE_TRASHCAN3;
+                break;
+            case MAGNET_ITEM_POGO_1:
+            case MAGNET_ITEM_POGO_2:
+            case MAGNET_ITEM_POGO_3:
+                aImage = IMAGE_ZOMBIEPOGO;
+                aCelCol = aItem.mItemType - MAGNET_ITEM_POGO_1;
+                break;
+            case MAGNET_ITEM_JACK_IN_THE_BOX:
+                aImage = IMAGE_REANIM_ZOMBIE_JACKBOX_BOX;
+                break;
+            case MAGNET_ITEM_LADDER_1:
+                aImage = IMAGE_REANIM_ZOMBIE_LADDER_1;
+                break;
+            case MAGNET_ITEM_LADDER_2:
+                aImage = IMAGE_REANIM_ZOMBIE_LADDER_1_DAMAGE1;
+                break;
+            case MAGNET_ITEM_LADDER_3:
+                aImage = IMAGE_REANIM_ZOMBIE_LADDER_1_DAMAGE2;
+                break;
+            case MAGNET_ITEM_LADDER_PLACED:
+                aImage = IMAGE_REANIM_ZOMBIE_LADDER_5;
+                break;
+            case MAGNET_ITEM_GRAVEDIGGER_SHOVEL:
+                aImage = addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_SHOVEL;
+                break;
+            case MAGNET_ITEM_PICK_AXE:
+                aImage = IMAGE_REANIM_ZOMBIE_DIGGER_PICKAXE;
+                break;
+            case MAGNET_ITEM_SILVER_COIN:
+                aImage = IMAGE_REANIM_COIN_SILVER_DOLLAR;
+                aScaleItem = false;
+                break;
+            case MAGNET_ITEM_GOLD_COIN:
+                aImage = IMAGE_REANIM_COIN_GOLD_DOLLAR;
+                aScaleItem = false;
+                break;
+            case MAGNET_ITEM_DIAMOND:
+                aImage = IMAGE_REANIM_DIAMOND;
+                aScaleItem = false;
+                break;
+            default:
+                continue;
+        }
+
+        float aDrawX = aItem.mPosX - float(mX);
+        float aDrawY = aHeightOffset - float(mY) + aItem.mPosY;
+        if (aScaleItem)
+            TodDrawImageCelScaledF(g, aImage, aDrawX, aDrawY, aCelCol, 0, 0.8f, 0.8f);
+        else
+            g->DrawImageCel(aImage, int(aDrawX), int(aDrawY), 0, 0);
+    }
 }
 
 bool Plant::DrawMagnetItemsOnTop() {
@@ -3852,7 +4053,7 @@ void Plant::UpdateMagnetShroom() {
                 continue;
 
             if (aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_STUNNED || aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_WALKING
-                || aZombie->mZombieType == ZombieType::ZOMBIE_POGO) {
+                || aZombie->mZombieType == ZombieType::ZOMBIE_POGO || aZombie->mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
                 if (!aZombie->mHasObject)
                     continue;
             } else if (!(aZombie->mHelmType == HelmType::HELMTYPE_PAIL || aZombie->mHelmType == HelmType::HELMTYPE_FOOTBALL || aZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR

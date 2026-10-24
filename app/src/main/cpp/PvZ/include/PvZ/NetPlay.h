@@ -255,6 +255,10 @@ enum EventType : uint8_t {
     // 仅用于本地回放，不能通过 netplay::PutEvent 发送此事件。
     EVENT_LOCAL_BOARD_ACTION,
 
+    EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE,
+    EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_BONE,
+    EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_SPAWN,
+
     NUM_EVENT_BOARD,
     /************************************************************/
     EVENT_CLIENT_VSRESULT_BUTTON_DEPRESS,

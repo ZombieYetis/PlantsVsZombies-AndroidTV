@@ -225,6 +225,14 @@ void LawnApp::LoadAddonImages() {
     addonImages.IMAGE_ZOMBIE_CROSSING_GUARD_ARM = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombieCrossingGuardArm");
     addonImages.IMAGE_ZOMBIE_CROSSING_GUARD_HEAD = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombieCrossingGuardHead");
     addonImages.IMAGE_ZOMBIE_SCIENTIST_HEAD = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombieScientistHead");
+    addonImages.IMAGE_ZOMBIE_GRAVEDIGGER_HEAD = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombieGraveDiggerHead");
+    addonImages.IMAGE_ZOMBIE_GRAVEDIGGER_ARM = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_outerarm_lower");
+    addonImages.IMAGE_PROJECTILEBONE = GetImageByFileName("addonFiles/images/ProjectileBone");
+    addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT1 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_hardhat1");
+    addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT2 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_hardhat2");
+    addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_HARDHAT3 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_hardhat3");
+    addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_OUTERARM_UPPER2 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_outerarm_upper2");
+    addonImages.IMAGE_REANIM_ZOMBIE_GRAVEDIGGER_SHOVEL = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_gravedigger_shovel");
     addonImages.IMAGE_REANIM_ZOMBIE_CROSSING_GUARD_HAT = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_crossing_guard_hat");
     addonImages.IMAGE_PROJECTILEPOLE = GetImageByFileName("addonFiles/images/ExtendedZombies/Zombie_giga_polevaulter_pole");
     addonImages.IMAGE_PROJECTILEZOMBLOB = GetImageByFileName("addonFiles/images/ExtendedZombies/zombie_zomblob_split");

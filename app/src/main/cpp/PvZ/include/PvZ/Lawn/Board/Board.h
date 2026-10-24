@@ -796,6 +796,7 @@ public:
     bool TakeSunMoney(int theAmount, int thePlayer);
     void ShuffleButtonDown(SeedPacket *theSeedPacket);
     bool CanAddGraveStoneAt(int theGridX, int theGridY);
+    bool CanGraveDiggerPlaceGraveAt(int theGridX, int theGridY);
     void DrawLevel(Sexy::Graphics *g);
     bool CanAddBobSledMP();
     GridItem *AddMPTarget(int theGridX, int theGridY);

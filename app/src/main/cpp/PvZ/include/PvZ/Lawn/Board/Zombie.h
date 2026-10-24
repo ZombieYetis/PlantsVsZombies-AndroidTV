@@ -450,6 +450,13 @@ public:
     bool BindRealatedZombie(Zombie *theZombie);
     void UnbindRealatedZombie();
     void LaunchTrafficCone(Zombie *theTarget);
+    void UpdateZombieGraveDigger();
+    bool FindGraveDiggerTarget(int &theGridX, int &theGridY);
+    bool HasGraveDiggerUsedCell(int theGridX) const;
+    void MarkGraveDiggerCellUsed(int theGridX);
+    void SetGraveDiggerPhase(ZombiePhase thePhase, int theGridX = -1, int theGridY = -1);
+    void LaunchBone(int theGridX, int theGridY);
+    void ApplyGraveDiggerDig();
     bool IsValidTeleportationTarget();
     void ApplyTrafficCone();
     void UpdateZombieGargantuar();
@@ -472,6 +479,7 @@ public:
     void EatPlant(Plant *thePlant);
     void EatZombie(Zombie *theZombie);
     void DetachShield();
+    void DiggerLoseAxe();
     void CheckForBoardEdge();
     void DrawBossPart(Sexy::Graphics *g, int theBossPart);
     bool IsGargantuar() const;

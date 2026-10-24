@@ -3523,6 +3523,37 @@ void Board::processServerEvent(const BaseEvent *event) {
                 mZombies.DataArrayGet(clientZombieID)->ApplyTrafficCone();
             }
         } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE: {
+            auto *aState = static_cast<const U16x4_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aState->data[0], aZombieID)) {
+                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
+                if (aZombie != nullptr && !aZombie->IsDeadOrDying()) {
+                    aZombie->SetGraveDiggerPhase(ZombiePhase(aState->data[1]), aState->data[2] == UINT16_MAX ? -1 : int(aState->data[2]), aState->data[3] == UINT16_MAX ? -1 : int(aState->data[3]));
+                }
+            }
+        } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_BONE: {
+            auto *aFire = static_cast<const U16x4_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aFire->data[0], aZombieID)) {
+                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
+                if (aZombie != nullptr) {
+                    aZombie->LaunchBone(int(aFire->data[1]), int(aFire->data[2]));
+                }
+            }
+        } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_SPAWN: {
+            auto *aSpawn = static_cast<const U16x4_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aSpawn->data[0], aZombieID)) {
+                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
+                if (aZombie != nullptr) {
+                    // 出土由后续的普通出土事件处理，这里只设置阵营。
+                    aZombie->mMindControlled = aSpawn->data[3] != 0;
+                }
+            }
+        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SCIENTIST_STATE: {
             auto *stateEvent = static_cast<const U16U16_Event *>(event);
             uint16_t clientZombieID = 0;
@@ -8784,6 +8815,27 @@ void Board::ShuffleButtonDown(SeedPacket *theSeedPacket) {
             netplay::PutEvent(event);
         }
     }
+}
+
+bool Board::CanGraveDiggerPlaceGraveAt(int theGridX, int theGridY) {
+    if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X || theGridY < 0 || theGridY >= (StageHas6Rows() ? 6 : 5)) {
+        return false;
+    }
+    if (mPlantRow[theGridY] == PlantRowType::PLANTROW_POOL || !CanAddGraveStoneAt(theGridX, theGridY) || IsIceAt(theGridX, theGridY)
+        || GetTopPlantAt(theGridX, theGridY, PlantPriority::TOPPLANT_ANY) != nullptr) {
+        return false;
+    }
+    GridItem *aGridItem = nullptr;
+    while (IterateGridItems(aGridItem)) {
+        // 对战靶子可以与墓碑共处一格，不占用墓碑生成位置。
+        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
+            continue;
+        }
+        if (!aGridItem->mDead && aGridItem->mGridX == theGridX && aGridItem->mGridY == theGridY) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Board::CanAddGraveStoneAt(int theGridX, int theGridY) {

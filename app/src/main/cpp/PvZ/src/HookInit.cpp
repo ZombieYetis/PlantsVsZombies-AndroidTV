@@ -430,6 +430,8 @@ void InitHookFunction() {
     homura::HookFunc(Plant_CobCannonFireAddr, &Plant::CobCannonFire, nullptr);
     homura::HookFunc(Plant_UpdateCobCannonAddr, &Plant::UpdateCobCannon, nullptr);
     // homura::HookFunc(Plant_UpdateReanimAddr, Plant_UpdateReanim, &old_Plant_UpdateReanim);
+    homura::HookFunc(Plant_MagnetShroomAttactItemAddr, &Plant::MagnetShroomAttactItem, nullptr);
+    homura::HookFunc(Plant_DrawMagnetItemsAddr, &Plant::DrawMagnetItems, nullptr);
 
 
     homura::HookFunc(Projectile_ProjectileInitializeAddr, &Projectile::ProjectileInitialize, &old_Projectile_ProjectileInitialize);
@@ -510,6 +512,7 @@ void InitHookFunction() {
     homura::HookFunc(Zombie_CheckForBoardEdgeAddr, &Zombie::CheckForBoardEdge, nullptr);
     homura::HookFunc(Zombie_DrawAddr, &Zombie::Draw, &old_Zombie_Draw);
     homura::HookFunc(Zombie_DrawShadowAddr, &Zombie::DrawShadow, nullptr);
+    homura::HookFunc(Zombie_DiggerLoseAxeAddr, &Zombie::DiggerLoseAxe, nullptr);
     homura::HookFunc(Zombie_DrawBossPartAddr, &Zombie::DrawBossPart, &old_Zombie_DrawBossPart);
     homura::HookFunc(ZombieTypeCanGoInPoolAddr, &Zombie::ZombieTypeCanGoInPool, nullptr);
     homura::HookFunc(Zombie_BossSpawnAttackAddr, &Zombie::BossSpawnAttack, nullptr);

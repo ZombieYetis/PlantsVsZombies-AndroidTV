@@ -875,6 +875,8 @@ ZombieType Challenge::IZombieSeedTypeToZombieType(SeedType theSeedType) {
             return ZOMBIE_CROSSING_GUARD;
         case SEED_ZOMBIE_SCIENTIST:
             return ZOMBIE_SCIENTIST;
+        case SEED_ZOMBIE_GRAVEDIGGER:
+            return ZOMBIE_GRAVEDIGGER;
         default:
             return ZOMBIE_INVALID;
     }
@@ -1067,7 +1069,7 @@ void Challenge::MouseDownWhackAZombie(int theX, int theY, int thePlayerIndex) co
 
 bool Challenge::IsMPResourceProducer(SeedType theSeedType) {
     return theSeedType == SeedType::SEED_SUNFLOWER || theSeedType == SeedType::SEED_SUNSHROOM || theSeedType == SeedType::SEED_TWINSUNFLOWER || theSeedType == SeedType::SEED_ZOMBIE_GRAVESTONE
-        || theSeedType == SeedType::SEED_SUN_BEAN;
+        || theSeedType == SeedType::SEED_SUN_BEAN || theSeedType == SeedType::SEED_ZOMBIE_GRAVEDIGGER;
 }
 
 bool Challenge::IsMPZombieTypeAddInRow(ZombieType theZombieType) {
