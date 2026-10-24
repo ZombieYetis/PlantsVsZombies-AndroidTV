@@ -1357,7 +1357,12 @@ void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerI
 
         if ((aPacketType >= SeedType::SEED_PEASHOOTER && aPacketType < SeedType::NUM_SEED_TYPES)
             || (aPacketType >= SeedType::SEED_ICEBERG_LETTUCE && aPacketType < SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED)) {
-            //            LOG_DEBUG("before MouseDownWithPlant {}", mPlayerIndex);
+            // 同一帧内切槽并种植时，光标可能仍是上一张卡；提交前与已校验的卡槽同步。
+            CursorObject *aCursor = mBoard->mCursorObject[mPlayerIndex];
+            aCursor->mSelectedIndex = mSelectedSeedIndex;
+            aCursor->mType = aPacketType;
+            aCursor->mImitaterType = aSeedPacket->mImitaterType;
+            aCursor->mCursorType = CursorType::CURSOR_TYPE_PLANT_FROM_BANK;
             mBoard->MouseDownWithPlant(mCursorPositionX, mCursorPositionY, 1, mPlayerIndex);
             mBoard->ClearCursor(mPlayerIndex);
             mGamepadState = MOVEMENT_STATE_NORMAL;
