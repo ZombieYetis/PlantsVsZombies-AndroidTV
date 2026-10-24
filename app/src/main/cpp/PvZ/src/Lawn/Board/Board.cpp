@@ -3607,6 +3607,10 @@ void Board::processServerEvent(const BaseEvent *event) {
                     }
                 } else if (aZombie->mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER) {
                     aZombie->mSummonCounter = serverZombieSummonCounter;
+                    // 校正客户端跳过 TAKE/PREPARE 动画事件时遗漏的备用杆显隐。
+                    aZombie->ReanimShowPrefix("anim_pole1", aZombie->mSummonCounter >= 3 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
+                    aZombie->ReanimShowPrefix("anim_pole2", aZombie->mSummonCounter >= 2 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
+                    aZombie->ReanimShowPrefix("anim_pole3", aZombie->mSummonCounter >= 1 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
                     aZombie->mPhaseCounter = serverPhaseCounter;
                     aZombie->mHasObject = aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PRE_VAULT || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PREPARE
                         || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_THROW;
