@@ -707,11 +707,14 @@ void Plant::UpdateAbilities() {
     if (!IsInPlay())
         return;
 
-    if (mSeedType == SeedType::SEED_SPORESHROOM && mIsAsleep) {
+    if (mSeedType == SeedType::SEED_SPORESHROOM) {
         Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
         if (aBodyReanim && aBodyReanim->IsAnimPlaying("anim_grow") && aBodyReanim->mLoopCount > 0) {
-            PlayBodyReanim("anim_sleep", ReanimLoopType::REANIM_LOOP, 20, aBodyReanim->mDefinition->mFPS);
-            return;
+            if (mIsAsleep) {
+                PlayBodyReanim("anim_sleep", ReanimLoopType::REANIM_LOOP, 20, aBodyReanim->mDefinition->mFPS);
+            } else {
+                PlayIdleAnim(aBodyReanim->mDefinition->mFPS);
+            }
         }
     }
 
