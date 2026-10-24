@@ -1919,7 +1919,14 @@ void Zombie::UpdateSuperFanImp() {
                 mVelX = aKickingDistance / float(aFlightFrames);
                 auto aFlightFramesF = float(aFlightFrames);
                 float aStartAltitude = mAltitude;
-                mVelZ = (-aStartAltitude + KICKED_ZOMBIE_GRAVITY * aFlightFramesF * (aFlightFramesF + 1.0f) * 0.5f) / aFlightFramesF;
+                float aGroundHeightDifference = 0.0f;
+                if (mBoard->StageHasRoof()) {
+                    // 补偿实际落点的屋顶高度差，避免滞空延长后飞入小推车。
+                    const float aLandingX = mPosX - (mMindControlled ? -mVelX : mVelX) * aFlightFramesF;
+                    const float aLandingY = mBoard->GetPosYBasedOnRow(aLandingX + 40.0f, mRow) - 30.0f;
+                    aGroundHeightDifference = aLandingY - mPosY;
+                }
+                mVelZ = (-aStartAltitude + KICKED_ZOMBIE_GRAVITY * aFlightFramesF * (aFlightFramesF + 1.0f) * 0.5f - aGroundHeightDifference) / aFlightFramesF;
                 PlayZombieReanim("anim_thrown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
                 UpdateReanim();
                 mApp->PlayFoley(FoleyType::FOLEY_IMP);
@@ -4380,7 +4387,13 @@ void Zombie::ZombieImpKicked(float theKickingDistance) {
     mVelX = aKickingDistance / float(aFlightFrames);
     auto aFlightFramesF = float(aFlightFrames);
     float aStartAltitude = mAltitude;
-    mVelZ = (-aStartAltitude + KICKED_ZOMBIE_GRAVITY * aFlightFramesF * (aFlightFramesF + 1.0f) * 0.5f) / aFlightFramesF;
+    float aGroundHeightDifference = 0.0f;
+    if (mBoard->StageHasRoof()) {
+        const float aLandingX = mPosX - (mMindControlled ? -mVelX : mVelX) * aFlightFramesF;
+        const float aLandingY = mBoard->GetPosYBasedOnRow(aLandingX + 40.0f, mRow) - 30.0f;
+        aGroundHeightDifference = aLandingY - mPosY;
+    }
+    mVelZ = (-aStartAltitude + KICKED_ZOMBIE_GRAVITY * aFlightFramesF * (aFlightFramesF + 1.0f) * 0.5f - aGroundHeightDifference) / aFlightFramesF;
     PlayZombieReanim("anim_thrown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
     UpdateReanim();
     mApp->PlayFoley(FoleyType::FOLEY_IMP);
