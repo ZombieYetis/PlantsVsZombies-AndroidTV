@@ -240,6 +240,7 @@ void LawnApp::LoadAddonImages() {
     addonImages.IMAGE_PROJECTILEBOOMERANG = GetImageByFileName("addonFiles/images/ProjectileBoomerang");
     addonImages.IMAGE_PROJECTILETELEPORTATION = GetImageByFileName("addonFiles/images/ProjectileTeleportation");
     addonImages.IMAGE_PROJECTILEACKEE = GetImageByFileName("addonFiles/images/ProjectileAckee");
+    addonImages.IMAGE_PROJECTILEREDSTINGER = GetImageByFileName("addonFiles/images/ProjectileRedStinger");
     addonImages.IMAGE_REANIM_ZOMBLOBHEAD_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombiezomblobhead_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_DYING_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_dying_buttered");

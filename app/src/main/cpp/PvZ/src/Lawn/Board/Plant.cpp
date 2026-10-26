@@ -46,6 +46,7 @@
 #include <cmath>
 
 #include <algorithm>
+#include <numbers>
 
 using namespace Sexy;
 
@@ -116,6 +117,7 @@ PlantDefinition gExtendedPlantDefs[]{
     {SeedType::SEED_SUN_BEAN, nullptr, ReanimationType::REANIM_SUN_BEAN, 0, 50, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "SUN_BEAN"},
     {SeedType::SEED_PEANUT, nullptr, ReanimationType::REANIM_PEANUT, 0, 150, 3000, PlantSubClass::SUBCLASS_SHOOTER, 200, "PEANUT"},
     {SeedType::SEED_ENDURIAN, nullptr, ReanimationType::REANIM_ENDURIAN, 0, 75, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "ENDURIAN"},
+    {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 1500, PlantSubClass::SUBCLASS_SHOOTER, 200, "RED_STINGER"},
     {SeedType::SEED_IMP_PEAR, nullptr, ReanimationType::REANIM_IMP_PEAR, 0, 100, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "IMP_PEAR"},
     {SeedType::SEED_AKEE, nullptr, ReanimationType::REANIM_AKEE, 0, 175, 750, PlantSubClass::SUBCLASS_SHOOTER, 300, "AKEE"},
 };
@@ -156,6 +158,13 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
         case SeedType::SEED_ENDURIAN:
             mPlantMaxHealth = 3000;
             break;
+        case SeedType::SEED_RED_STINGER: {
+            const int aForm = GetRedStingerForm();
+            mPlantMaxHealth = aForm == 1 ? 300 : (aForm == 2 ? 900 : 1500);
+            PlayIdleAnim(25.0f);
+            UpdateReanim();
+            break;
+        }
         default:
             break;
     }
@@ -209,6 +218,8 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon) const {
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 1 : 2;
         case SeedType::SEED_PEANUT:
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 9 : 1; // 下方的头可攻击地面僵尸和僵尸狗
+        case SeedType::SEED_RED_STINGER:
+            return GetRedStingerForm() == 2 ? 13 : 1;
         case SeedType::SEED_CHERRYBOMB:
         case SeedType::SEED_JALAPENO:
         case SeedType::SEED_COBCANNON:
@@ -1431,6 +1442,17 @@ void Plant::IceAZombie(Zombie *theZombie) {
 }
 
 void Plant::DoSpecial_Origin() {
+    if (mSeedType == SeedType::SEED_RED_STINGER) {
+        if (GetRedStingerForm() == 3 && mState != PlantState::STATE_RED_STINGER_DYING) {
+            // 仅由 Zombie::EatPlant 触发临死反击，保留植物本体直到最后一次攻击动画播放完成。
+            // 复用现有字段，不新增存档字段。
+            mPlantHealth = 0;
+            mState = PlantState::STATE_RED_STINGER_DYING;
+            LaunchRedStinger();
+        }
+        return;
+    }
+
     int aPosX = mX + mWidth / 2;
     int aPosY = mY + mHeight / 2;
     int aDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
@@ -1763,6 +1785,10 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags) {
 }
 
 void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem) {
+    if (mSeedType == SeedType::SEED_RED_STINGER && GetRedStingerForm() != 2) {
+        RedStingerFire();
+        return;
+    }
     if (mSeedType == SeedType::SEED_FUMESHROOM) {
         DoRowAreaDamage(20, 2U);
         mApp->PlayFoley(FoleyType::FOLEY_FUME);
@@ -1823,6 +1849,9 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
             break;
         case SeedType::SEED_AKEE:
             aProjectileType = ProjectileType::PROJECTILE_ACKEE;
+            break;
+        case SeedType::SEED_RED_STINGER:
+            aProjectileType = ProjectileType::PROJECTILE_RED_STINGER;
             break;
         default:
             break;
@@ -1909,6 +1938,9 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
         const bool aTopHeadIsFiring = thePlantWeapon == PlantWeapon::WEAPON_PRIMARY;
         aOriginX = mX + 30;
         aOriginY = mY + (aTopHeadIsFiring ? 12 : 38);
+    } else if (mSeedType == SeedType::SEED_RED_STINGER) {
+        aOriginX = mX + 50;
+        aOriginY = mY + 25;
     } else {
         aOriginX = mX + 10;
         aOriginY = mY + 5;
@@ -2071,7 +2103,7 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
     }
 
     if (mSeedType == SeedType::SEED_CABBAGEPULT || mSeedType == SeedType::SEED_KERNELPULT || mSeedType == SeedType::SEED_MELONPULT || mSeedType == SeedType::SEED_WINTERMELON
-        || mSeedType == SeedType::SEED_SPORESHROOM || mSeedType == SeedType::SEED_AKEE) {
+        || mSeedType == SeedType::SEED_SPORESHROOM || mSeedType == SeedType::SEED_AKEE || mSeedType == SeedType::SEED_RED_STINGER) {
         float aRangeX = NAN, aRangeY = NAN;
         if (theTargetZombie) {
             Rect aZombieRect = theTargetZombie->GetZombieRect();
@@ -2110,6 +2142,10 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
         aProjectile->mVelY = 0.0f;
         aProjectile->mVelZ = aRangeY / 120.0f - 7.0f;
         aProjectile->mAccZ = 0.115f;
+        if (aProjectile->mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
+            aProjectile->mRotation = -7.0f * std::numbers::pi_v<float> / 25.0f;
+            aProjectile->mRotationSpeed = -0.05f;
+        }
     } else if (mSeedType == SeedType::SEED_THREEPEATER) {
         if (theRow < mRow) {
             aProjectile->mMotionType = ProjectileMotion::MOTION_THREEPEATER;
@@ -2577,6 +2613,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
             return 75;
         case SeedType::SEED_CACTUS:
         case SeedType::SEED_SPORESHROOM:
+        case SeedType::SEED_RED_STINGER:
         case SeedType::SEED_ZOMBIE_POLEVAULTER:
         case SeedType::SEED_ZOMBIE_PAIL:
         case SeedType::SEED_ZOMBIE_SCREEN_DOOR:
@@ -3560,6 +3597,101 @@ void Plant::UpdateProductionPlant() {
     }
 }
 
+int Plant::GetRedStingerForm() const {
+    if (!IsOnBoard()) {
+        return 1;
+    }
+    const int aColumnsPerForm = mApp->IsVSMode() ? 2 : 3;
+    return std::clamp(mPlantCol / aColumnsPerForm + 1, 1, 3);
+}
+
+void Plant::LaunchRedStinger() {
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    if (aBodyReanim == nullptr) {
+        if (mState == PlantState::STATE_RED_STINGER_DYING) {
+            Die();
+        }
+        return;
+    }
+
+    const int aForm = GetRedStingerForm();
+    if (aForm == 3 && mState != PlantState::STATE_RED_STINGER_DYING) {
+        return;
+    }
+    const char *aTrack = aForm == 1 ? "anim_shooting1" : (aForm == 2 ? "anim_shooting2" : "anim_shooting3");
+    // 一形态以 -1 等待首发动作，首发后再启动双发射手式的补发倒计时。
+    mShootingCounter = aForm == 1 ? -1 : 1;
+    PlayBodyReanim(aTrack, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
+}
+
+void Plant::UpdateRedStingerShooting() {
+    if (NotOnGround() || mShootingCounter == 0) {
+        return;
+    }
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    if (aBodyReanim == nullptr) {
+        mShootingCounter = 0;
+        if (mState == PlantState::STATE_RED_STINGER_DYING) {
+            Die();
+        }
+        return;
+    }
+
+    const int aForm = GetRedStingerForm();
+    if (aForm == 1) {
+        if (mShootingCounter < 0) {
+            // 首发对齐原始动画帧 59；保持当前播放速度，不提前结束前摇。
+            if (aBodyReanim->ShouldTriggerTimedEvent(15.0f / 40.0f)) {
+                Fire(nullptr, mRow, PlantWeapon::WEAPON_PRIMARY, nullptr);
+                mShootingCounter = 26;
+            }
+            return;
+        }
+        if (mShootingCounter > 1) {
+            // 从 26 倒数至 1，间隔 25 tick 补发第二颗，不重新播放攻击动画。
+            if (--mShootingCounter == 1) {
+                Fire(nullptr, mRow, PlantWeapon::WEAPON_PRIMARY, nullptr);
+            }
+            return;
+        }
+    } else {
+        // 二、三形态分别在原始动画帧 124 和 190 释放花瓣子弹。
+        const float aFireTime = aForm == 2 ? 8.0f / 17.0f : 25.0f / 35.0f;
+        if (aBodyReanim->ShouldTriggerTimedEvent(aFireTime)) {
+            Zombie *aZombie = aForm == 2 ? FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
+            GridItem *aGridItem = aForm == 2 && aZombie == nullptr ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
+            Fire(aZombie, mRow, PlantWeapon::WEAPON_PRIMARY, aGridItem);
+        }
+    }
+    if (aBodyReanim->mLoopCount > 0) {
+        mShootingCounter = 0;
+        if (mState == PlantState::STATE_RED_STINGER_DYING) {
+            Die();
+        } else {
+            PlayIdleAnim(aBodyReanim->mDefinition->mFPS);
+        }
+    }
+}
+
+void Plant::RedStingerFire() {
+    const bool aBurst = mState == PlantState::STATE_RED_STINGER_DYING;
+    const int aCount = aBurst ? 12 : 1;
+    const int aOriginX = mX + (aBurst ? 22 : 50);
+    const int aOriginY = mY + 25 - (mBoard->GetFlowerPotAt(mPlantCol, mRow) ? 5 : 0);
+    mApp->PlayFoley(FoleyType::FOLEY_THROW);
+    for (int i = 0; i < aCount; ++i) {
+        Projectile *aProjectile = mBoard->AddProjectile(aOriginX, aOriginY, mRenderOrder - 1, mRow, ProjectileType::PROJECTILE_RED_STINGER);
+        aProjectile->mDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
+        if (aBurst) {
+            const float aAngle = 2.0f * std::numbers::pi_v<float> * i / aCount;
+            aProjectile->mMotionType = ProjectileMotion::MOTION_STAR;
+            aProjectile->mVelX = 3.33f * std::cos(aAngle);
+            aProjectile->mVelY = 3.33f * std::sin(aAngle);
+            aProjectile->mRotation = -aAngle;
+        }
+    }
+}
+
 void Plant::LaunchPeanut() {
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim == nullptr) {
@@ -3576,6 +3708,10 @@ void Plant::LaunchPeanut() {
 }
 
 void Plant::UpdateShooting() {
+    if (mSeedType == SeedType::SEED_RED_STINGER) {
+        UpdateRedStingerShooting();
+        return;
+    }
     if (NotOnGround() || mShootingCounter == 0)
         return;
 
@@ -3762,6 +3898,10 @@ void Plant::UpdateShooter() {
         return;
     }
 
+    if (mSeedType == SeedType::SEED_RED_STINGER && (GetRedStingerForm() == 3 || mState == PlantState::STATE_RED_STINGER_DYING)) {
+        return;
+    }
+
     mLaunchCounter--;
     if (mSeedType == SeedType::SEED_BLOOMERANG
         && (HasActiveBoomerang() || mState == PlantState::STATE_BLOOMERANG_CATCHING || mState == PlantState::STATE_UMBRELLA_TRIGGERED || mState == PlantState::STATE_UMBRELLA_REFLECTING)) {
@@ -3813,7 +3953,12 @@ void Plant::UpdateShooter() {
 void Plant::PlayIdleAnim(float theRate) {
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim) {
-        PlayBodyReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, theRate);
+        const char *aTrack = "anim_idle";
+        if (mSeedType == SeedType::SEED_RED_STINGER) {
+            const int aForm = GetRedStingerForm();
+            aTrack = aForm == 1 ? "anim_idle1" : (aForm == 2 ? "anim_idle2" : "anim_idle3");
+        }
+        PlayBodyReanim(aTrack, ReanimLoopType::REANIM_LOOP, 20, theRate);
         if (mApp->IsIZombieLevel()) {
             aBodyReanim->SetAnimRate(0.0f);
         }
@@ -3846,6 +3991,9 @@ bool Plant::IsDisposable(SeedType theSeedType) {
 }
 
 bool Plant::IsInvulnerable() {
+    if (mSeedType == SeedType::SEED_RED_STINGER && mState == PlantState::STATE_RED_STINGER_DYING) {
+        return true;
+    }
     if (mSeedType == SeedType::SEED_ICEBERG_LETTUCE) {
         return mState == PlantState::STATE_READY;
     }
@@ -3926,7 +4074,18 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
     }
 
     bool result;
-    if (mSeedType == SeedType::SEED_PEANUT) {
+    if (mSeedType == SeedType::SEED_RED_STINGER) {
+        const int aForm = GetRedStingerForm();
+        // 每轮只启动一次动画，首发、计时补发和收招期间都不能重新启动。
+        if (aForm == 3 || mShootingCounter != 0 || mState == PlantState::STATE_RED_STINGER_DYING) {
+            return false;
+        }
+        if (FindTargetZombie(theRow, thePlantWeapon) == nullptr && FindTargetGridItem(theRow, thePlantWeapon) == nullptr) {
+            return false;
+        }
+        LaunchRedStinger();
+        result = true;
+    } else if (mSeedType == SeedType::SEED_PEANUT) {
         Zombie *aZombie = FindTargetZombie(theRow, PlantWeapon::WEAPON_SECONDARY);
         GridItem *aGridItem = FindTargetGridItem(theRow, PlantWeapon::WEAPON_SECONDARY);
         if (aZombie == nullptr && aGridItem == nullptr) {

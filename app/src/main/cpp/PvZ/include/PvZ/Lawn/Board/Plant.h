@@ -107,7 +107,8 @@ enum PlantState // Prefix: STATE
     STATE_BONK_CHOY_UPPERCUTTING,
     STATE_ENDURIAN_STARTING,
     STATE_ENDURIAN_ATTACKING,
-    STATE_ENDURIAN_STOPPING
+    STATE_ENDURIAN_STOPPING,
+    STATE_RED_STINGER_DYING,
 };
 
 enum PLANT_LAYER {
@@ -155,7 +156,9 @@ enum MagnetItemType {
     MAGNET_ITEM_TRASHCAN_1,
     MAGNET_ITEM_TRASHCAN_2,
     MAGNET_ITEM_TRASHCAN_3,
+    // extended begin
     MAGNET_ITEM_GRAVEDIGGER_SHOVEL,
+    // extended end
 };
 
 class MagnetItem {
@@ -336,6 +339,10 @@ public:
     bool MakesSun() const;
     void UpdateProductionPlant();
     void UpdateShooting();
+    int GetRedStingerForm() const;
+    void LaunchRedStinger();
+    void UpdateRedStingerShooting();
+    void RedStingerFire();
     void UpdateShooter();
     void LaunchPeanut();
     void CobCannonFire(int theTargetX, int theTargetY);

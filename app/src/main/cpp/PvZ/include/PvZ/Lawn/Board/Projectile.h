@@ -146,8 +146,6 @@ inline bool ColdPeaCanPassFireWood;
 // inline GridItem *(*Projectile_FindCollisionTargetGridItem)(Projectile *a);
 
 
-inline void (*old_Projectile_ProjectileInitialize)(Projectile *projectile, int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType);
-
 inline void (*old_Projectile_ConvertToPea)(Projectile *projectile, int aGridX);
 
 inline void (*old_Projectile_Draw)(Projectile *, Sexy::Graphics *);

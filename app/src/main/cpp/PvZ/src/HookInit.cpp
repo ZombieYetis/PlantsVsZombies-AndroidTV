@@ -435,7 +435,7 @@ void InitHookFunction() {
     homura::HookFunc(Plant_DrawMagnetItemsAddr, &Plant::DrawMagnetItems, nullptr);
 
 
-    homura::HookFunc(Projectile_ProjectileInitializeAddr, &Projectile::ProjectileInitialize, &old_Projectile_ProjectileInitialize);
+    homura::HookFunc(Projectile_ProjectileInitializeAddr, &Projectile::ProjectileInitialize, nullptr);
     homura::HookFunc(Projectile_ConvertToFireballAddr, &Projectile::ConvertToFireball, nullptr);
     homura::HookFunc(Projectile_ConvertToPeaAddr, &Projectile::ConvertToPea, &old_Projectile_ConvertToPea);
     homura::HookFunc(Projectile_UpdateAddr, &Projectile::Update, nullptr);

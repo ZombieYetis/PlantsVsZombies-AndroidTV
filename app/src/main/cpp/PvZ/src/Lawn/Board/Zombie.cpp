@@ -879,8 +879,10 @@ void Zombie::UpdateZombieGraveDigger() {
         return;
     }
     if (aDigging && aBodyReanim->ShouldTriggerTimedEvent(0.45f)) {
-        mApp->AddTodParticle(mPosX, mPosY + 140.0f, mRenderOrder + 4, ParticleEffect::PARTICLE_GRAVE_BUSTER_DIE);
         mApp->PlayFoley(FoleyType::FOLEY_USE_SHOVEL);
+    }
+    if (aDigging && aBodyReanim->ShouldTriggerTimedEvent(0.74f)) {
+        mApp->AddTodParticle(mPosX, mPosY + 140.0f, mRenderOrder + 4, ParticleEffect::PARTICLE_GRAVE_BUSTER_DIE);
     }
     // 客户端随已同步的动画播放表现，技能结算和状态切换由主机处理。
     if (IsRemoteClientOrViewer()) {
@@ -5854,6 +5856,9 @@ void Zombie::StopEating() {
 }
 
 void Zombie::EatPlant(Plant *thePlant) {
+    if (thePlant->mSeedType == SeedType::SEED_RED_STINGER && thePlant->mState == PlantState::STATE_RED_STINGER_DYING) {
+        return;
+    }
     if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN) {
         mPhaseCounter = 1;
         return;
@@ -5996,7 +6001,11 @@ void Zombie::EatPlant(Plant *thePlant) {
         }
 
         mBoard->mPlantsEaten++;
-        thePlant->Die();
+        if (thePlant->mSeedType == SeedType::SEED_RED_STINGER && thePlant->GetRedStingerForm() == 3) {
+            thePlant->DoSpecial();
+        } else {
+            thePlant->Die();
+        }
         mBoard->mChallenge->ZombieAtePlant(this, thePlant);
 
         if (mBoard->mLevel >= 2 && mBoard->mLevel <= 4 && mApp->IsFirstTimeAdventureMode()) {
@@ -8056,6 +8065,9 @@ Plant *Zombie::FindFriendPlantTarget() {
 }
 
 bool Zombie::CanTargetPlant(Plant *thePlant, ZombieAttackType theAttackType) {
+    if (thePlant->mSeedType == SeedType::SEED_RED_STINGER && thePlant->mState == PlantState::STATE_RED_STINGER_DYING) {
+        return false;
+    }
     if (mApp->IsWallnutBowlingLevel() && theAttackType != ZombieAttackType::ATTACKTYPE_VAULT)
         return false;
 

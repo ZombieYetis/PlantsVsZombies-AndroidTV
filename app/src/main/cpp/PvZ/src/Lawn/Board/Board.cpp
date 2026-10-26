@@ -2794,6 +2794,8 @@ void Board::processServerEvent(const BaseEvent *event) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
                 if (aPlant->mSeedType == SeedType::SEED_PEANUT) {
                     aPlant->LaunchPeanut();
+                } else if (aPlant->mSeedType == SeedType::SEED_RED_STINGER) {
+                    aPlant->LaunchRedStinger();
                 } else {
                     old_Plant_FindTargetAndFire(aPlant, event1->data1, PlantWeapon(event1->data2));
                 }

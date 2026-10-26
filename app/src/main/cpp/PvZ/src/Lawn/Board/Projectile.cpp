@@ -51,6 +51,49 @@ constexpr float ACKEE_BOUNCE_VELOCITY_Z = -6.0f;
 constexpr float ACKEE_BOUNCE_ACCELERATION_Z = 0.115f;
 constexpr int ACKEE_DAMAGE[ACKEE_MAX_HITS] = {60, 50, 40, 30};
 
+int GetProjectileImpactDamage(const Projectile *theProjectile) {
+    int aDamage = theProjectile->GetProjectileDef().mDamage;
+    if (theProjectile->mProjectileType == ProjectileType::PROJECTILE_RED_STINGER && theProjectile->mMotionType == ProjectileMotion::MOTION_STRAIGHT) {
+        aDamage -= 10; // 红针花一形态的直射子弹减少 10 点伤害
+    }
+    return aDamage;
+}
+
+ProjectileType ResolveInitialProjectileType(ProjectileType theProjectileType) {
+    if (isOnlyTouchFireWood || IsOnlineServerModeActive() || gIsReplayMode) {
+        return theProjectileType;
+    }
+
+    // 这些子弹承载独立技能，不参与出生时的子弹替换。
+    switch (theProjectileType) {
+        case ProjectileType::PROJECTILE_COBBIG:
+        case ProjectileType::PROJECTILE_ZOMBIE_PEA:
+        case ProjectileType::PROJECTILE_ZOMBLOB:
+        case ProjectileType::PROJECTILE_BOOMERANG:
+        case ProjectileType::PROJECTILE_TELEPORTATION:
+        case ProjectileType::PROJECTILE_TRAFFIC_CONE:
+        case ProjectileType::PROJECTILE_BONE:
+            return theProjectileType;
+        default:
+            break;
+    }
+
+    if ((theProjectileType == ProjectileType::PROJECTILE_STAR && banStar) || (isOnlyPeaUseable && theProjectileType != ProjectileType::PROJECTILE_PEA)) {
+        return theProjectileType;
+    }
+
+    // 保持原优先级：随机子弹覆盖手动选择，但过滤条件始终判断原始类型。
+    if (randomBullet) {
+        const int aMaxType = ProjectileType::PROJECTILE_ZOMBIE_PEA - 1 - banCobCannon;
+        int aType = RandRangeInt(ProjectileType::PROJECTILE_SNOWPEA, aMaxType);
+        if (banCobCannon && aType == ProjectileType::PROJECTILE_COBBIG) {
+            ++aType;
+        }
+        return static_cast<ProjectileType>(aType);
+    }
+    return bulletSpinnerChosenNum == -1 ? theProjectileType : static_cast<ProjectileType>(bulletSpinnerChosenNum);
+}
+
 bool IsPiercingSpike(const Projectile *theProjectile) {
     return theProjectile->mApp->IsVSMode() && (VSSetupAddonWidget::msBalancePatchMode || Challenge::msVSShuffleMode) && theProjectile->mProjectileType == ProjectileType::PROJECTILE_SPIKE;
 }
@@ -278,68 +321,124 @@ ProjectileDefinition gExtendedProjectileDefinition[] = {
     {ProjectileType::PROJECTILE_TRAFFIC_CONE, 0, 0},
     {ProjectileType::PROJECTILE_ACKEE, 0, 60},
     {ProjectileType::PROJECTILE_BONE, 0, 0},
+    {ProjectileType::PROJECTILE_RED_STINGER, 0, 30},
 };
 
 void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType) {
-    if (!isOnlyTouchFireWood && theProjectileType != ProjectileType::PROJECTILE_ZOMBLOB && theProjectileType != ProjectileType::PROJECTILE_BOOMERANG
-        && theProjectileType != ProjectileType::PROJECTILE_TELEPORTATION && theProjectileType != ProjectileType::PROJECTILE_TRAFFIC_CONE && theProjectileType != ProjectileType::PROJECTILE_BONE) {
-        // 僵尸子弹与加农炮子弹NULL
-        if (theProjectileType == ProjectileType::PROJECTILE_COBBIG || theProjectileType == ProjectileType::PROJECTILE_ZOMBIE_PEA) {
-            old_Projectile_ProjectileInitialize(this, theX, theY, theRenderOrder, theRow, theProjectileType);
-            return;
-        }
-        if (theProjectileType == ProjectileType::PROJECTILE_STAR && banStar) {
-            old_Projectile_ProjectileInitialize(this, theX, theY, theRenderOrder, theRow, theProjectileType);
-            return;
-        }
-        if (isOnlyPeaUseable && theProjectileType != ProjectileType::PROJECTILE_PEA) {
-            old_Projectile_ProjectileInitialize(this, theX, theY, theRenderOrder, theRow, theProjectileType);
-            return;
-        }
-        if (bulletSpinnerChosenNum != -1 && !IsOnlineServerModeActive() && !gIsReplayMode) {
-            theProjectileType = ProjectileType(bulletSpinnerChosenNum);
-        }
-        if (randomBullet && !IsOnlineServerModeActive() && !gIsReplayMode) {
-            int aNumProjectile = PROJECTILE_ZOMBIE_PEA - 1 - banCobCannon;
-            theProjectileType = ProjectileType(RandRangeInt(PROJECTILE_SNOWPEA, aNumProjectile));
-            if (banCobCannon && theProjectileType == ProjectileType::PROJECTILE_COBBIG) {
-                theProjectileType = ProjectileType(theProjectileType + 1);
-            }
-        }
-    }
-
-    old_Projectile_ProjectileInitialize(this, theX, theY, theRenderOrder, theRow, theProjectileType);
-
-    if (theProjectileType == ProjectileType::PROJECTILE_ZOMBLOB) {
-        mMotionType = ProjectileMotion::MOTION_LOBBED;
-        mRotation = 0.0f;
-        mRotationSpeed = 0.0f;
-    } else if (mProjectileType == ProjectileType::PROJECTILE_SPORE) {
-        mRotation = -7 * std::numbers::pi / 25; // DEG_TO_RAD(-50.4f);
-        mRotationSpeed = RandRangeFloat(-0.08f, -0.02f);
-    } else if (mProjectileType == ProjectileType::PROJECTILE_BOOMERANG) {
-        mRotationSpeed = 0.2f;
-    } else if (mProjectileType == ProjectileType::PROJECTILE_TRAFFIC_CONE) {
-        mRotation = RandRangeFloat(0.0f, 2 * std::numbers::pi);
-        mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
-    } else if (mProjectileType == ProjectileType::PROJECTILE_BONE) {
-        mMotionType = ProjectileMotion::MOTION_LOBBED;
-        mFrame = 0;
-        mNumFrames = 1;
-        mRotation = 0.0f;
-        mRotationSpeed = 0.1f;
-        mWidth = addonImages.IMAGE_PROJECTILEBONE->GetCelWidth();
-        mHeight = addonImages.IMAGE_PROJECTILEBONE->GetCelHeight();
-    } else if (mProjectileType == ProjectileType::PROJECTILE_ACKEE) {
-        mRotation = 0.0f;
-        mRotationSpeed = 0.0f;
-        mLastPortalX = 0;
-        mCobTargetRow = 0;
-    }
-
+    mProjectileType = ResolveInitialProjectileType(theProjectileType);
+    mPosX = static_cast<float>(theX);
+    mPosY = static_cast<float>(theY);
+    mPosZ = 0.0f;
+    mVelX = 0.0f;
+    mVelY = 0.0f;
+    mVelZ = 0.0f;
+    mAccZ = 0.0f;
+    mRow = theRow;
+    mRenderOrder = theRenderOrder;
+    mWidth = 40;
+    mHeight = 40;
+    mFrame = 0;
+    mNumFrames = 1;
+    mAnimCounter = 0;
+    mAnimTicksPerFrame = 0;
+    mMotionType = ProjectileMotion::MOTION_STRAIGHT;
+    mProjectileAge = 0;
+    mClickBackoffCounter = 0;
+    mRotation = 0.0f;
+    mRotationSpeed = 0.0f;
+    mDead = false;
+    mDamageRangeFlags = 0;
+    mHitTorchwoodGridX = -1;
+    mLastPortalX = -1;
+    mAttachmentID = AttachmentID::ATTACHMENTID_NULL;
+    mCobTargetX = 0.0f;
+    mCobTargetRow = 0;
+    mTargetZombieID = ZombieID::ZOMBIEID_NULL;
     mRelatedPlantID = PlantID::PLANTID_NULL;
     mReturning = false;
     ResetHitHistory(this);
+
+    const int aGridX = mBoard->PixelToGridXKeepOnBoard(theX, theY);
+    mShadowY = static_cast<float>(mBoard->GridToPixelY(aGridX, theRow)) + 67.0f;
+    mOnHighGround = mBoard->mGridSquareType[aGridX][theRow] == GridSquareType::GRIDSQUARE_HIGH_GROUND;
+    if (mBoard->StageHasRoof() && mPosX < 480.0f) {
+        mShadowY -= 12.0f;
+    }
+
+    switch (mProjectileType) {
+        case ProjectileType::PROJECTILE_CABBAGE:
+        case ProjectileType::PROJECTILE_BUTTER:
+            mRotation = -7 * std::numbers::pi / 25;
+            mRotationSpeed = RandRangeFloat(-0.08f, -0.02f);
+            break;
+        case ProjectileType::PROJECTILE_MELON:
+        case ProjectileType::PROJECTILE_WINTERMELON:
+            mRotation = -2 * std::numbers::pi / 5;
+            mRotationSpeed = RandRangeFloat(-0.08f, -0.02f);
+            break;
+        case ProjectileType::PROJECTILE_KERNEL:
+            mRotationSpeed = RandRangeFloat(-0.2f, -0.08f);
+            break;
+        case ProjectileType::PROJECTILE_SNOWPEA: {
+            TodParticleSystem *aParticle = mApp->AddTodParticle(mPosX + 8.0f, mPosY + 13.0f, RenderLayer::RENDER_LAYER_TOP, ParticleEffect::PARTICLE_SNOWPEA_TRAIL);
+            AttachParticle(mAttachmentID, aParticle, 8.0f, 13.0f);
+            break;
+        }
+        case ProjectileType::PROJECTILE_PUFF: {
+            TodParticleSystem *aParticle = mApp->AddTodParticle(mPosX + 13.0f, mPosY + 13.0f, RenderLayer::RENDER_LAYER_TOP, ParticleEffect::PARTICLE_PUFFSHROOM_TRAIL);
+            AttachParticle(mAttachmentID, aParticle, 13.0f, 13.0f);
+            break;
+        }
+        case ProjectileType::PROJECTILE_FIREBALL:
+            ConvertToFireball(0);
+            break;
+        case ProjectileType::PROJECTILE_COBBIG: {
+            Image *aImage = IMAGE_REANIM_COBCANNON_COB;
+            mWidth = aImage->GetVTable()->GetWidth(aImage);
+            mHeight = aImage->GetVTable()->GetHeight(aImage);
+            mRotation = std::numbers::pi_v<float> / 2.0f;
+            break;
+        }
+        case ProjectileType::PROJECTILE_BASKETBALL:
+            mRotation = Sexy::Rand(2.0f * std::numbers::pi_v<float>);
+            mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
+            break;
+        case ProjectileType::PROJECTILE_STAR:
+            mShadowY += 15.0f;
+            mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
+            if (Sexy::Rand(2) == 0) {
+                mRotationSpeed = -mRotationSpeed;
+            }
+            break;
+        case ProjectileType::PROJECTILE_ZOMBLOB:
+            mMotionType = ProjectileMotion::MOTION_LOBBED;
+            break;
+        case ProjectileType::PROJECTILE_SPORE:
+            mRotation = -7 * std::numbers::pi / 25;
+            mRotationSpeed = RandRangeFloat(-0.08f, -0.02f);
+            break;
+        case ProjectileType::PROJECTILE_BOOMERANG:
+            mRotationSpeed = 0.2f;
+            break;
+        case ProjectileType::PROJECTILE_TRAFFIC_CONE:
+            mRotation = RandRangeFloat(0.0f, 2.0f * std::numbers::pi_v<float>);
+            mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
+            break;
+        case ProjectileType::PROJECTILE_BONE:
+            mMotionType = ProjectileMotion::MOTION_LOBBED;
+            mRotationSpeed = 0.1f;
+            mWidth = addonImages.IMAGE_PROJECTILEBONE->GetCelWidth();
+            mHeight = addonImages.IMAGE_PROJECTILEBONE->GetCelHeight();
+            break;
+        case ProjectileType::PROJECTILE_ACKEE:
+            mLastPortalX = 0;
+            break;
+        default:
+            break;
+    }
+
+    mX = static_cast<int>(mPosX);
+    mY = static_cast<int>(mPosY);
 }
 
 Plant *Projectile::FindCollisionTargetPlant() {
@@ -915,7 +1014,7 @@ void Projectile::UpdateLobMotion() {
         } else if (mProjectileType == ProjectileType::PROJECTILE_MELON || mProjectileType == ProjectileType::PROJECTILE_WINTERMELON) {
             aMinCollisionZ = -35.0f;
         } else if (mProjectileType == ProjectileType::PROJECTILE_CABBAGE || mProjectileType == ProjectileType::PROJECTILE_KERNEL || mProjectileType == ProjectileType::PROJECTILE_SPORE
-                   || mProjectileType == ProjectileType::PROJECTILE_ACKEE) {
+                   || mProjectileType == ProjectileType::PROJECTILE_ACKEE || mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
             aMinCollisionZ = -30.0f;
         } else if (mProjectileType == ProjectileType::PROJECTILE_COBBIG) {
             aMinCollisionZ = -60.0f;
@@ -1198,7 +1297,7 @@ void Projectile::DoImpact(Zombie *theZombie) {
                 }
             }
 
-            theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
+            theZombie->TakeDamage(GetProjectileImpactDamage(this), aDamageFlags);
         }
     }
 
@@ -1362,7 +1461,7 @@ void Projectile::DoImpactGridItem(GridItem *theGridItem) {
             }
             return;
         }
-        theGridItem->TakeDamage(GetProjectileDef().mDamage, 0U);
+        theGridItem->TakeDamage(GetProjectileImpactDamage(this), 0U);
     }
 
     float aLastPosX = mPosX - mVelX;
@@ -1637,7 +1736,8 @@ void Projectile::CheckForCollision() {
     }
 
 
-    if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR) && mShadowY - mPosY > 90.0f) {
+    if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_RED_STINGER)
+        && mShadowY - mPosY > 90.0f) {
         return;
     }
     if (mMotionType == ProjectileMotion::MOTION_FLOAT_OVER) {
@@ -1712,7 +1812,8 @@ bool Projectile::CantHitHighGround() const {
         return false;
 
     return (mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_SNOWPEA || mProjectileType == ProjectileType::PROJECTILE_STAR
-            || mProjectileType == ProjectileType::PROJECTILE_PUFF || mProjectileType == ProjectileType::PROJECTILE_FIREBALL || mProjectileType == ProjectileType::PROJECTILE_BOOMERANG)
+            || mProjectileType == ProjectileType::PROJECTILE_PUFF || mProjectileType == ProjectileType::PROJECTILE_FIREBALL || mProjectileType == ProjectileType::PROJECTILE_BOOMERANG
+            || mProjectileType == ProjectileType::PROJECTILE_RED_STINGER)
         && !mOnHighGround;
 }
 
@@ -1840,6 +1941,8 @@ void Projectile::Draw(Graphics *g) {
         aImage = addonImages.IMAGE_PROJECTILEBONE;
     } else if (mProjectileType == ProjectileType::PROJECTILE_ACKEE) {
         aImage = addonImages.IMAGE_PROJECTILEACKEE;
+    } else if (mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
+        aImage = addonImages.IMAGE_PROJECTILEREDSTINGER;
     }
 
     bool aMirror = false;
