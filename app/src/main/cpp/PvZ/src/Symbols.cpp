@@ -1314,6 +1314,7 @@ bool LoadGameMain() {
     TodDrawStringWrappedAddr = GetLibGameMain().GetSymbol("_Z20TodDrawStringWrappedPN4Sexy8GraphicsERKSsRKNS_5TRectIiEEPNS_4FontERKNS_5ColorE23DrawStringJustificationb");
     TodDrawStringMatrixAddr = GetLibGameMain().GetSymbol("_Z19TodDrawStringMatrixPN4Sexy8GraphicsEPNS_4FontERKNS_11SexyMatrix3ERKSsRKNS_5ColorE");
     TodParticleSystem_OverrideColorAddr = GetLibGameMain().GetSymbol("_ZN17TodParticleSystem13OverrideColorEPKcRKN4Sexy5ColorE");
+    TodParticleLoadDefinitionsAddr = GetLibGameMain().GetSymbol("_Z26TodParticleLoadDefinitionsP14ParticleParamsi");
     TodParticleSystem_OverrideImageAddr = GetLibGameMain().GetSymbol("_ZN17TodParticleSystem13OverrideImageEPKcPN4Sexy5ImageE");
     TodParticleSystem_OverrideFrameAddr = GetLibGameMain().GetSymbol("_ZN17TodParticleSystem13OverrideFrameEPKci");
     TodParticleSystem_OverrideScaleAddr = GetLibGameMain().GetSymbol("_ZN17TodParticleSystem13OverrideScaleEPKcf");
@@ -1474,6 +1475,7 @@ bool LoadGameMain() {
     SaveGameContext_SyncBytesAddr = GetLibGameMain().GetSymbol("_ZN15SaveGameContext9SyncBytesEPvi");
     SaveGameContext_SyncImageAddr = GetLibGameMain().GetSymbol("_ZN15SaveGameContext9SyncImageERPN4Sexy5ImageE");
     SaveGameContext_SyncReanimationDefAddr = GetLibGameMain().GetSymbol("_ZN15SaveGameContext18SyncReanimationDefERP20ReanimatorDefinition");
+    SaveGameContext_SyncParticleDefAddr = GetLibGameMain().GetSymbol("_ZN15SaveGameContext15SyncParticleDefERP21TodParticleDefinition");
     EffectSystem_EffectSystemInitializeAddr = GetLibGameMain().GetSymbol("_ZN12EffectSystem22EffectSystemInitializeEv");
     EffectSystem_EffectSystemFreeAllAddr = GetLibGameMain().GetSymbol("_ZN12EffectSystem19EffectSystemFreeAllEv");
     EffectSystem_UpdateAddr = GetLibGameMain().GetSymbol("_ZN12EffectSystem6UpdateEv");
@@ -2308,6 +2310,8 @@ bool (&::gZombieDefeated)[ZombieType::NUM_ZOMBIE_TYPES] = *GetLibGameMain().GetS
 TodStringListFormat (&::gLawnStringFormats)[14] = *GetLibGameMain().GetSymbol<TodStringListFormat[14]>("gLawnStringFormats");
 ReanimationParams (&::gLawnReanimationArray)[ReanimationType::NUM_REANIMS] = *GetLibGameMain().GetSymbol<ReanimationParams[ReanimationType::NUM_REANIMS]>("gLawnReanimationArray");
 ReanimatorDefinition *& ::gReanimatorDefArray = *GetLibGameMain().GetSymbol<ReanimatorDefinition *>("gReanimatorDefArray");
+TodParticleDefinition *& ::gParticleDefArray = *GetLibGameMain().GetSymbol<TodParticleDefinition *>("gParticleDefArray");
+int & ::gParticleDefCount = *GetLibGameMain().GetSymbol<int>("gParticleDefCount");
 char *& ::ReanimTrackId_anim_head1 = *GetLibGameMain().GetSymbol<char *>("ReanimTrackId_anim_head1");
 DISABLE_WARNING_END
 

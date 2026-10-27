@@ -20,9 +20,25 @@
 #ifndef PVZ_SEXYAPPFRAMEWORK_EFFECT_TOD_PARTICLE_H
 #define PVZ_SEXYAPPFRAMEWORK_EFFECT_TOD_PARTICLE_H
 
+#include "PvZ/Lawn/Common/ConstEnums.h"
+#include "PvZ/Lawn/Common/SyncObject.h"
 #include "PvZ/SexyAppFramework/Misc/SexyVector.h"
+#include "PvZ/Symbols.h"
 #include "PvZ/TodLib/Common/DataArray.h"
 #include "PvZ/TodLib/Common/TodList.h"
+
+namespace Sexy {
+class Color;
+class Graphics;
+} // namespace Sexy
+
+struct ParticleParams {
+    ParticleEffect mParticleEffect;
+    const char *mParticleFileName;
+};
+
+void TodParticleLoadDefinitions(ParticleParams *theParticleParamArray, int theParticleParamArraySize);
+inline void (*old_TodParticleLoadDefinitions)(ParticleParams *theParticleParamArray, int theParticleParamArraySize);
 
 // ====================================================================================================
 // ★ 【发射器定义】

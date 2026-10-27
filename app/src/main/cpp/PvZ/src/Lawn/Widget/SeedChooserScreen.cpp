@@ -635,7 +635,7 @@ bool IsBuiltinAICandidate(SeedChooserScreen *screen, SeedType seedType) {
     }
 
     const int bannedSeedIndex = static_cast<int>(seedType);
-    return !screen->mBanningPhase || (bannedSeedIndex >= 0 && bannedSeedIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED && screen->mBannedSeed[bannedSeedIndex].mSeedState != BannedSeedState::SEED_BANNED);
+    return !screen->mBanningPhase || (bannedSeedIndex >= 0 && bannedSeedIndex < EXTENDED_NUM_SEEDS_IN_CHOOSER && screen->mBannedSeed[bannedSeedIndex].mSeedState != BannedSeedState::SEED_BANNED);
 }
 
 bool HasBuiltinAIPlantSeed(SeedChooserScreen *screen, SeedType seedType) {
@@ -1315,7 +1315,7 @@ SeedType PlantTemplateMainSeed(SeedChooserScreen *screen, int profile) {
 
 bool IsBuiltinAIPlantSeedBanned(const SeedChooserScreen *screen, SeedType seedType) {
     const int index = static_cast<int>(seedType);
-    return screen != nullptr && index >= 0 && index < NUM_SEEDS_IN_CHOOSER_EXTENDED && screen->mBannedSeed[index].mSeedState == BannedSeedState::SEED_BANNED;
+    return screen != nullptr && index >= 0 && index < EXTENDED_NUM_SEEDS_IN_CHOOSER && screen->mBannedSeed[index].mSeedState == BannedSeedState::SEED_BANNED;
 }
 
 void ReplaceBuiltinAIPlantTemplateAfterOpeningBan(SeedChooserScreen *screen) {
@@ -1453,11 +1453,11 @@ void SeedChooserScreen::ApplyGlobalBpBans() {
         if (!mIsZombieChooser && GetSeedPacketIndex(selectedSeedType) < 0) {
             continue;
         }
-        if (mIsZombieChooser && (int(selectedSeedType) < int(SEED_ZOMBIE_GRAVESTONE) || int(selectedSeedType) >= NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
+        if (mIsZombieChooser && (int(selectedSeedType) < int(SEED_ZOMBIE_GRAVESTONE) || int(selectedSeedType) >= EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
             continue;
         }
         const int bannedSeedIndex = int(selectedSeedType);
-        if (bannedSeedIndex < 0 || bannedSeedIndex >= NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+        if (bannedSeedIndex < 0 || bannedSeedIndex >= EXTENDED_NUM_SEEDS_IN_CHOOSER) {
             continue;
         }
 
@@ -1468,7 +1468,7 @@ void SeedChooserScreen::ApplyGlobalBpBans() {
         if (!mIsZombieChooser && chooserSeedIndex >= GetSeedStorageCount()) {
             continue;
         }
-        if (mIsZombieChooser && chooserSeedIndex >= NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
+        if (mIsZombieChooser && chooserSeedIndex >= EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
             continue;
         }
 
@@ -1987,7 +1987,7 @@ void SeedChooserScreen::UpdateBuiltinAIPick() {
         SeedChooserScreen *plantChooser = mApp->mSeedChooserScreen;
         const int bannedIndex = static_cast<int>(kDogwalker);
         const bool dogwalkerBannedByPlant =
-            plantChooser != nullptr && bannedIndex >= 0 && bannedIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED && plantChooser->mBannedSeed[bannedIndex].mSeedState == BannedSeedState::SEED_BANNED;
+            plantChooser != nullptr && bannedIndex >= 0 && bannedIndex < EXTENDED_NUM_SEEDS_IN_CHOOSER && plantChooser->mBannedSeed[bannedIndex].mSeedState == BannedSeedState::SEED_BANNED;
         // Plant-side Ban is the only intended way to deny Dogwalker. Do not
         // let a replay template or its randomized order omit this card.
         if (!dogwalkerAlreadyChosen && !dogwalkerBannedByPlant && IsBuiltinAICandidate(this, kDogwalker)) {
@@ -2556,7 +2556,7 @@ unsigned int SeedChooserScreen::SeedNotRecommendedToPick(SeedType theSeedType) {
 }
 
 bool SeedChooserScreen::HasPacket(SeedType theSeedType, bool theIsZombie) {
-    if (mPageIndex == 1 && theSeedType >= SEED_ICEBERG_LETTUCE && theSeedType < NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+    if (mPageIndex == 1 && theSeedType >= SEED_ICEBERG_LETTUCE && theSeedType < EXTENDED_NUM_SEEDS_IN_CHOOSER) {
         return true;
     }
     if (!mApp->IsVSMode()) {
@@ -2571,7 +2571,7 @@ bool SeedChooserScreen::HasPacket(SeedType theSeedType, bool theIsZombie) {
 SeedType SeedChooserScreen::GetZombieSeedType(int theSeedIndex) {
     int aSeedType = theSeedIndex + SEED_ZOMBIE_GRAVESTONE;
     // 解锁更多对战僵尸
-    return aSeedType < NUM_ZOMBIE_SEEDS_IN_CHOOSER ? SeedType(aSeedType) : SEED_NONE;
+    return aSeedType < EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER ? SeedType(aSeedType) : SEED_NONE;
 }
 
 bool SeedChooserScreen::PickedPlantType(SeedType theSeedType) {
@@ -2599,7 +2599,7 @@ SeedType SeedChooserScreen::GetPlantSeedType(int theSeedIndex) const {
     // 新增植物：存储在 NUM_SEEDS_IN_CHOOSER 之后，但实际枚举从 SEED_ICEBERG_LETTUCE 开始
     const int extendedIndex = theSeedIndex - NUM_SEEDS_IN_CHOOSER;
 
-    if (extendedIndex >= 0 && extendedIndex < NUM_SEED_TYPES_EXTENDED) {
+    if (extendedIndex >= 0 && extendedIndex < EXTENDED_NUM_SEED_TYPES) {
         return SeedType(SEED_ICEBERG_LETTUCE + extendedIndex);
     }
 
@@ -2608,10 +2608,10 @@ SeedType SeedChooserScreen::GetPlantSeedType(int theSeedIndex) const {
 
 int SeedChooserScreen::GetSeedStorageCount() const {
     if (mIsZombieChooser) {
-        return NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_GRAVESTONE;
+        return EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_GRAVESTONE;
     }
 
-    return NUM_SEED_TYPES + NUM_SEED_TYPES_EXTENDED;
+    return NUM_SEED_TYPES + EXTENDED_NUM_SEED_TYPES;
 }
 
 int SeedChooserScreen::GetCurrentPageSeedCount() const {
@@ -2631,7 +2631,7 @@ int SeedChooserScreen::GetCurrentPageSeedCount() const {
         return NUM_SEEDS_IN_CHOOSER;
     }
 
-    return mShowExtendedSeeds ? NUM_SEED_TYPES_EXTENDED : 0;
+    return mShowExtendedSeeds ? EXTENDED_NUM_SEED_TYPES : 0;
 }
 
 int SeedChooserScreen::GetPageSeedStorageIndex(int theSeedIndex) const {
@@ -2652,7 +2652,7 @@ int SeedChooserScreen::GetPageSeedStorageIndex(int theSeedIndex) const {
 
 int SeedChooserScreen::GetSeedPacketIndex(int theSeedIndex) const {
     if (mIsZombieChooser) {
-        if (theSeedIndex < SEED_ZOMBIE_GRAVESTONE || theSeedIndex >= NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
+        if (theSeedIndex < SEED_ZOMBIE_GRAVESTONE || theSeedIndex >= EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
             return -1;
         }
         return theSeedIndex - SEED_ZOMBIE_GRAVESTONE;
@@ -2664,7 +2664,7 @@ int SeedChooserScreen::GetSeedPacketIndex(int theSeedIndex) const {
     }
 
     // 新增植物
-    if (theSeedIndex >= SEED_ICEBERG_LETTUCE && theSeedIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+    if (theSeedIndex >= SEED_ICEBERG_LETTUCE && theSeedIndex < EXTENDED_NUM_SEEDS_IN_CHOOSER) {
         return NUM_SEEDS_IN_CHOOSER + (theSeedIndex - SEED_ICEBERG_LETTUCE);
     }
 
@@ -2955,7 +2955,7 @@ void SeedChooserScreen::ClickedSeedInChooser_Orgin(ChosenSeed &theChosenSeed, in
                 aBannedSeed.mSeedType = theChosenSeed.mSeedType;
 
                 int aSeedBanned = aBannedSeed.mSeedType;
-                if (mSeedsInBanned >= mNumBanPackets || aSeedBanned < 0 || aSeedBanned >= NUM_SEEDS_IN_CHOOSER_EXTENDED || mBannedSeed[aSeedBanned].mSeedState == BannedSeedState::SEED_BANNED) {
+                if (mSeedsInBanned >= mNumBanPackets || aSeedBanned < 0 || aSeedBanned >= EXTENDED_NUM_SEEDS_IN_CHOOSER || mBannedSeed[aSeedBanned].mSeedState == BannedSeedState::SEED_BANNED) {
                     return;
                 }
 
@@ -4013,7 +4013,7 @@ void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int &x, int &y) {
         } else {
             if (theIndex >= NUM_SEEDS_IN_CHOOSER && theIndex < GetSeedStorageCount()) {
                 theIndex -= NUM_SEEDS_IN_CHOOSER;
-            } else if (theIndex >= SEED_ICEBERG_LETTUCE && theIndex < NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+            } else if (theIndex >= SEED_ICEBERG_LETTUCE && theIndex < EXTENDED_NUM_SEEDS_IN_CHOOSER) {
                 theIndex -= SEED_ICEBERG_LETTUCE;
             }
         }
@@ -4231,7 +4231,7 @@ void SeedChooserScreen::MouseMove(int x, int y) {
     }
 
     if (mIsZombieChooser) {
-        if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
+        if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
             return;
         }
         if (mPageIndex == 1) {
@@ -4379,7 +4379,7 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount) {
     }
 
     if (mIsZombieChooser) {
-        if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
+        if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
             return;
         }
         if (mPageIndex == 1) {
@@ -4392,7 +4392,7 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount) {
         mSeedIndex1 = mSeedIndex2 = aZombieSeedIdx;
     } else if (m1PChoosingSeeds) {
         if (mApp->IsVSMode()) {
-            if ((mPageIndex == 0 && aSeedType > SeedType::SEED_MELONPULT) || (mPageIndex == 1 && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED)) {
+            if ((mPageIndex == 0 && aSeedType > SeedType::SEED_MELONPULT) || (mPageIndex == 1 && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER)) {
                 return;
             }
             if (mPageIndex == 1) {
@@ -4440,7 +4440,7 @@ void SeedChooserScreen::MouseDrag(int x, int y) {
             return;
         }
         if (mIsZombieChooser) {
-            if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
+            if ((mPageIndex == 0 && aSeedType > GetZombieFirstPageLastSeedType(this)) || (mPageIndex == 1 && aSeedType >= SeedType::EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER)) {
                 return;
             }
             if (mPageIndex == 1) {
@@ -4454,7 +4454,7 @@ void SeedChooserScreen::MouseDrag(int x, int y) {
         } else if (m1PChoosingSeeds) {
             if (mApp->IsVSMode()) {
                 if ((mPageIndex == 0 && aSeedType > SeedType::SEED_MELONPULT)
-                    || (mPageIndex == 1 && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED)) {
+                    || (mPageIndex == 1 && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER)) {
                     return;
                 }
                 if (mPageIndex == 1) {
@@ -4569,7 +4569,7 @@ int SeedChooserScreen::GetNextSeedInDir(int theNumSeed, SeedDir theMoveDirection
         } else {
             if ((theNumSeed == 4 && theMoveDirection == SeedDir::SEED_DIR_DOWN) || //
                 (theNumSeed == 5 && theMoveDirection == SeedDir::SEED_DIR_RIGHT)) {
-                return NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_BALLOON - 2;
+                return EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_BALLOON - 2;
             }
         }
     }
@@ -4675,7 +4675,7 @@ void SeedChooserScreen::Draw(Graphics *g) { // Early returns for dialogsif (mApp
             if (mPageIndex == 0) {
                 aNumSeeds = GetZombieFirstPageSeedCount(this);
             } else if (mPageIndex == 1) {
-                aNumSeeds = NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_GRAVESTONE;
+                aNumSeeds = EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER - SEED_ZOMBIE_GRAVESTONE;
             }
         } else {
             aNumSeeds = GetCurrentPageSeedCount();
@@ -4784,7 +4784,7 @@ void SeedChooserScreen::Draw(Graphics *g) { // Early returns for dialogsif (mApp
                     continue;
                 }
                 if (mPageIndex == 1) {
-                    if (aDisplaySeedType < SeedType::SEED_ICEBERG_LETTUCE || aDisplaySeedType >= SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+                    if (aDisplaySeedType < SeedType::SEED_ICEBERG_LETTUCE || aDisplaySeedType >= SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER) {
                         continue;
                     }
                 }
@@ -5088,7 +5088,7 @@ void SeedChooserScreen::DrawBanIcon(Sexy::Graphics *g) {
         return false;
     };
 
-    SeedType otherPageBannedSeeds[NUM_SEEDS_IN_CHOOSER_EXTENDED]{};
+    SeedType otherPageBannedSeeds[EXTENDED_NUM_SEEDS_IN_CHOOSER]{};
     int otherPageBannedSeedCount = 0;
 
     for (const auto &aBannedSeed : mBannedSeed) {

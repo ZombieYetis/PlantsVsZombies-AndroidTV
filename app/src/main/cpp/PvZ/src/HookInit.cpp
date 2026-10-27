@@ -69,6 +69,7 @@
 #include "PvZ/SexyAppFramework/Widget/WidgetManager.h"
 #include "PvZ/Symbols.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
+#include "PvZ/TodLib/Effect/TodParticle.h"
 
 void InitHookFunction() {
     homura::HookFunc(LawnApp_LawnAppAddr, &LawnApp::_constructor, &old_LawnApp_LawnApp);
@@ -755,8 +756,10 @@ void InitHookFunction() {
     homura::HookFunc(SettingsDialog_RemovedFromManagerAddr, &SettingsDialog::RemovedFromManager, &old_SettingsDialog_RemovedFromManager);
     homura::HookFunc(SettingsDialog_DrawAddr, &SettingsDialog::Draw, &old_SettingsDialog_Draw);
     homura::HookFunc(ReanimatorLoadDefinitionsAddr, &ReanimatorLoadDefinitions, &old_ReanimatorLoadDefinitions);
+    homura::HookFunc(TodParticleLoadDefinitionsAddr, &TodParticleLoadDefinitions, &old_TodParticleLoadDefinitions);
     homura::HookFunc(DefinitionGetCompiledFilePathFromXMLFilePathAddr, &DefinitionGetCompiledFilePathFromXMLFilePath, &old_DefinitionGetCompiledFilePathFromXMLFilePath);
     homura::HookFunc(SaveGameContext_SyncReanimationDefAddr, &SaveGameContext::SyncReanimationDef, nullptr);
+    homura::HookFunc(SaveGameContext_SyncParticleDefAddr, &SaveGameContext::SyncParticleDef, nullptr);
     homura::HookFunc(SyncReanimationAddr, &SyncReanimation, nullptr);
     homura::HookFunc(PoolEffect_PoolEffectDrawAddr, &PoolEffect::PoolEffectDraw, nullptr);
     homura::HookFunc(Sexy_MemoryImage_ClearRectAddr, &Sexy::MemoryImage::ClearRect, nullptr);

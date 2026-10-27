@@ -29,6 +29,7 @@
 
 class Board;
 class LawnApp;
+class TodParticleDefinition;
 struct BaseEvent;
 
 #define SAVE_FILE_MAGIC_NUMBER 0xFEEDDEAD
@@ -63,6 +64,7 @@ public:
     }
 
     void SyncReanimationDef(ReanimatorDefinition *&theDefinition);
+    void SyncParticleDef(TodParticleDefinition *&theDefinition);
 };
 
 inline void SyncBoard(SaveGameContext *theContext, Board *theBoard) {

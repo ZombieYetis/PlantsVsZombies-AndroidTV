@@ -30,6 +30,7 @@
 #include "PvZ/Lawn/System/Music.h"
 #include "PvZ/NetPlay.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
+#include "PvZ/TodLib/Effect/TodParticle.h"
 
 #include <cstring>
 #include <algorithm>
@@ -603,6 +604,33 @@ void SaveGameContext::SyncReanimationDef(ReanimatorDefinition *&theDefinition) {
             }
         }
         SyncInt(aReanimType);
+    }
+}
+
+void SaveGameContext::SyncParticleDef(TodParticleDefinition *&theDefinition) {
+    // 原版把粒子定义数量写死为 108；扩展后按实际加载数量同步，沿用原存档的索引格式。
+    int aParticleIndex = -1;
+    if (mReading) {
+        SyncInt(aParticleIndex);
+        theDefinition = nullptr;
+        if (mFailed || aParticleIndex == -1) {
+            return;
+        }
+        if (gParticleDefArray != nullptr && aParticleIndex >= 0 && aParticleIndex < gParticleDefCount) {
+            theDefinition = &gParticleDefArray[aParticleIndex];
+        } else {
+            mFailed = true;
+        }
+    } else {
+        if (theDefinition != nullptr && gParticleDefArray != nullptr) {
+            for (int i = 0; i < gParticleDefCount; ++i) {
+                if (theDefinition == &gParticleDefArray[i]) {
+                    aParticleIndex = i;
+                    break;
+                }
+            }
+        }
+        SyncInt(aParticleIndex);
     }
 }
 

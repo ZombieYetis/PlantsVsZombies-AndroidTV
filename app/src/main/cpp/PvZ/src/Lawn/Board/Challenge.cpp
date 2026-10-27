@@ -764,11 +764,11 @@ void Challenge::LastStandUpdate() {
 }
 
 int Challenge::IsMPSeedType(SeedType theSeedType) {
-    return theSeedType >= SEED_ZOMBIE_GRAVESTONE && theSeedType < NUM_ZOMBIE_SEED_TYPES;
+    return theSeedType >= SEED_ZOMBIE_GRAVESTONE && theSeedType < EXTENDED_NUM_ZOMBIE_SEED_TYPES;
 }
 
 int Challenge::IsZombieSeedType(SeedType theSeedType) {
-    return theSeedType >= SEED_ZOMBIE_GRAVESTONE && theSeedType < NUM_ZOMBIE_SEED_TYPES;
+    return theSeedType >= SEED_ZOMBIE_GRAVESTONE && theSeedType < EXTENDED_NUM_ZOMBIE_SEED_TYPES;
 }
 
 void Challenge::IZombieSetPlantFilterEffect(Plant *thePlant, FilterEffect theFilterEffect) const {

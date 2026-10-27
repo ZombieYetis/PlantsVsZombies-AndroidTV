@@ -2584,7 +2584,7 @@ void Plant::Die_Origin() {
 }
 
 PlantDefinition &GetPlantDefinition(SeedType theSeedType) {
-    if (theSeedType >= SeedType::SEED_ICEBERG_LETTUCE && theSeedType < SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+    if (theSeedType >= SeedType::SEED_ICEBERG_LETTUCE && theSeedType < SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER) {
         return gExtendedPlantDefs[theSeedType - SEED_ICEBERG_LETTUCE];
     }
     return gPlantDefs[theSeedType];

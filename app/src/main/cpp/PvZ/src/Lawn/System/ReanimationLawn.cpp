@@ -70,7 +70,7 @@ void ReanimatorCache::ReanimatorCacheInitialize() {
     for (int i = 0; i < ZombieType::NUM_ZOMBIE_TYPES; i++)
         mZombieImages[i] = nullptr;
 
-    for (int i = 0; i < NUM_SEED_TYPES_EXTENDED; i++)
+    for (int i = 0; i < EXTENDED_NUM_SEED_TYPES; i++)
         msExtendedPlantImages[i] = nullptr;
     for (int i = 0; i < EXTENDED_NUM_ZOMBIE_TYPES - NUM_CACHED_ZOMBIE_TYPES; i++)
         msExtendedZombieImages[i] = nullptr;
@@ -88,7 +88,7 @@ void ReanimatorCache::ReanimatorCacheDispose() {
     for (int i = 0; i < ZombieType::NUM_ZOMBIE_TYPES; i++)
         delete mZombieImages[i];
 
-    for (int i = 0; i < NUM_SEED_TYPES_EXTENDED; i++)
+    for (int i = 0; i < EXTENDED_NUM_SEED_TYPES; i++)
         delete msExtendedPlantImages[i];
     for (int i = 0; i < EXTENDED_NUM_ZOMBIE_TYPES - NUM_CACHED_ZOMBIE_TYPES; i++)
         delete msExtendedZombieImages[i];
@@ -127,7 +127,7 @@ void ReanimatorCache::DrawCachedPlant(Graphics *g, float thePosX, float thePosY,
 }
 
 void ReanimatorCache::DrawCachedExtendedPlant(Graphics *g, float thePosX, float thePosY, SeedType theSeedType, DrawVariation theDrawVariation) {
-    if (theSeedType < SEED_ICEBERG_LETTUCE || theSeedType >= NUM_SEEDS_IN_CHOOSER_EXTENDED) {
+    if (theSeedType < SEED_ICEBERG_LETTUCE || theSeedType >= EXTENDED_NUM_SEEDS_IN_CHOOSER) {
         return;
     }
 

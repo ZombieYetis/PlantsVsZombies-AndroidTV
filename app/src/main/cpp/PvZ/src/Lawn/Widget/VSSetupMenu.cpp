@@ -793,7 +793,7 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
                 break;
             }
             if (isZombieChooser) {
-                if (seedType < SeedType::SEED_ZOMBIE_GRAVESTONE || seedType >= SeedType::NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
+                if (seedType < SeedType::SEED_ZOMBIE_GRAVESTONE || seedType >= SeedType::EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
                     break;
                 }
             } else {
@@ -963,7 +963,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
                 break;
             }
             if (isZombieChooser) {
-                if (seedType < SeedType::SEED_ZOMBIE_GRAVESTONE || seedType >= SeedType::NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
+                if (seedType < SeedType::SEED_ZOMBIE_GRAVESTONE || seedType >= SeedType::EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER) {
                     break;
                 }
             } else {

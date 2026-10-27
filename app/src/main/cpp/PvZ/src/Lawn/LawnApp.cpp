@@ -1278,7 +1278,7 @@ int LawnApp::GetSeedsAvailable(bool theIsZombieChooser) {
         isExtendedSeedsMode = mVSSetupMenu->mAddonWidget->mExtendedSeedsMode;
     }
     if (theIsZombieChooser && isExtendedSeedsMode) {
-        return NUM_ZOMBIE_SEEDS_IN_CHOOSER;
+        return EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER;
     }
 
     return old_LawnApp_GetSeedsAvailable(this, theIsZombieChooser);

@@ -32,7 +32,7 @@
 
 inline constexpr int NUM_CHALLENGE_MODES_ORIGINAL(int(GameMode::NUM_GAME_MODES - 1));
 inline constexpr int MAX_CHALLENGE_MODES = 200;
-inline constexpr int NUM_CHALLENGE_MODES_EXTENDED = MAX_CHALLENGE_MODES - NUM_CHALLENGE_MODES_ORIGINAL;
+inline constexpr int EXTENDED_NUM_CHALLENGE_MODES = MAX_CHALLENGE_MODES - NUM_CHALLENGE_MODES_ORIGINAL;
 extern const int NUM_CHALLENGE_MODES;
 inline constexpr int GAMEMODE_MP_VS_DAY = 70;
 inline constexpr int GAMEMODE_MP_VS_NIGHT = 71;
@@ -76,9 +76,9 @@ public:
     // 大小380个整数, 以下是新增成员!
     NewLawnButton *mBackButton = nullptr;
     NetplayLobbyWidget *mNetplayLobbyWidget = nullptr;
-    Sexy::ButtonWidget *mChallengeButtonsExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
-    int mPageChallengeIndexExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
-    float mPageChallengeAnimTimeExtended[NUM_CHALLENGE_MODES_EXTENDED]{};
+    Sexy::ButtonWidget *mChallengeButtonsExtended[EXTENDED_NUM_CHALLENGE_MODES]{};
+    int mPageChallengeIndexExtended[EXTENDED_NUM_CHALLENGE_MODES]{};
+    float mPageChallengeAnimTimeExtended[EXTENDED_NUM_CHALLENGE_MODES]{};
 
     Sexy::ButtonWidget *&GetChallengeButton(int theChallengeIndex) {
         return theChallengeIndex < NUM_CHALLENGE_MODES_ORIGINAL ? mChallengeButtons[theChallengeIndex] : mChallengeButtonsExtended[theChallengeIndex - NUM_CHALLENGE_MODES_ORIGINAL];

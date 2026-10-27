@@ -829,7 +829,7 @@ void GamepadControls::UpdatePreviewReanim() {
             aNewPreviewingReanim = aZombieReanim;
         } else {
             if (aSeedType == SeedType::NUM_SEEDS_IN_CHOOSER
-                || (aSeedType >= SeedType::NUM_SEED_TYPES && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED))
+                || (aSeedType >= SeedType::NUM_SEED_TYPES && aSeedType < SeedType::SEED_ICEBERG_LETTUCE && aSeedType >= SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER))
                 return;
             Reanimation *plantReanim = mApp->AddReanimation(0.0, theDrawHeightOffset, aRenderOrder + 2, GetPlantDefinition(aSeedType).mReanimationType);
             plantReanim->mIsAttachment = true;
@@ -1356,7 +1356,7 @@ void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerI
         }
 
         if ((aPacketType >= SeedType::SEED_PEASHOOTER && aPacketType < SeedType::NUM_SEED_TYPES)
-            || (aPacketType >= SeedType::SEED_ICEBERG_LETTUCE && aPacketType < SeedType::NUM_SEEDS_IN_CHOOSER_EXTENDED)) {
+            || (aPacketType >= SeedType::SEED_ICEBERG_LETTUCE && aPacketType < SeedType::EXTENDED_NUM_SEEDS_IN_CHOOSER)) {
             // 同一帧内切槽并种植时，光标可能仍是上一张卡；提交前与已校验的卡槽同步。
             CursorObject *aCursor = mBoard->mCursorObject[mPlayerIndex];
             aCursor->mSelectedIndex = mSelectedSeedIndex;

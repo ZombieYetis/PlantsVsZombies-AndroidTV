@@ -44,7 +44,7 @@ class Reanimation;
 
 class ReanimatorCache {
 public:
-    static inline Sexy::MemoryImage *msExtendedPlantImages[NUM_SEED_TYPES_EXTENDED];
+    static inline Sexy::MemoryImage *msExtendedPlantImages[EXTENDED_NUM_SEED_TYPES];
     static inline Sexy::MemoryImage *msExtendedZombieImages[EXTENDED_NUM_ZOMBIE_TYPES - NUM_CACHED_ZOMBIE_TYPES];
 
     ImageVariationList mImageVariationList;

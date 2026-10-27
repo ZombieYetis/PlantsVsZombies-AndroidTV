@@ -152,12 +152,12 @@ public:
     int mPageIndex = 0;
     int mNumBanPackets = 2;
     int mSeedsInBanned = 0;
-    BannedSeed mBannedSeed[NUM_SEEDS_IN_CHOOSER_EXTENDED]{};
+    BannedSeed mBannedSeed[EXTENDED_NUM_SEEDS_IN_CHOOSER]{};
     bool mBanningPhase = false;
     bool mShowExtendedSeeds = false;
     bool mHas7Packets = false;
     bool mGlobalBpBansApplied = false;
-    ChosenSeed mChosenSeedsExtended[NUM_SEED_TYPES_EXTENDED]{};
+    ChosenSeed mChosenSeedsExtended[EXTENDED_NUM_SEED_TYPES]{};
     GameButton *mMainMenuButton = nullptr;
     int mTimedDraftTicksRemaining = 0;
     bool mTimedDraftWasActive = false;
@@ -210,7 +210,7 @@ public:
             return int(aChosenSeed - mChosenSeeds);
         }
 
-        if (aChosenSeed >= mChosenSeedsExtended && aChosenSeed < mChosenSeedsExtended + NUM_SEED_TYPES_EXTENDED) {
+        if (aChosenSeed >= mChosenSeedsExtended && aChosenSeed < mChosenSeedsExtended + EXTENDED_NUM_SEED_TYPES) {
             return NUM_SEED_TYPES + int(aChosenSeed - mChosenSeedsExtended);
         }
 
