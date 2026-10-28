@@ -703,7 +703,7 @@ void InitHookFunction() {
     // homura::HookFunc(Sexy_WidgetManager_AxisMovedAddr, Sexy_WidgetManager_AxisMoved, nullptr);
 
 
-    homura::HookFunc(LawnMower_UpdateAddr, &LawnMower::Update, &old_LawnMower_Update);
+    homura::HookFunc(LawnMower_UpdateAddr, &LawnMower::Update, nullptr);
     homura::HookFunc(LawnMower_StartMowerAddr, &LawnMower::StartMower, &old_LawnMower_StartMower);
     homura::HookFunc(LawnMower_SquishMowerAddr, &LawnMower::SquishMower, nullptr);
     homura::HookFunc(ConfirmBackToMainDialog_ButtonDepressAddr, &ConfirmBackToMainDialog_ButtonDepress, &old_ConfirmBackToMainDialog_ButtonDepress);

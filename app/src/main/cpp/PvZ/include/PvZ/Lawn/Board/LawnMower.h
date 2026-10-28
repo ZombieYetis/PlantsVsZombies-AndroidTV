@@ -48,13 +48,20 @@ public:
     MowerHeight mMowerHeight;   //+0x3C
     int mLastPortalX;           //+0x40
 
+    void MowZombie(Zombie *theZombie) {
+        reinterpret_cast<void (*)(LawnMower *, Zombie *)>(LawnMower_MowZombieAddr)(this, theZombie);
+    }
+    void UpdatePool() {
+        reinterpret_cast<void (*)(LawnMower *)>(LawnMower_UpdatePoolAddr)(this);
+    }
+    void Die() {
+        reinterpret_cast<void (*)(LawnMower *)>(LawnMower_DieAddr)(this);
+    }
     void StartMower();
     void SquishMower();
     void SquishMower_Origin();
     void Update();
 };
-
-inline void (*old_LawnMower_Update)(LawnMower *lawnMover);
 
 inline void (*old_LawnMower_StartMower)(LawnMower *);
 

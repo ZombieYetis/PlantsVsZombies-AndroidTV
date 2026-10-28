@@ -1441,6 +1441,9 @@ bool LoadGameMain() {
     ConfirmBackToMainDialog_ButtonDepressAddr = GetLibGameMain().GetSymbol("_ZN23ConfirmBackToMainDialog13ButtonDepressEi");
     GameOverDialog_ButtonDepressAddr = GetLibGameMain().GetSymbol("_ZN14GameOverDialog13ButtonDepressEi");
     LawnMower_UpdateAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower6UpdateEv");
+    LawnMower_MowZombieAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower9MowZombieEP6Zombie");
+    LawnMower_UpdatePoolAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower10UpdatePoolEv");
+    LawnMower_DieAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower3DieEv");
     LawnMower_StartMowerAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower10StartMowerEv");
     LawnMower_SquishMowerAddr = GetLibGameMain().GetSymbol("_ZN9LawnMower11SquishMowerEv");
     MailScreen_MailScreenAddr = GetLibGameMain().GetSymbol("_ZN10MailScreenC2EP7LawnApp");
