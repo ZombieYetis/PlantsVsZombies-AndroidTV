@@ -211,21 +211,9 @@ void VSSetupMenu::DrawOverlay(Graphics *g) {
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
-                case VSSetupAddonWidget::VSSetupAddonWidget_ExtendedSeeds: {
-                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_REMIND_HOST_FMT]");
-                    pvzstl::string opt = TodStringTranslate((!mAddonWidget->mExtendedSeedsMode) ? "[VS_OPT_ENABLE_EXTRA_SEEDS]" : "[VS_OPT_DISABLE_EXTRA_SEEDS]");
-                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
-                    break;
-                }
                 case VSSetupAddonWidget::VSSetupAddonWidget_BanMode: {
                     pvzstl::string fmt = TodStringTranslate("[VS_TIP_REMIND_HOST_FMT]");
                     pvzstl::string opt = TodStringTranslate((!mAddonWidget->mBanMode) ? "[VS_OPT_ENABLE_BAN_MODE]" : "[VS_OPT_DISABLE_BAN_MODE]");
-                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
-                    break;
-                }
-                case VSSetupAddonWidget::VSSetupAddonWidget_BalancePatch: {
-                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_REMIND_HOST_FMT]");
-                    pvzstl::string opt = TodStringTranslate((!mAddonWidget->mBalancePatchMode) ? "[VS_OPT_ENABLE_BALANCE_PATCH]" : "[VS_OPT_DISABLE_BALANCE_PATCH]");
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
@@ -313,21 +301,9 @@ void VSSetupMenu::DrawOverlay(Graphics *g) {
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
-                case VSSetupAddonWidget::VSSetupAddonWidget_ExtendedSeeds: {
-                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_OPPONENT_WANTS_GET_FMT]");
-                    pvzstl::string opt = TodStringTranslate((!mAddonWidget->mExtendedSeedsMode) ? "[VS_OPT_ENABLE_EXTRA_SEEDS]" : "[VS_OPT_DISABLE_EXTRA_SEEDS]");
-                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
-                    break;
-                }
                 case VSSetupAddonWidget::VSSetupAddonWidget_BanMode: {
                     pvzstl::string fmt = TodStringTranslate("[VS_TIP_OPPONENT_WANTS_GET_FMT]");
                     pvzstl::string opt = TodStringTranslate((!mAddonWidget->mBanMode) ? "[VS_OPT_ENABLE_BAN_MODE]" : "[VS_OPT_DISABLE_BAN_MODE]");
-                    TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
-                    break;
-                }
-                case VSSetupAddonWidget::VSSetupAddonWidget_BalancePatch: {
-                    pvzstl::string fmt = TodStringTranslate("[VS_TIP_OPPONENT_WANTS_GET_FMT]");
-                    pvzstl::string opt = TodStringTranslate((!mAddonWidget->mBalancePatchMode) ? "[VS_OPT_ENABLE_BALANCE_PATCH]" : "[VS_OPT_DISABLE_BALANCE_PATCH]");
                     TodDrawString(g, StrFormat(fmt.c_str(), opt.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153), DrawStringJustification::DS_ALIGN_LEFT);
                     break;
                 }
@@ -1075,9 +1051,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_VSSETUP_ADDON_BUTTON_INIT: {
             auto *eventButtonInit = static_cast<const B1x8_Event *>(event);
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtraPacket, eventButtonInit->data1, false);
-            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtendedSeeds, eventButtonInit->data2, false);
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BanMode, eventButtonInit->data3, false);
-            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BalancePatch, eventButtonInit->data4, false);
             mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft, eventButtonInit->data5, false);
             U8_Event eventState = {{EventType::EVENT_CLIENT_VSSETUP_SEND_NAME_STATE}, mApp->mPlayerInfo->mVSResultsSendPlayerName};
             netplay::PutEvent(eventState);
@@ -1155,9 +1129,9 @@ void VSSetupMenu::OnStateEnter(VSSetupState theState) {
             B1x8_Event event = {
                 {EventType::EVENT_SERVER_VSSETUP_ADDON_BUTTON_INIT},
                 mAddonWidget->mExtraPacketMode,
-                mAddonWidget->mExtendedSeedsMode,
+                false, // Reserved: extended seeds are determined by the VS mode.
                 mAddonWidget->mBanMode,
-                mAddonWidget->mBalancePatchMode,
+                false, // Reserved: balance rules are determined by the VS mode.
                 mAddonWidget->mTimedDraftMode,
                 // Keep the B1x8 payload layout compatible. Builtin AI
                 // preferences are local-only and intentionally stay zero.
@@ -1186,7 +1160,9 @@ void VSSetupMenu::OnStateEnter(VSSetupState theState) {
 
         // 此事件仅针对中途加入的观战者，告知观战者本局对战的模式。Guest无需处理此事件。
         if (IsRemoteServer()) {
-            U8U8_Event event = {{EventType::EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE}, uint8_t(Challenge::msVSShuffleMode), uint8_t(mApp->mBoard->mBackground)};
+            // Wire modes: 0 = normal, 1 = shuffle, 2 = classic.
+            const uint8_t mode = Challenge::msVSClassicMode ? 2 : uint8_t(Challenge::msVSShuffleMode);
+            U8U8_Event event = {{EventType::EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE}, mode, uint8_t(mApp->mBoard->mBackground)};
             netplay::PutEvent(event);
         }
 
@@ -1263,7 +1239,7 @@ void VSSetupMenu::ButtonDepress(int theId) {
 void VSSetupMenu::ButtonDepress_Origin(int theId) {
     // 拓展功能开启情况
     if (mAddonWidget) {
-        netplay::MetricsSetAddonFlags(mAddonWidget->mExtraPacketMode, mAddonWidget->mExtendedSeedsMode, mAddonWidget->mBanMode, mAddonWidget->mBalancePatchMode);
+        netplay::MetricsSetAddonFlags(mAddonWidget->mExtraPacketMode, mAddonWidget->mBanMode);
     }
 
     int aNumPackets = mApp->mBoard->GetNumSeedsInBank(false);
@@ -1316,9 +1292,7 @@ void VSSetupMenu::ButtonDepress_Origin(int theId) {
 
                 if (mState == VS_SETUP_STATE_CUSTOM_BATTLE) {
                     mAddonWidget->SetDisable(mAddonWidget->mExtraPacketCheckbox);
-                    mAddonWidget->SetDisable(mAddonWidget->mExtendedSeedsCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mBanModeCheckbox);
-                    mAddonWidget->SetDisable(mAddonWidget->mBalancePatchCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mAISettingsButton);
                     mAddonWidget->SetDisable(mAddonWidget->mTimedDraftCheckbox);
                     mAddonWidget->SetDisable(mAddonWidget->mBackButton);

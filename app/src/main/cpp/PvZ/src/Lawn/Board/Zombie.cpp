@@ -5628,7 +5628,7 @@ void Zombie::CheckForBoardEdge() {
                     // 所选对战场地
                     netplay::MetricsSetVsBackground(int(gVSBackground));
                     // 对战游戏模式
-                    netplay::MetricsSetShuffleMode(Challenge::msVSShuffleMode);
+                    netplay::MetricsSetVsMode(Challenge::msVSShuffleMode, Challenge::msVSClassicMode);
                     // 僵尸胜利的对局时间
                     netplay::MetricsSendSettlement(false, mBoard->mMainCounter);
                 }

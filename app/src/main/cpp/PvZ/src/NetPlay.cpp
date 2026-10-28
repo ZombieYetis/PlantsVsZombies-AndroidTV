@@ -147,6 +147,7 @@ void netplay::MetricsResetSettlementEvents() {
     gMetricsGraveLoss = 0;
     gMetricsSunflowerLoss = 0;
     gMetricsShuffleMode = false;
+    gMetricsClassicMode = false;
     gMetricsPlantUseCount.clear();
     gMetricsZombieUseCount.clear();
     gMetricsHostSendNameAllowed = true;
@@ -167,14 +168,13 @@ void netplay::MetricsRecordSeedEvent(bool zombieSide, bool banEvent, int seedTyp
 void netplay::MetricsSetBattleType(int battleType) {
     gMetricsBattleType = battleType;
 }
-void netplay::MetricsSetShuffleMode(bool shuffleMode) {
+void netplay::MetricsSetVsMode(bool shuffleMode, bool classicMode) {
     gMetricsShuffleMode = shuffleMode;
+    gMetricsClassicMode = classicMode;
 }
-void netplay::MetricsSetAddonFlags(bool extraPackets, bool extraSeeds, bool banMode, bool balancePatch) {
+void netplay::MetricsSetAddonFlags(bool extraPackets, bool banMode) {
     gMetricsExtraPacket = extraPackets;
-    gMetricsExtendedSeeds = extraSeeds;
     gMetricsBanMode = banMode;
-    gMetricsBalancePatch = balancePatch;
 }
 void netplay::MetricsSetVsBackground(int background) {
     gMetricsVsBackground = background;
@@ -299,9 +299,10 @@ bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
             o << items[i].first << ':' << items[i].second;
         }
     };
-    oss << "|bg=" << gMetricsVsBackground << "&battle=" << gMetricsBattleType << "&shuffle=" << (gMetricsShuffleMode ? 1 : 0) << "&addon_ep=" << (gMetricsExtraPacket ? 1 : 0)
-        << "&addon_es=" << (gMetricsExtendedSeeds ? 1 : 0) << "&addon_ban=" << (gMetricsBanMode ? 1 : 0) << "&addon_bp=" << (gMetricsBalancePatch ? 1 : 0) << "&mower_loss=" << gMetricsMowerLoss
-        << "&target_loss=" << gMetricsTargetLoss << "&grave_loss=" << gMetricsGraveLoss << "&sunflower_loss=" << gMetricsSunflowerLoss << "&plant_use=";
+    const char *gameMode = gMetricsClassicMode ? "CLASSIC" : gMetricsShuffleMode ? "SHUFFLE" : "NORMAL";
+    oss << "|bg=" << gMetricsVsBackground << "&battle=" << gMetricsBattleType << "&game_mode=" << gameMode << "&addon_ep=" << (gMetricsExtraPacket ? 1 : 0)
+        << "&addon_ban=" << (gMetricsBanMode ? 1 : 0) << "&mower_loss=" << gMetricsMowerLoss << "&target_loss=" << gMetricsTargetLoss << "&grave_loss=" << gMetricsGraveLoss
+        << "&sunflower_loss=" << gMetricsSunflowerLoss << "&plant_use=";
     appendUsage(oss, gMetricsPlantUseCount);
     oss << "&zombie_use=";
     appendUsage(oss, gMetricsZombieUseCount);

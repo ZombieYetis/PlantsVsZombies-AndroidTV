@@ -27,11 +27,9 @@
 #include "PvZ/SexyAppFramework/Widget/Widget.h"
 
 inline int VS_ADDON_BUTTON_X = 800;
-inline int VS_BUTTON_EXTRA_PACKET_Y = 280;
-inline int VS_BUTTON_EXTENDED_SEEDS_Y = 240;
-inline int VS_BUTTON_BAN_MODE_Y = 320;
-inline int VS_BUTTON_BALANCE_PATCH_Y = 200;
-inline int VS_BUTTON_AI_SETTINGS_Y = 440;
+inline int VS_BUTTON_EXTRA_PACKET_Y = 200;
+inline int VS_BUTTON_BAN_MODE_Y = 240;
+inline int VS_BUTTON_AI_SETTINGS_Y = 360;
 
 namespace Sexy {
 class ButtonWidget;
@@ -44,9 +42,8 @@ class VSSetupAddonWidget final : public Sexy::CheckboxListener {
 public:
     enum {
         VSSetupAddonWidget_ExtraPacket = 12,
-        VSSetupAddonWidget_ExtendedSeeds = 13,
+        // IDs 13 and 15 were the removed mode-dependent options; do not reuse.
         VSSetupAddonWidget_BanMode = 14,
-        VSSetupAddonWidget_BalancePatch = 15,
         VSSetupAddonWidget_Back = 16,
         VSSetupAddonWidget_GlobalBP = 17,
         // Local-only AI preferences are appended so existing setup/network
@@ -87,9 +84,7 @@ public:
     NewLawnButton *mBackButton = nullptr;
     GameButton *mGlobalBpButton = nullptr;
     Sexy::Checkbox *mExtraPacketCheckbox = nullptr;
-    Sexy::Checkbox *mExtendedSeedsCheckbox = nullptr;
     Sexy::Checkbox *mBanModeCheckbox = nullptr;
-    Sexy::Checkbox *mBalancePatchCheckbox = nullptr;
     GameButton *mAISettingsButton = nullptr;
     Sexy::Checkbox *mTimedDraftCheckbox = nullptr;
     AISettingsWidget *mAISettingsWidget = nullptr;

@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3211;
+inline constexpr uint32_t NETPLAY_VERSION = 3212;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -555,10 +555,9 @@ inline int gMetricsRoomId = 0;
 inline int gMetricsVsBackground = -1;
 inline int gMetricsBattleType = -1; // 9 quick, 10 custom, 11 random
 inline bool gMetricsShuffleMode = false;
+inline bool gMetricsClassicMode = false;
 inline bool gMetricsExtraPacket = false;
-inline bool gMetricsExtendedSeeds = false;
 inline bool gMetricsBanMode = false;
-inline bool gMetricsBalancePatch = false;
 inline int gMetricsMowerLoss = 0;
 inline int gMetricsTargetLoss = 0;
 inline int gMetricsGraveLoss = 0;
@@ -632,8 +631,8 @@ void MetricsSetRoomId(int roomId);
 void MetricsResetSettlementEvents();
 void MetricsRecordSeedEvent(bool zombieSide, bool banEvent, int seedType);
 void MetricsSetBattleType(int battleType);
-void MetricsSetShuffleMode(bool shuffleMode);
-void MetricsSetAddonFlags(bool extraPacket, bool extendedSeeds, bool banMode, bool balancePatch);
+void MetricsSetVsMode(bool shuffleMode, bool classicMode);
+void MetricsSetAddonFlags(bool extraPacket, bool banMode);
 void MetricsSetVsBackground(int background);
 void MetricsRecordPlantUsed(int seedType);
 void MetricsRecordZombieUsed(int zombieType);

@@ -53,6 +53,7 @@ bool IsValidVsMode(int mode) {
         case GAMEMODE_MP_VS_POOL_NIGHT:
         case GAMEMODE_MP_VS_ROOF:
         case GAMEMODE_MP_VS_SHUFFLE_MODE:
+        case GAMEMODE_MP_VS_CLASSIC_MODE:
             return true;
         default:
             return false;
@@ -114,6 +115,8 @@ pvzstl::string GetNetplayModeName(int mode) {
             return TodStringTranslate("[MP_VS_ROOF]");
         case GAMEMODE_MP_VS_SHUFFLE_MODE:
             return TodStringTranslate("[MP_VS_SHUFFLE_MODE]");
+        case GAMEMODE_MP_VS_CLASSIC_MODE:
+            return TodStringTranslate("[MP_VS_CLASSIC_MODE]");
         default:
             break;
     }
@@ -256,6 +259,7 @@ ChallengeDefinition gChallengeDefs[] = {
     {GameMode::GAMEMODE_MP_VS, 4, ChallengePage::CHALLENGE_PAGE_LIMBO, 0, 4, "[MP_VS_ROOF]"},
     {GameMode::GAMEMODE_MP_VS, 0, ChallengePage::CHALLENGE_PAGE_VS, 1, 0, "[MP_VS_SHUFFLE_MODE]"},
     {GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD, 19, ChallengePage::CHALLENGE_PAGE_COOP, 2, 1, "[COOP_FINAL_BOSS_HARD]"},
+    {GameMode::GAMEMODE_MP_VS, 0, ChallengePage::CHALLENGE_PAGE_VS, 1, 1, "[MP_VS_CLASSIC_MODE]"},
 };
 
 const int NUM_CHALLENGE_MODES = int(std::size(gChallengeDefs));
@@ -352,6 +356,7 @@ void ChallengeScreen::_constructor(LawnApp *theApp, ChallengePage thePage) {
     }
     if (mPage == CHALLENGE_PAGE_VS) {
         Challenge::msVSShuffleMode = false;
+        Challenge::msVSClassicMode = false;
         mApp->TryHelpTextScreen(HelpTextPage::HELP_TEXT_PAGE_VS);
     }
     if (mPage == CHALLENGE_PAGE_COOP) {
@@ -1167,12 +1172,15 @@ void ChallengeScreen::KeyDown_Origin(Sexy::KeyCode theKey) {
         // 更新对战战场选择
         if (mPage == ChallengePage::CHALLENGE_PAGE_VS) {
             const int aMode = SelectionToNetplayMode(mPage, mSelectedChallengeIndex);
+            Challenge::msVSShuffleMode = aMode == GAMEMODE_MP_VS_SHUFFLE_MODE;
+            Challenge::msVSClassicMode = aMode == GAMEMODE_MP_VS_CLASSIC_MODE;
             if (gChallengeScreenRequestState == aMode) {
                 gChallengeScreenRequestState = 0;
             }
 
             switch (aMode) {
                 case GAMEMODE_MP_VS_DAY:
+                case GAMEMODE_MP_VS_CLASSIC_MODE:
                     gVSBackground = BackgroundType::BACKGROUND_1_DAY;
                     break;
                 case GAMEMODE_MP_VS_NIGHT:
@@ -1269,8 +1277,11 @@ void ChallengeScreen::processServerEvent(const BaseEvent *event) {
                 return;
             }
 
+            Challenge::msVSShuffleMode = theId == GAMEMODE_MP_VS_SHUFFLE_MODE;
+            Challenge::msVSClassicMode = theId == GAMEMODE_MP_VS_CLASSIC_MODE;
             switch (theId) {
                 case GAMEMODE_MP_VS_DAY:
+                case GAMEMODE_MP_VS_CLASSIC_MODE:
                     gVSBackground = BackgroundType::BACKGROUND_1_DAY;
                     break;
                 case GAMEMODE_MP_VS_NIGHT:

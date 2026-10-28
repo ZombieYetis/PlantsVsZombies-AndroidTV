@@ -173,6 +173,9 @@ public:
                 case -1:
                     bgText = TodStringTranslate("[MP_VS_SHUFFLE_MODE]");
                     break;
+                case -2:
+                    bgText = TodStringTranslate("[MP_VS_CLASSIC_MODE]");
+                    break;
                 default:
                     bgText = "Unknown";
                     break;
@@ -448,6 +451,8 @@ void ReplayManageWidget::StartReplayByIndex(int index) const {
         dialog->RequestClose(NetplayLobbyWidget::NetplayLobbyWidget_Enter);
     }
 
+    Challenge::msVSShuffleMode = false;
+    Challenge::msVSClassicMode = false;
     switch (item.vsBackground) {
         case 0:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
@@ -467,6 +472,10 @@ void ReplayManageWidget::StartReplayByIndex(int index) const {
         case -1:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
             Challenge::msVSShuffleMode = true;
+            break;
+        case -2:
+            gVSBackground = BackgroundType::BACKGROUND_1_DAY;
+            Challenge::msVSClassicMode = true;
             break;
         default:
             break;

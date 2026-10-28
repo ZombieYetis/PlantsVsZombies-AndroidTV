@@ -218,7 +218,7 @@ void VSResultsMenu::processServerEvent(const BaseEvent *event) {
 
 void VSResultsMenu::InitFromBoard(Board *theBoard) {
     mBoardMainCounter = theBoard->mMainCounter;
-    mBoardBackground = Challenge::msVSShuffleMode ? BackgroundType(-1) : theBoard->mBackground;
+    mBoardBackground = Challenge::msVSClassicMode ? BackgroundType(-2) : Challenge::msVSShuffleMode ? BackgroundType(-1) : theBoard->mBackground;
 
     int aSeedNum = theBoard->mSeedBank[0]->mNumPackets;
     for (int i = 1; i < aSeedNum; ++i) {

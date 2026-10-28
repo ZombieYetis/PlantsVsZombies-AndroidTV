@@ -40,7 +40,8 @@ inline constexpr int GAMEMODE_MP_VS_POOL_DAY = 72;
 inline constexpr int GAMEMODE_MP_VS_POOL_NIGHT = 73;
 inline constexpr int GAMEMODE_MP_VS_ROOF = 74;
 inline constexpr int GAMEMODE_MP_VS_SHUFFLE_MODE = 75;
-inline constexpr int NUM_VS_MODES(GAMEMODE_MP_VS_SHUFFLE_MODE - GAMEMODE_MP_VS_DAY + 1);
+inline constexpr int GAMEMODE_MP_VS_CLASSIC_MODE = 76;
+inline constexpr int NUM_VS_MODES(GAMEMODE_MP_VS_CLASSIC_MODE - GAMEMODE_MP_VS_DAY + 1);
 
 class NewLawnButton;
 class ChallengeScreen : public Sexy::Widget, public Sexy::ButtonListener {

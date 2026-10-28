@@ -48,13 +48,16 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     mBoard->AddWidget(mBackButton);
 
     mGlobalBpButton = MakeButton(VSSetupAddonWidget::VSSetupAddonWidget_GlobalBP, mButtonListener, theVSSetupMenu, "[VS_UI_GLOBAL_BP_CLOSED]");
-    mGlobalBpButton->Resize(VS_ADDON_BUTTON_X, 360, 175, 50);
+    mGlobalBpButton->Resize(VS_ADDON_BUTTON_X, 280, 175, 50);
     mBoard->AddWidget(mGlobalBpButton);
 
     mExtraPacketMode = mApp->mPlayerInfo->mVSExtraPacketMode;
-    mExtendedSeedsMode = mApp->mPlayerInfo->mVSExtendedSeedsMode;
+    mExtendedSeedsMode = !Challenge::msVSClassicMode;
     mBanMode = mApp->mPlayerInfo->mVSBanMode;
-    mBalancePatchMode = mApp->mPlayerInfo->mVSBalancePatchMode;
+    mBalancePatchMode = !Challenge::msVSClassicMode;
+    if (!mExtendedSeedsMode) {
+        ResetGlobalBpState();
+    }
     mPlantAIMode = mApp->mPlayerInfo->mVSPlantAIMode;
     mZombieAIMode = mApp->mPlayerInfo->mVSZombieAIMode;
     mAIEnhancementMode = mApp->mPlayerInfo->mVSAIEnhancementMode;
@@ -72,24 +75,18 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     msTimedDraftMode = mTimedDraftMode;
 
     mExtraPacketCheckbox = MakeNewCheckbox(VSSetupAddonWidget_ExtraPacket, this, theVSSetupMenu, mExtraPacketMode);
-    mExtendedSeedsCheckbox = MakeNewCheckbox(VSSetupAddonWidget_ExtendedSeeds, this, theVSSetupMenu, mExtendedSeedsMode);
     mBanModeCheckbox = MakeNewCheckbox(VSSetupAddonWidget_BanMode, this, theVSSetupMenu, mBanMode);
-    mBalancePatchCheckbox = MakeNewCheckbox(VSSetupAddonWidget_BalancePatch, this, theVSSetupMenu, mBalancePatchMode);
     mAISettingsButton = MakeButton(VSSetupAddonWidget_AISettings, mButtonListener, theVSSetupMenu, "[VS_UI_AI_SETTINGS]");
     mAISettingsButton->mDrawStoneButton = true;
     mTimedDraftCheckbox = MakeNewCheckbox(VSSetupAddonWidget_TimedDraft, this, theVSSetupMenu, mTimedDraftMode);
 
     mBoard->AddWidget(mExtraPacketCheckbox);
-    mBoard->AddWidget(mExtendedSeedsCheckbox);
     mBoard->AddWidget(mBanModeCheckbox);
-    mBoard->AddWidget(mBalancePatchCheckbox);
     mBoard->AddWidget(mAISettingsButton);
     mBoard->AddWidget(mTimedDraftCheckbox);
 
     mExtraPacketCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_EXTRA_PACKET_Y, 175, 50);
-    mExtendedSeedsCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_EXTENDED_SEEDS_Y, 175, 50);
     mBanModeCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_BAN_MODE_Y, 175, 50);
-    mBalancePatchCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_BALANCE_PATCH_Y, 175, 50);
     mAISettingsButton->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_AI_SETTINGS_Y, 175, 50);
     mTimedDraftCheckbox->Resize(VS_ADDON_BUTTON_X, VS_BUTTON_AI_SETTINGS_Y, 175, 50);
 
@@ -103,9 +100,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
 
     if (Challenge::msVSShuffleMode) {
         SetDisable(mExtraPacketCheckbox);
-        SetDisable(mExtendedSeedsCheckbox);
         SetDisable(mBanModeCheckbox);
-        SetDisable(mBalancePatchCheckbox);
         SetDisable(mAISettingsButton);
         SetDisable(mTimedDraftCheckbox);
         SetDisable(mGlobalBpButton);
@@ -114,7 +109,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
 
     if (gIsReplayMode) {
         // 回放仅展示选项状态，不允许玩家操作扩展控件。
-        Widget *aControls[] = {mGlobalBpButton, mExtraPacketCheckbox, mExtendedSeedsCheckbox, mBanModeCheckbox, mBalancePatchCheckbox, mAISettingsButton};
+        Widget *aControls[] = {mGlobalBpButton, mExtraPacketCheckbox, mBanModeCheckbox, mAISettingsButton};
         for (Widget *aControl : aControls) {
             aControl->mDisabled = true;
         }
@@ -130,14 +125,8 @@ VSSetupAddonWidget::~VSSetupAddonWidget() {
         if (mExtraPacketCheckbox) {
             mBoard->RemoveWidget(mExtraPacketCheckbox);
         }
-        if (mExtendedSeedsCheckbox) {
-            mBoard->RemoveWidget(mExtendedSeedsCheckbox);
-        }
         if (mBanModeCheckbox) {
             mBoard->RemoveWidget(mBanModeCheckbox);
-        }
-        if (mBalancePatchCheckbox) {
-            mBoard->RemoveWidget(mBalancePatchCheckbox);
         }
         if (mAISettingsButton) {
             mBoard->RemoveWidget(mAISettingsButton);
@@ -152,9 +141,7 @@ VSSetupAddonWidget::~VSSetupAddonWidget() {
 
     delete mBackButton;
     delete mExtraPacketCheckbox;
-    delete mExtendedSeedsCheckbox;
     delete mBanModeCheckbox;
-    delete mBalancePatchCheckbox;
     delete mAISettingsButton;
     delete mTimedDraftCheckbox;
     delete mGlobalBpButton;
@@ -271,12 +258,8 @@ bool VSSetupAddonWidget::GetAddonMode(int theId) const {
     switch (theId) {
         case VSSetupAddonWidget_ExtraPacket:
             return mExtraPacketMode;
-        case VSSetupAddonWidget_ExtendedSeeds:
-            return mExtendedSeedsMode;
         case VSSetupAddonWidget_BanMode:
             return mBanMode;
-        case VSSetupAddonWidget_BalancePatch:
-            return mBalancePatchMode;
         case VSSetupAddonWidget_PlantAI:
             return mPlantAIMode;
         case VSSetupAddonWidget_ZombieAI:
@@ -305,18 +288,6 @@ void VSSetupAddonWidget::SetAddonMode(int theId, bool checked, bool saveDetails)
                 mApp->mPlayerInfo->mVSExtraPacketMode = mExtraPacketMode;
             }
             break;
-        case VSSetupAddonWidget_ExtendedSeeds:
-            mExtendedSeedsMode = checked;
-            mExtendedSeedsCheckbox->SetChecked(mExtendedSeedsMode, false);
-            msExtendedSeedsMode = mExtendedSeedsMode;
-            if (saveDetails) {
-                mApp->mPlayerInfo->mVSExtendedSeedsMode = mExtendedSeedsMode;
-            }
-            if (!mExtendedSeedsMode) {
-                msGlobalBpMode = GlobalBpMode::GLOBALBP_CLOSED;
-            }
-            UpdateGlobalBpButtonState();
-            break;
         case VSSetupAddonWidget_BanMode:
             mBanMode = checked;
             mBanModeCheckbox->SetChecked(mBanMode, false);
@@ -327,14 +298,6 @@ void VSSetupAddonWidget::SetAddonMode(int theId, bool checked, bool saveDetails)
                 msGlobalBpMode = GlobalBpMode::GLOBALBP_CLOSED;
             }
             UpdateGlobalBpButtonState();
-            break;
-        case VSSetupAddonWidget_BalancePatch:
-            mBalancePatchMode = checked;
-            mBalancePatchCheckbox->SetChecked(mBalancePatchMode, false);
-            msBalancePatchMode = mBalancePatchMode;
-            if (saveDetails) {
-                mApp->mPlayerInfo->mVSBalancePatchMode = mBalancePatchMode;
-            }
             break;
         case VSSetupAddonWidget_PlantAI:
             mPlantAIMode = checked;
@@ -400,10 +363,6 @@ void VSSetupAddonWidget::Draw(Graphics *g) const {
         g->SetColor(mExtraPacketMode ? Color(255, 255, 153) : Color(0, 205, 0, 255));
         g->DrawString(TodStringTranslate("[VS_UI_EXTRA_SLOTS]"), VS_ADDON_BUTTON_X + 40, VS_BUTTON_EXTRA_PACKET_Y + 25);
     }
-    if (mExtendedSeedsCheckbox->mVisible) {
-        g->SetColor(mExtendedSeedsMode ? Color(255, 255, 153) : Color(0, 205, 0, 255));
-        g->DrawString(TodStringTranslate("[VS_UI_EXTRA_SEEDS]"), VS_ADDON_BUTTON_X + 40, VS_BUTTON_EXTENDED_SEEDS_Y + 25);
-    }
     if (mBanModeCheckbox->mVisible) {
         g->SetColor(mBanMode ? Color(255, 255, 153) : Color(0, 205, 0, 255));
         g->DrawString(TodStringTranslate("[VS_UI_BAN_MODE]"), VS_ADDON_BUTTON_X + 40, VS_BUTTON_BAN_MODE_Y + 25);
@@ -411,10 +370,6 @@ void VSSetupAddonWidget::Draw(Graphics *g) const {
             g->SetColor(Color(205, 0, 0, 255));
             g->DrawString(TodStringTranslate("[VS_UI_BAN_PHASE_BIG]"), 200, 45);
         }
-    }
-    if (mBalancePatchCheckbox->mVisible) {
-        g->SetColor(mBalancePatchMode ? Color(255, 255, 153) : Color(0, 205, 0, 255));
-        g->DrawString(TodStringTranslate("[VS_UI_BALANCE_PATCH]"), VS_ADDON_BUTTON_X + 40, VS_BUTTON_BALANCE_PATCH_Y + 25);
     }
     if (mTimedDraftCheckbox->mVisible) {
         const Color labelColor = mTimedDraftMode ? Color(255, 255, 153) : Color(0, 205, 0, 255);

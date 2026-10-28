@@ -67,6 +67,7 @@ struct BeghouledBoardState {
 class Challenge : public SyncObject {
 public:
     static inline bool msVSShuffleMode = false; // 对战刷牌模式
+    static inline bool msVSClassicMode = false; // 对战经典模式
     static int &gVSResourseDropMode;            // 常为0
     static int &gVSResourceDropCount;           // 常为4
     static int &gVSWinMode;
