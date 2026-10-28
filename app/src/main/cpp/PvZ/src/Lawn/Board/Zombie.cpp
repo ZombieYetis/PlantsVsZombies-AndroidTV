@@ -4947,7 +4947,7 @@ void Zombie::PlayDeathAnim(unsigned int theDamageFlags) {
     }
 
     if (TestBit(theDamageFlags, (int)DamageFlags::DAMAGE_DOESNT_LEAVE_BODY)) {
-        if (mZombieType != ZombieType::ZOMBIE_BOSS && !IsGargantuar()) {
+        if (mZombieType != ZombieType::ZOMBIE_BOSS && mZombieType != ZombieType::ZOMBIE_SKELETON && !IsGargantuar()) {
             DieNoLoot();
             return;
         }
