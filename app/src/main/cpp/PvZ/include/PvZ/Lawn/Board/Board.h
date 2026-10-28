@@ -797,6 +797,7 @@ public:
     void ShuffleButtonDown(SeedPacket *theSeedPacket);
     bool CanAddGraveStoneAt(int theGridX, int theGridY);
     bool CanGraveDiggerPlaceGraveAt(int theGridX, int theGridY);
+    GridItem *AddSkeletonPile(Zombie *theZombie, float thePosX, float thePosY);
     void DrawLevel(Sexy::Graphics *g);
     bool CanAddBobSledMP();
     GridItem *AddMPTarget(int theGridX, int theGridY);

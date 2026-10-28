@@ -123,6 +123,7 @@ ZombieDefinition gExtendedZombieDefs[] = {
     {ZOMBIE_CROSSING_GUARD, REANIM_ZOMBIE_CROSSING_GUARD, 4, 36, 10, 1000, "CROSSING_GUARD_ZOMBIE"},
     {ZOMBIE_SCIENTIST, REANIM_ZOMBIE_SCIENTIST, 2, 33, 10, 2000, "SCIENTIST_ZOMBIE"},
     {ZOMBIE_GRAVEDIGGER, REANIM_ZOMBIE_GRAVEDIGGER, 4, 43, 10, 1000, "GRAVEDIGGER_ZOMBIE"},
+    {ZOMBIE_SKELETON, REANIM_ZOMBIE_SKELETON, 1, 1, 1, 4000, "SKELETON_ZOMBIE"},
 };
 
 static constexpr ZombieType gBossZombieList[] = {
@@ -416,6 +417,12 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
             StartWalkAnim(0);
             break;
 
+        case ZombieType::ZOMBIE_SKELETON:
+            mBodyHealth = 190;
+            mZombieAttackRect = Rect(20, 0, 50, 115);
+            SetSkeletonVariant(IsOnBoard() && Rand(1000) == 0);
+            break;
+
         case ZombieType::ZOMBIE_SCIENTIST:
             mBodyHealth = 500;
             mVariant = false;
@@ -686,6 +693,22 @@ void Zombie::UpdateActions() {
     }
 }
 
+void Zombie::SetSkeletonVariant(bool theColorful) {
+    if (mZombieType != ZombieType::ZOMBIE_SKELETON) {
+        return;
+    }
+    mVariant = theColorful;
+    const ReanimationType aType = theColorful ? ReanimationType::REANIM_ZOMBIE_SKELETON_COLORFUL : ReanimationType::REANIM_ZOMBIE_SKELETON;
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    if (aBodyReanim == nullptr || aBodyReanim->mReanimationType != aType) {
+        if (aBodyReanim != nullptr) {
+            aBodyReanim->ReanimationDie();
+        }
+        LoadReanim(aType);
+    }
+    ReanimShowPrefix("anim_cone", RENDER_GROUP_HIDDEN);
+}
+
 bool Zombie::HasGraveDiggerUsedCell(int theGridX) const {
     if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X) {
         return true;
@@ -823,8 +846,7 @@ void Zombie::ApplyGraveDiggerDig() {
         if (aGrave == nullptr || aGrave->mDead) {
             return;
         }
-        // 骷髅僵尸尚未实装，暂时使用普僵。
-        Zombie *aZombie = mBoard->AddZombieInRow(ZombieType::ZOMBIE_NORMAL, aRow, mFromWave, false);
+        Zombie *aZombie = mBoard->AddZombieInRow(ZombieType::ZOMBIE_SKELETON, aRow, mFromWave, false);
         if (aZombie == nullptr) {
             return;
         }
@@ -2325,7 +2347,8 @@ bool Zombie::CanRevived() const {
     return mZombieType != ZombieType::ZOMBIE_DANCER && mZombieType != ZombieType::ZOMBIE_SNORKEL && mZombieType != ZombieType::ZOMBIE_ZAMBONI && mZombieType != ZombieType::ZOMBIE_BOBSLED
         && mZombieType != ZombieType::ZOMBIE_DOLPHIN_RIDER && mZombieType != ZombieType::ZOMBIE_BALLOON && mZombieType != ZombieType::ZOMBIE_DIGGER && mZombieType != ZombieType::ZOMBIE_POGO
         && mZombieType != ZombieType::ZOMBIE_BUNGEE && mZombieType != ZombieType::ZOMBIE_CATAPULT && !IsGargantuar() && mZombieType != ZombieType::ZOMBIE_BOSS
-        && mZombieType != ZombieType::ZOMBIE_JACKSON && mZombieType != ZombieType::ZOMBIE_DOGWALKER && mZombieType != ZombieType::ZOMBIE_DOG && !IsZomblob(mZombieType);
+        && mZombieType != ZombieType::ZOMBIE_JACKSON && mZombieType != ZombieType::ZOMBIE_DOGWALKER && mZombieType != ZombieType::ZOMBIE_DOG && mZombieType != ZombieType::ZOMBIE_SKELETON
+        && !IsZomblob(mZombieType);
 }
 
 ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol) {
@@ -5117,6 +5140,17 @@ void Zombie::UpdateDeath() {
         return;
     }
 
+    if (mZombieType == ZombieType::ZOMBIE_SKELETON) {
+        // 客户端保持死亡末帧，等待主机生成骨堆并删除旧僵尸。
+        if (aBodyReanim->mLoopCount > 0 && !IsRemoteClientOrViewer()) {
+            if (IsOnBoard()) {
+                mBoard->AddSkeletonPile(this, mPosX, mPosY);
+            }
+            DieNoLoot();
+        }
+        return;
+    }
+
     if (mZombieHeight == ZombieHeight::HEIGHT_FALLING) {
         UpdateZombieFalling();
     }
@@ -7256,7 +7290,7 @@ void Zombie::DrawReanim(Sexy::Graphics *g, ZombieDrawPosition &theDrawPos, int t
 bool Zombie::CanLoseBodyParts() {
     return mZombieType != ZombieType::ZOMBIE_ZAMBONI && mZombieType != ZombieType::ZOMBIE_BUNGEE && mZombieType != ZombieType::ZOMBIE_CATAPULT && !IsGargantuar()
         && mZombieType != ZombieType::ZOMBIE_BOSS && mZombieHeight != ZombieHeight::HEIGHT_ZOMBIQUARIUM && !IsFlying() && !IsBobsledTeamWithSled() && !IsZomblob(mZombieType)
-        && mZombieType != ZombieType::ZOMBIE_DOG;
+        && mZombieType != ZombieType::ZOMBIE_DOG && mZombieType != ZombieType::ZOMBIE_SKELETON;
 }
 
 void Zombie::SetupReanimForLostHead() {
@@ -9102,6 +9136,12 @@ float Zombie::ZombieTargetLeadX(float theTime) {
 void Zombie::ApplyBurn() {
     if (mDead || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED)
         return;
+
+//    if (mZombieType == ZombieType::ZOMBIE_SKELETON) {
+//        SettleSunBeanSun();
+//        DieWithLoot();
+//        return;
+//    }
 
     if (mBodyHealth >= 1800 || mZombieType == ZombieType::ZOMBIE_BOSS) {
         TakeDamage(1800, 18U);

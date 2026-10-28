@@ -250,6 +250,9 @@ Sexy::MemoryImage *ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieTy
             }
             Reanimation aReanim;
             aReanim.ReanimationInitializeType(aPosX, aPosY, aZombieDef.mReanimationType);
+            if (theZombieType == ZombieType::ZOMBIE_SKELETON) {
+                aReanim.AssignRenderGroupToPrefix("anim_cone", RENDER_GROUP_HIDDEN);
+            }
             aReanim.PlayReanim("anim_idle", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
             aReanim.Update();
             aReanim.Draw(&aMemoryGraphics);

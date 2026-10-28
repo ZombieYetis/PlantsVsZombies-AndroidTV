@@ -898,6 +898,7 @@ void Board::DrawDebugObjectRects(Sexy::Graphics *g) {
                 switch (aGridItem->mGridItemType) {
                     case GRIDITEM_MP_TARGET_ZOMBIE:
                     case GRIDITEM_MP_BURIAL_MOUND:
+                    case GRIDITEM_SKELETON:
                     case GRIDITEM_GRAVESTONE: {
                         g->SetColor(Color{0, 255, 0});
                         g->DrawRect(aGridItem->GetDebugDrawRect());
@@ -3523,6 +3524,36 @@ void Board::processServerEvent(const BaseEvent *event) {
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, eventApply->data, clientZombieID)) {
                 mZombies.DataArrayGet(clientZombieID)->ApplyTrafficCone();
+            }
+        } break;
+        case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_ADD: {
+            const auto *aAdd = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aAdd->data1, aZombieID)) {
+                if (Zombie *aZombie = mZombies.DataArrayGet(aZombieID)) {
+                    GridItem *aPile = AddSkeletonPile(aZombie, aAdd->data4.f32, aAdd->data5.f32);
+                    serverGridItemIDMap[aAdd->data2] = uint16_t(mGridItems.DataArrayGetID(aPile));
+                }
+            }
+        } break;
+        case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_REBIRTH: {
+            const auto *aRebirth = static_cast<const U16_Event *>(event);
+            uint16_t aGridItemID = 0;
+            if (homura::FindInMap(serverGridItemIDMap, aRebirth->data, aGridItemID)) {
+                if (GridItem *aPile = mGridItems.DataArrayGet(aGridItemID)) {
+                    aPile->StartSkeletonRebirth();
+                }
+            }
+        } break;
+        case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_SPAWN: {
+            const auto *aSpawn = static_cast<const U16U16_Event *>(event);
+            uint16_t aGridItemID = 0, aZombieID = 0;
+            if (homura::FindInMap(serverGridItemIDMap, aSpawn->data1, aGridItemID) && homura::FindInMap(serverZombieIDMap, aSpawn->data2, aZombieID)) {
+                GridItem *aPile = mGridItems.DataArrayGet(aGridItemID);
+                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
+                if (aPile != nullptr && aZombie != nullptr) {
+                    aPile->RestoreSkeleton(aZombie);
+                }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE: {
@@ -8381,6 +8412,11 @@ int Board::KillAllZombiesInRadius_Custom(int theRow, int theX, int theY, int the
     int aGridY = PixelToGridYKeepOnBoard(theX, theY);
     GridItem *aGridItem = nullptr;
     while (IterateGridItems(aGridItem)) {
+        if (aGridItem->IsSkeletonPile()
+            && (aGridItem->mSummonIndex != 0) == TestBit(theDamageRangeFlags, DamageRangeFlags::DAMAGES_ONLY_MINDCONTROLLED)
+            && abs(aGridItem->mGridY - theRow) <= theRowRange && GetCircleRectOverlap(theX, theY, theRadius, aGridItem->GetItemRect())) {
+            aGridItem->TakeDamage(1800, 18U);
+        }
         if (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER || (theDamageRangeFlags == 127 && aGridItem->mGridItemType == GridItemType::GRIDITEM_POLE)) {
             if (GridInRange(aGridItem->mGridX, aGridItem->mGridY, aGridX, aGridY, theRowRange, theRowRange)) {
                 aGridItem->GridItemDie();
@@ -8570,6 +8606,46 @@ GridItem *Board::PlaceRake_Origin(int theGridX, int theGridY) {
     aRake->mGridItemReanimID = mApp->ReanimationGetID(aReanim);
     aRake->mGridItemState = GridItemState::GRIDITEM_STATE_RAKE_ATTRACTING;
     return aRake;
+}
+
+GridItem *Board::AddSkeletonPile(Zombie *theZombie, float thePosX, float thePosY) {
+    GridItem *aPile = mGridItems.DataArrayAlloc();
+    aPile->mGridItemType = GridItemType::GRIDITEM_SKELETON;
+    aPile->mGridItemState = GridItemState::GRIDITEM_STATE_SKELETON_WAITING;
+    aPile->mPosX = thePosX;
+    aPile->mPosY = thePosY;
+    aPile->mGridX = PixelToGridXKeepOnBoard(int(thePosX + 40.0f), int(thePosY));
+    aPile->mGridY = theZombie->mRow;
+    aPile->mRenderOrder = theZombie->mRenderOrder;
+    aPile->mVSGraveStoneHealth = 190;
+    aPile->mGridItemCounter = 700;
+    aPile->mZombieType = ZombieType::ZOMBIE_SKELETON;
+    // 骨堆复用闲置字段保存阵营、波次、皮肤、缩放和高度。
+    aPile->mSummonIndex = int(theZombie->mMindControlled);
+    aPile->mSummonCounter = theZombie->mFromWave;
+    aPile->mIsSpecialGrave = theZombie->mVariant;
+    aPile->mGoalX = theZombie->mScaleZombie;
+    aPile->mGoalY = theZombie->mAltitude;
+    const float aScale = aPile->mGoalX;
+    Reanimation *aReanim = mApp->AddReanimation(0.0f, 0.0f, aPile->mRenderOrder,
+        aPile->mIsSpecialGrave ? ReanimationType::REANIM_ZOMBIE_SKELETON_COLORFUL : ReanimationType::REANIM_ZOMBIE_SKELETON);
+    aReanim->mIsAttachment = true;
+    aReanim->OverrideScale(aPile->mSummonIndex ? -aScale : aScale, aScale);
+    aReanim->SetPosition(thePosX + 45.0f - 30.0f * aScale + (aPile->mSummonIndex ? 90.0f * aScale : 0.0f), thePosY - aPile->mGoalY + 112.0f - 120.0f * aScale);
+    aReanim->PlayReanim("anim_death", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 0.0f);
+    aReanim->mAnimTime = 1.0f;
+    aReanim->AssignRenderGroupToPrefix("anim_cone", RENDER_GROUP_HIDDEN);
+    aPile->mGridItemReanimID = mApp->ReanimationGetID(aReanim);
+    if (IsRemoteServer()) {
+        U16U16U16UNI32UNI32_Event event{};
+        event.type = EventType::EVENT_SERVER_BOARD_GRIDITEM_SKELETON_ADD;
+        event.data1 = uint16_t(ZombieGetID(theZombie));
+        event.data2 = uint16_t(mGridItems.DataArrayGetID(aPile));
+        event.data4.f32 = thePosX;
+        event.data5.f32 = thePosY;
+        netplay::PutEvent(event);
+    }
+    return aPile;
 }
 
 GridItem *Board::AddAGraveStone(int theGridX, int theGridY) {

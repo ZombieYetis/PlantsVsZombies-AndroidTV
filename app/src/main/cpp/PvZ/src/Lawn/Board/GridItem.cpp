@@ -141,6 +141,12 @@ void GridItem::GridItemDie() {
 }
 
 void GridItem::DrawGridItem(Graphics *g) {
+    if (IsSkeletonPile()) {
+        if (Reanimation *aReanim = mApp->ReanimationTryToGet(mGridItemReanimID)) {
+            aReanim->Draw(g);
+        }
+        return;
+    }
     if (mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
         DrawBurialMound(g);
         return;
@@ -339,6 +345,11 @@ void GridItem::Update() {
         return;
     }
 
+    if (IsSkeletonPile()) {
+        UpdateSkeletonPile();
+        return;
+    }
+
     old_GridItem_Update(this);
 
     //    if (mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
@@ -357,6 +368,85 @@ void GridItem::Update() {
     //            }
     //        }
     //    }
+}
+
+bool GridItem::IsPlantAttackTarget() const {
+    // 缓存目标也会调用这里，不能只依赖遍历时过滤死亡对象。
+    if (mDead) {
+        return false;
+    }
+    if (IsSkeletonPile()) {
+        return mVSGraveStoneHealth > 0 && mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_WAITING && mSummonIndex == 0;
+    }
+    return mApp->IsVSMode() && (mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND
+        || (mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && mVSTargetZombieHealth > 0));
+}
+
+void GridItem::StartSkeletonRebirth() {
+    if (!IsSkeletonPile() || mDead || mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
+        return;
+    }
+    mGridItemState = GridItemState::GRIDITEM_STATE_SKELETON_REBIRTHING;
+    if (Reanimation *aReanim = mApp->ReanimationTryToGet(mGridItemReanimID)) {
+        aReanim->PlayReanim("anim_rebirth", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 20.0f);
+    }
+    if (IsRemoteServer()) {
+        U16_Event event = {{EventType::EVENT_SERVER_BOARD_GRIDITEM_SKELETON_REBIRTH}, uint16_t(mBoard->mGridItems.DataArrayGetID(this))};
+        netplay::PutEvent(event);
+    }
+}
+
+void GridItem::RestoreSkeleton(Zombie *theZombie) {
+    theZombie->mMindControlled = mSummonIndex != 0;
+    theZombie->SetSkeletonVariant(mIsSpecialGrave);
+    theZombie->mPosX = mPosX;
+    theZombie->mPosY = mPosY;
+    theZombie->mX = int(mPosX);
+    theZombie->mY = int(mPosY);
+    theZombie->mScaleZombie = mGoalX;
+    theZombie->mAltitude = mGoalY;
+    theZombie->mOnHighGround = mGoalY > 0.0f;
+    theZombie->mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
+    theZombie->StartWalkAnim(0);
+}
+
+void GridItem::UpdateSkeletonPile() {
+    if (mApp->mGameScene != GameScenes::SCENE_PLAYING) {
+        return;
+    }
+    Reanimation *aReanim = mApp->ReanimationTryToGet(mGridItemReanimID);
+    if (aReanim == nullptr) {
+        return;
+    }
+    aReanim->Update();
+    if (mGraveJustGotShotCounter > 0) {
+        --mGraveJustGotShotCounter;
+    }
+    aReanim->mEnableExtraAdditiveDraw = mGraveJustGotShotCounter > 0;
+    aReanim->mExtraAdditiveColor = Color(255, 255, 255, 255);
+    // 客户端更新动画和受击闪光，计时及重生结果由主机决定。
+    if (IsRemoteClientOrViewer()) {
+        return;
+    }
+    if (mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
+        if (mGridItemCounter > 0) {
+            --mGridItemCounter;
+        }
+        if (mGridItemCounter == 0) {
+            StartSkeletonRebirth();
+        }
+    } else if (mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_REBIRTHING && aReanim->mLoopCount > 0) {
+        Zombie *aZombie = mBoard->AddZombieInRow(ZombieType::ZOMBIE_SKELETON, mGridY, mSummonCounter, false);
+        if (aZombie == nullptr) {
+            return;
+        }
+        RestoreSkeleton(aZombie);
+        if (IsRemoteServer()) {
+            U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_GRIDITEM_SKELETON_SPAWN}, uint16_t(mBoard->mGridItems.DataArrayGetID(this)), uint16_t(mBoard->ZombieGetID(aZombie))};
+            netplay::PutEvent(event);
+        }
+        GridItemDie();
+    }
 }
 
 void GridItem::UpdateMPGraveStone() {
@@ -877,6 +967,10 @@ void GridItem::DrawMPTarget(Graphics *g) {
 }
 
 Rect GridItem::GetItemRect() const {
+    if (IsSkeletonPile()) {
+        const int aOffsetX = mSummonIndex ? -13 : 30;
+        return {int(mPosX) + aOffsetX, int(mPosY - mGoalY) + 45, 103, 85};
+    }
     if (mGridItemType == GRIDITEM_POLE) {
         return {int(mPosX), int(mPosY), 30, 160};
     }
@@ -901,7 +995,7 @@ Rect GridItem::GetDebugDrawRect() const {
 }
 
 void GridItem::TakeDamage(int theDamage, unsigned int theDamageFlags) {
-    if (!mApp->IsVSMode()) {
+    if (!mApp->IsVSMode() && !IsSkeletonPile()) {
         return;
     }
 
@@ -922,6 +1016,18 @@ void GridItem::TakeDamage(int theDamage, unsigned int theDamageFlags) {
 }
 
 void GridItem::TakeDamage_Origin(int theDamage, unsigned int theDamageFlags) {
+    if (IsSkeletonPile()) {
+        if (mDead || mVSGraveStoneHealth <= 0) {
+            return;
+        }
+        mVSGraveStoneHealth -= theDamage;
+        if (mVSGraveStoneHealth <= 0) {
+            GridItemDie();
+        } else {
+            mGraveJustGotShotCounter = 25;
+        }
+        return;
+    }
     if (mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
         if (mDead || mVSTargetZombieHealth <= 0) {
             return;

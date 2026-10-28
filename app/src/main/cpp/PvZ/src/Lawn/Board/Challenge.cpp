@@ -877,6 +877,8 @@ ZombieType Challenge::IZombieSeedTypeToZombieType(SeedType theSeedType) {
             return ZOMBIE_SCIENTIST;
         case SEED_ZOMBIE_GRAVEDIGGER:
             return ZOMBIE_GRAVEDIGGER;
+        case SEED_ZOMBIE_SKELETON:
+            return ZOMBIE_SKELETON;
         default:
             return ZOMBIE_INVALID;
     }

@@ -451,6 +451,7 @@ public:
     void UnbindRealatedZombie();
     void LaunchTrafficCone(Zombie *theTarget);
     void UpdateZombieGraveDigger();
+    void SetSkeletonVariant(bool theColorful);
     bool FindGraveDiggerTarget(int &theGridX, int &theGridY);
     bool HasGraveDiggerUsedCell(int theGridX) const;
     void MarkGraveDiggerCellUsed(int theGridX);

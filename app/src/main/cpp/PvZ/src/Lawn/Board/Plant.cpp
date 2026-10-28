@@ -1469,7 +1469,7 @@ void Plant::DoSpecial_Origin() {
             mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
             mApp->PlaySample(SOUND_BOWLINGIMPACT2);
 
-            mBoard->KillAllZombiesInRadius(mRow, aPosX, aPosY, 90, 1, true, aDamageRangeFlags | 32U);
+            mBoard->KillAllZombiesInRadius_Custom(mRow, aPosX, aPosY, 90, 1, true, aDamageRangeFlags | 32U);
 
             mApp->AddTodParticle(aPosX, aPosY, int(RenderLayer::RENDER_LAYER_TOP), ParticleEffect::PARTICLE_POWIE);
             mBoard->ShakeBoard(3, -4);
@@ -1755,7 +1755,10 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags) {
             if (!aGridItem) {
                 aGridItem = mBoard->GetGridItemAt(GridItemType::GRIDITEM_MP_TARGET_ZOMBIE, aGridX, mRow);
             }
-            if (aGridItem) {
+            if (!aGridItem) {
+                aGridItem = mBoard->GetGridItemAt(GridItemType::GRIDITEM_SKELETON, aGridX, mRow);
+            }
+            if (aGridItem && aGridItem->IsPlantAttackTarget()) {
                 aGridItem->TakeDamage(theDamage, theDamageFlags);
                 return;
             }
@@ -1765,6 +1768,9 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags) {
 
     GridItem *aGridItem = nullptr;
     while (mBoard->IterateGridItems(aGridItem)) {
+        if (!aGridItem->IsPlantAttackTarget()) {
+            continue;
+        }
         int aDiffY = aGridItem->mGridY - mRow;
         if (mSeedType == SeedType::SEED_GLOOMSHROOM) {
             if (aDiffY < -1 || aDiffY > 1) {
@@ -2026,11 +2032,14 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
             AddBoomerangTarget(float(aZombie->mX), mBoard->ZombieGetID(aZombie), GridItemID::GRIDITEMID_NULL);
         }
 
-        if (mApp->IsVSMode()) {
+        {
             bool aHasGravestoneInRow = false;
             GridItem *aGridItem = nullptr;
             while (mBoard->IterateGridItems(aGridItem)) {
-                if (aGridItem->mGridY == theRow && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND)) {
+                if (!aGridItem->IsPlantAttackTarget()) {
+                    continue;
+                }
+                if (aGridItem->mGridY == theRow && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile())) {
                     aHasGravestoneInRow = true;
                     break;
                 }
@@ -2042,6 +2051,9 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
 
             aGridItem = nullptr;
             while (mBoard->IterateGridItems(aGridItem)) {
+                if (!aGridItem->IsPlantAttackTarget()) {
+                    continue;
+                }
                 if (aGridItem->mGridY != theRow) {
                     continue;
                 }
@@ -2050,11 +2062,7 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
                     continue;
                 }
 
-                const bool aIsGravestone = aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND;
-                const bool aDamageableGridItem = aIsGravestone || (aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && aGridItem->mVSTargetZombieHealth > 0);
-                if (!aDamageableGridItem) {
-                    continue;
-                }
+                const bool aIsGravestone = aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile();
 
                 const Rect aGridItemRect = aGridItem->GetItemRect();
                 if (aGridItemRect.mX + aGridItemRect.mWidth <= aOriginX) {
@@ -2122,6 +2130,11 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
             if (theTargetZombie->mZombieType == ZombieType::ZOMBIE_BOSS) {
                 aRangeY = mBoard->GridToPixelY(8, mRow) - aOriginY;
             }
+        } else if (theTargetGridItem != nullptr && theTargetGridItem->IsSkeletonPile()) {
+            // 骨堆留在死亡位置，投手按实际碰撞框瞄准，不能套用格子左边界。
+            const Rect aPileRect = theTargetGridItem->GetItemRect();
+            aRangeX = aPileRect.mX + aPileRect.mWidth * 0.5f - aOriginX - 30.0f;
+            aRangeY = aPileRect.mY - aOriginY;
         } else if (theTargetGridItem) {
             aRangeX = mBoard->GridToPixelX(theTargetGridItem->mGridX, theTargetGridItem->mGridY) - aOriginX;
             // 为靶子僵尸添加半格距离，以匹配靶子僵尸的碰撞箱。水路除外，以修复西瓜投手无法命中靶子
@@ -2387,14 +2400,9 @@ bool Plant::FindStarFruitTarget() {
         }
     }
 
-    if (!mApp->IsVSMode()) {
-        return false;
-    }
-
     GridItem *aGridItem = nullptr;
     while (mBoard->IterateGridItems(aGridItem)) {
-        if (aGridItem->mGridItemType != GridItemType::GRIDITEM_GRAVESTONE && aGridItem->mGridItemType != GridItemType::GRIDITEM_MP_BURIAL_MOUND
-            && aGridItem->mGridItemType != GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
+        if (!aGridItem->IsPlantAttackTarget()) {
             continue;
         }
 
@@ -2416,7 +2424,7 @@ bool Plant::FindStarFruitTarget() {
 }
 
 GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
-    // 对战模式专用，植物索敌僵尸墓碑和靶子僵尸。
+    // 骨堆在所有模式均可被索敌，墓碑和靶子沿用对战模式限制。
     // 原版函数BUG：植物还会索敌梯子和毁灭菇弹坑，故重写以修复BUG。
 
     if (mSeedType == SEED_SPLITPEA && thePlantWeapon == WEAPON_SECONDARY) {
@@ -2424,12 +2432,23 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
         return nullptr;
     }
 
+    if (mSeedType == SeedType::SEED_CELERY_STALKER) {
+        GridItem *aGridItem = nullptr;
+        GridItem *aBestGridItem = nullptr;
+        while (mBoard->IterateGridItems(aGridItem)) {
+            // 潜伏芹菜只攻击本行身后的相邻一格。
+            if (!aGridItem->IsPlantAttackTarget() || aGridItem->mGridY != theRow || aGridItem->mGridX != mPlantCol - 1) {
+                continue;
+            }
+            if (aBestGridItem == nullptr || aGridItem->GetItemRect().mX > aBestGridItem->GetItemRect().mX) {
+                aBestGridItem = aGridItem;
+            }
+        }
+        return aBestGridItem;
+    }
+
     if (mSeedType == SeedType::SEED_BONK_CHOY) {
         static constexpr int kBonkChoyGridItemRange = 2;
-
-        if (!mApp->IsVSMode()) {
-            return nullptr;
-        }
 
         GridItem *aBestGridItem = nullptr;
         int aBestDistance = kBonkChoyGridItemRange + 1;
@@ -2437,14 +2456,14 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
 
         GridItem *aGridItem = nullptr;
         while (mBoard->IterateGridItems(aGridItem)) {
-            if (aGridItem->mDead || aGridItem->mGridY != theRow) {
+            if (!aGridItem->IsPlantAttackTarget() || aGridItem->mGridY != theRow) {
                 continue;
             }
 
             int aGridItemHealth = 0;
             if (aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
                 aGridItemHealth = aGridItem->mVSTargetZombieHealth;
-            } else if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
+            } else if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile()) {
                 aGridItemHealth = aGridItem->mVSGraveStoneHealth;
             } else {
                 continue;
@@ -2474,16 +2493,22 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
     GridItem *aBestGridItem = nullptr;
 
     GridItem *aGridItem = nullptr;
-    if (mApp->IsVSMode()) { // 如果是对战模式
+    {
         int aRow = mStartRow;
         while (mBoard->IterateGridItems(aGridItem)) { // 遍历场上的所有GridItem
             int aGridX = aGridItem->mGridX;
             int aGridY = aGridItem->mGridY;
             GridItemType aGridItemType = aGridItem->mGridItemType;
 
-            if (aGridItemType != GridItemType::GRIDITEM_GRAVESTONE && aGridItemType != GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && aGridItemType != GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
+            if (!aGridItem->IsPlantAttackTarget()) {
                 // 修复植物们攻击核坑和梯子
                 continue;
+            }
+            if (aGridItem->IsSkeletonPile() && mSeedType != SeedType::SEED_GLOOMSHROOM) {
+                const Rect aPileRect = aGridItem->GetItemRect();
+                if (aPileRect.mX + aPileRect.mWidth <= mX + 40) {
+                    continue;
+                }
             }
 
             if (mSeedType == SeedType::SEED_GLOOMSHROOM) {
@@ -2604,6 +2629,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_PEA_HEAD:
         case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_MOUND:
+        case SeedType::SEED_ZOMBIE_SKELETON:
             return 50;
         case SeedType::SEED_SQUASH:
         case SeedType::SEED_GARLIC:
@@ -3475,6 +3501,9 @@ void Plant::BurnRow(int theRow) {
 
     GridItem *aGridItem = nullptr;
     while (mBoard->IterateGridItems(aGridItem)) {
+        if (aGridItem->IsSkeletonPile() && aGridItem->mGridY == theRow && aGridItem->mSummonIndex == 0) {
+            aGridItem->TakeDamage(1800, 18U);
+        }
         if (aGridItem->mGridY == theRow && (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER || aGridItem->mGridItemType == GridItemType::GRIDITEM_POLE)) {
             aGridItem->GridItemDie();
         }
@@ -4067,6 +4096,112 @@ void Plant::SyncAnimationToClient() {
 }
 
 
+bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon)
+{
+    Zombie *aTargetZombie = FindTargetZombie(theRow, thePlantWeapon);
+    GridItem *aTargetGridItem = FindTargetGridItem(theRow, thePlantWeapon);
+    if (aTargetGridItem == nullptr && aTargetZombie == nullptr) {
+        return false;
+    }
+
+    if (mBlinkReanimID != ReanimationID::REANIMATIONID_NULL) {
+        mApp->RemoveReanimation(mBlinkReanimID);
+        mBlinkReanimID = ReanimationID::REANIMATIONID_NULL;
+        if (Reanimation *aReanim = mApp->ReanimationTryToGet(mBodyReanimID)) {
+            aReanim->AssignRenderGroupToPrefix("anim_eye", RENDER_GROUP_NORMAL);
+        }
+    }
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    Reanimation *aHeadReanim = mApp->ReanimationTryToGet(mHeadReanimID);
+    if (mSeedType == SEED_SPLITPEA && thePlantWeapon == WEAPON_SECONDARY)
+    {
+        Reanimation *aHeadReanim2 = mApp->ReanimationGet(mHeadReanimID2);
+        aHeadReanim2->StartBlend(20);
+        aHeadReanim2->mLoopType = REANIM_PLAY_ONCE_AND_HOLD;
+        aHeadReanim2->SetAnimRate(35.0f);
+        aHeadReanim2->SetFramesForLayer("anim_splitpea_shooting");
+        mShootingCounter = 26;
+    }
+    else if (aHeadReanim != nullptr && aHeadReanim->TrackExists("anim_shooting"))
+    {
+        aHeadReanim->StartBlend(20);
+        aHeadReanim->mLoopType = REANIM_PLAY_ONCE_AND_HOLD;
+        aHeadReanim->SetAnimRate(35.0f);
+        aHeadReanim->SetFramesForLayer("anim_shooting");
+        mShootingCounter = 35;
+
+        if (mSeedType == SEED_SPLITPEA || mSeedType == SEED_REPEATER || mSeedType == SEED_LEFTPEATER)
+        {
+            aHeadReanim->SetAnimRate(45.0f);
+            mShootingCounter = 26;
+        }
+        else if (mSeedType == SEED_GATLINGPEA)
+        {
+            aHeadReanim->SetAnimRate(38.0f);
+            mShootingCounter = 100;
+        }
+    }
+    else if (mState == STATE_CACTUS_HIGH)
+    {
+        PlayBodyReanim("anim_shootinghigh", REANIM_PLAY_ONCE_AND_HOLD, 20, 35.0f);
+        mShootingCounter = 23;
+    }
+    else if (mSeedType == SEED_GLOOMSHROOM)
+    {
+        PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 14.0f);
+        mShootingCounter = 200;
+    }
+    else if (mSeedType == SEED_CATTAIL)
+    {
+        PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 10, 30.0f);
+        mShootingCounter = 50;
+    }
+    else if (aBodyReanim != nullptr && aBodyReanim->TrackExists("anim_shooting"))
+    {
+        PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 35.0f);
+        switch (mSeedType)
+        {
+            case SEED_FUMESHROOM:
+                mShootingCounter = 50;
+                break;
+            case SEED_PUFFSHROOM:
+                mShootingCounter = 29;
+                break;
+            case SEED_SCAREDYSHROOM:
+                mShootingCounter = 25;
+                break;
+            case SEED_CABBAGEPULT:
+                mShootingCounter = 32;
+                break;
+            case SEED_MELONPULT:
+            case SEED_WINTERMELON:
+                mShootingCounter = 36;
+                break;
+            case SEED_KERNELPULT:
+                if (Rand(4) == 0)
+                {
+                    Reanimation *aButterReanim = mApp->ReanimationGet(mBodyReanimID);
+                    aButterReanim->AssignRenderGroupToPrefix("Cornpult_butter", 0);
+                    aButterReanim->AssignRenderGroupToPrefix("Cornpult_kernal", -1);
+                    mState = STATE_KERNELPULT_BUTTER;
+                }
+                mShootingCounter = 30;
+                break;
+            case SEED_CACTUS:
+                mShootingCounter = 35;
+                break;
+            default:
+                mShootingCounter = 29;
+                break;
+        }
+    }
+    else
+    {
+        Fire(aTargetZombie, theRow, thePlantWeapon, aTargetGridItem);
+    }
+    return true;
+}
+
 bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
     // 此函数用于在mLaunchCounter到0之后播放投手的投掷动画、豌豆的发射动画
     if (IsRemoteClientOrViewer()) {
@@ -4111,6 +4246,9 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
         result = true;
     } else {
         result = old_Plant_FindTargetAndFire(this, theRow, thePlantWeapon);
+        if (!result && !mApp->IsVSMode()) {
+            result = FindTargetAndFire_Origin(theRow, thePlantWeapon);
+        }
     }
 
     if (result) {
@@ -4519,6 +4657,57 @@ void Plant::UpdateIcebergLettuce() {
     }
 }
 
+void Plant::SetCeleryStalkerState(PlantState theState) {
+    Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
+    const char *aTrack = nullptr;
+    ReanimLoopType aLoop = ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD;
+    int aBlend = 20;
+    float aRate = 18.0f;
+    switch (theState) {
+        case PlantState::STATE_CELERY_STALKER_LOW:
+            aTrack = "anim_idlelow";
+            aLoop = ReanimLoopType::REANIM_LOOP;
+            aRate = 0.0f;
+            break;
+        case PlantState::STATE_CELERY_STALKER_HIGH:
+            aTrack = "anim_idle";
+            aLoop = ReanimLoopType::REANIM_LOOP;
+            aRate = 0.0f;
+            break;
+        case PlantState::STATE_CELERY_STALKER_RISING:
+            aTrack = "anim_rise";
+            aRate = aBodyReanim->mDefinition->mFPS;
+            break;
+        case PlantState::STATE_CELERY_STALKER_LOWERING:
+            aTrack = "anim_lower";
+            aRate = aBodyReanim->mDefinition->mFPS;
+            break;
+        case PlantState::STATE_CELERY_STALKER_PUNCHING:
+            aTrack = "anim_punch";
+            aBlend = 0;
+            break;
+        case PlantState::STATE_CELERY_STALKER_ATTACKING:
+            aTrack = "anim_attack";
+            aLoop = ReanimLoopType::REANIM_LOOP;
+            aBlend = 0;
+            break;
+        case PlantState::STATE_CELERY_STALKER_STOPPING:
+            aTrack = "anim_stop";
+            aBlend = 0;
+            break;
+        default:
+            return;
+    }
+    mState = theState;
+    PlayBodyReanim(aTrack, aLoop, aBlend, aRate);
+    if ((theState == PlantState::STATE_CELERY_STALKER_LOW || theState == PlantState::STATE_CELERY_STALKER_HIGH) && mApp->IsIZombieLevel()) {
+        aBodyReanim->mAnimRate = 0.0f;
+    }
+    if (theState == PlantState::STATE_CELERY_STALKER_RISING) {
+        mApp->PlayFoley(FoleyType::FOLEY_CELERY_STALKER_RISE);
+    }
+}
+
 void Plant::UpdateCeleryStalker() {
     static constexpr int kCeleryAttackDamage = 20;
     static constexpr int kCeleryHitInterval = 50;
@@ -4526,73 +4715,51 @@ void Plant::UpdateCeleryStalker() {
 
     Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
     Zombie *aZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
+    GridItem *aGridItem = aZombie == nullptr ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
+    const bool aHasTarget = aZombie != nullptr || aGridItem != nullptr;
 
     if (mState == PlantState::STATE_CELERY_STALKER_LOWERING) {
         if (aBodyReanim->mLoopCount > 0) {
-            mState = PlantState::STATE_CELERY_STALKER_LOW;
-            PlayBodyReanim("anim_idlelow", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
-            if (mApp->IsIZombieLevel()) {
-                aBodyReanim->mAnimRate = 0.0f;
-            }
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_LOW);
         }
         return;
     }
-
     if (mState == PlantState::STATE_CELERY_STALKER_LOW) {
-        if (aZombie != nullptr) {
-            mState = PlantState::STATE_CELERY_STALKER_RISING;
-            PlayBodyReanim("anim_rise", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, aBodyReanim->mDefinition->mFPS);
-            mApp->PlayFoley(FoleyType::FOLEY_CELERY_STALKER_RISE);
+        if (aHasTarget) {
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_RISING);
         }
         return;
     }
-
     if (mState == PlantState::STATE_CELERY_STALKER_RISING) {
         if (aBodyReanim->mLoopCount > 0) {
-            if (aZombie != nullptr) {
-                mState = PlantState::STATE_CELERY_STALKER_PUNCHING;
-                mLaunchCounter = 0;
-                mStateCountdown = 0;
-                PlayBodyReanim("anim_punch", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
-            } else {
-                mState = PlantState::STATE_CELERY_STALKER_HIGH;
-                mLaunchCounter = 0;
-                mStateCountdown = 0;
-                PlayBodyReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
-                if (mApp->IsIZombieLevel()) {
-                    aBodyReanim->mAnimRate = 0.0f;
-                }
-            }
-        }
-        return;
-    }
-
-    if (mState == PlantState::STATE_CELERY_STALKER_PUNCHING) {
-        if (aZombie == nullptr) {
-            mState = PlantState::STATE_CELERY_STALKER_STOPPING;
-            PlayBodyReanim("anim_stop", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
-            return;
-        }
-
-        if (aBodyReanim->mLoopCount > 0) {
-            mState = PlantState::STATE_CELERY_STALKER_ATTACKING;
             mLaunchCounter = 0;
-            PlayBodyReanim("anim_attack", ReanimLoopType::REANIM_LOOP, 0, 18.0f);
+            mStateCountdown = 0;
+            SetCeleryStalkerState(aHasTarget ? PlantState::STATE_CELERY_STALKER_PUNCHING : PlantState::STATE_CELERY_STALKER_HIGH);
         }
         return;
     }
-
+    if (mState == PlantState::STATE_CELERY_STALKER_PUNCHING) {
+        if (!aHasTarget) {
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_STOPPING);
+        } else if (aBodyReanim->mLoopCount > 0) {
+            mLaunchCounter = 0;
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_ATTACKING);
+        }
+        return;
+    }
     if (mState == PlantState::STATE_CELERY_STALKER_ATTACKING) {
-        if (aZombie == nullptr) {
-            mState = PlantState::STATE_CELERY_STALKER_STOPPING;
-            PlayBodyReanim("anim_stop", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
+        if (!aHasTarget) {
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_STOPPING);
             return;
         }
-
         if (mLaunchCounter <= 0) {
             unsigned int aDamageFlags = 0U;
             SetBit(aDamageFlags, int(DamageFlags::DAMAGE_BYPASSES_SHIELD), true);
-            aZombie->TakeDamage(kCeleryAttackDamage, aDamageFlags);
+            if (aZombie != nullptr) {
+                aZombie->TakeDamage(kCeleryAttackDamage, aDamageFlags);
+            } else {
+                aGridItem->TakeDamage(kCeleryAttackDamage, aDamageFlags);
+            }
             mApp->PlayFoley(FoleyType::FOLEY_CELERY_STALKER_ATTACK);
             mLaunchCounter = kCeleryHitInterval;
         } else {
@@ -4600,49 +4767,34 @@ void Plant::UpdateCeleryStalker() {
         }
         return;
     }
-
     if (mState == PlantState::STATE_CELERY_STALKER_STOPPING) {
         if (aBodyReanim->mLoopCount > 0) {
-            mState = PlantState::STATE_CELERY_STALKER_HIGH;
             mLaunchCounter = 0;
             mStateCountdown = kCeleryRetreatDelay;
-            PlayBodyReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
-            if (mApp->IsIZombieLevel()) {
-                aBodyReanim->mAnimRate = 0.0f;
-            }
+            SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_HIGH);
         }
         return;
     }
-
     if (mState == PlantState::STATE_CELERY_STALKER_HIGH) {
-        if (aZombie == nullptr) {
+        if (!aHasTarget) {
             if (mStateCountdown == 1) {
-                mState = PlantState::STATE_CELERY_STALKER_LOWERING;
-                PlayBodyReanim("anim_lower", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, aBodyReanim->mDefinition->mFPS);
+                SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_LOWERING);
             } else if (mStateCountdown <= 0) {
                 mStateCountdown = kCeleryRetreatDelay;
             }
             return;
         }
-
         mStateCountdown = 0;
-        mState = PlantState::STATE_CELERY_STALKER_PUNCHING;
         mLaunchCounter = 0;
-        PlayBodyReanim("anim_punch", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
+        SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_PUNCHING);
         return;
     }
-
-    if (aZombie != nullptr) {
-        mState = PlantState::STATE_CELERY_STALKER_HIGH;
+    if (aHasTarget) {
         mLaunchCounter = 0;
         mStateCountdown = 0;
-        PlayBodyReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 0.0f);
-        if (mApp->IsIZombieLevel()) {
-            aBodyReanim->mAnimRate = 0.0f;
-        }
+        SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_HIGH);
     } else {
-        mState = PlantState::STATE_CELERY_STALKER_LOWERING;
-        PlayBodyReanim("anim_lower", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, aBodyReanim->mDefinition->mFPS);
+        SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_LOWERING);
     }
 }
 

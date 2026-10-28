@@ -145,18 +145,12 @@ void ResetHitHistory(Projectile *theProjectile) {
 }
 
 bool IsAckeeGridTarget(const GridItem *theGridItem) {
-    if (theGridItem == nullptr || theGridItem->mDead) {
-        return false;
-    }
-
-    if (theGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
-        return theGridItem->mVSTargetZombieHealth > 0;
-    }
-    return theGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || theGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND;
+    return theGridItem != nullptr && theGridItem->IsPlantAttackTarget();
 }
 
 bool IsAckeeGraveTarget(const GridItem *theGridItem) {
-    return theGridItem != nullptr && (theGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || theGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND);
+    return theGridItem != nullptr && theGridItem->IsPlantAttackTarget()
+        && (theGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || theGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || theGridItem->IsSkeletonPile());
 }
 
 struct AckeeTarget {
@@ -186,7 +180,7 @@ AckeeTarget FindAckeeBounceTarget(Projectile *theProjectile, float theSourceTarg
         }
     }
 
-    if (theProjectile->mApp->IsVSMode() && theProjectile->mCobTargetRow == 0) {
+    if (theProjectile->mCobTargetRow == 0) {
         GridItem *aGridItem = nullptr;
         while (theProjectile->mBoard->IterateGridItems(aGridItem)) {
             if (aGridItem->mGridY != theSourceRow || !IsAckeeGridTarget(aGridItem) || HasHitGridItem(theProjectile, aGridItem)) {
@@ -760,8 +754,8 @@ void Projectile::UpdateBoomerang() {
         if (!(aZombie->mOnHighGround && CantHitHighGround())) {
             DoImpact(aZombie);
         }
-    } else if (mApp->IsVSMode()) {
-        // 对战模式下检测墓碑和靶子
+    } else {
+        // 检测骨堆，以及对战模式的墓碑和靶子。
         GridItem *aGridItem = FindCollisionTargetGridItem();
         if (aGridItem != nullptr) {
             DoImpactGridItem(aGridItem);
@@ -1037,9 +1031,7 @@ void Projectile::UpdateLobMotion() {
         aPlantTarget = FindCollisionTargetPlant();
     } else {
         aZombieTarget = FindCollisionTarget();
-        if (mApp->mGameMode == GameMode::GAMEMODE_MP_VS) {
-            aGridTarget = FindCollisionTargetGridItem();
-        }
+        aGridTarget = FindCollisionTargetGridItem();
     }
 
     const float aGroundZ = mProjectileType == ProjectileType::PROJECTILE_COBBIG ? -40.0f : 80.0f;
@@ -1412,6 +1404,10 @@ void Projectile::DoImpact(Zombie *theZombie) {
 }
 
 void Projectile::DoImpactGridItem(GridItem *theGridItem) {
+    // 骨堆开始重生后，已经在途的子弹也不能再造成伤害。
+    if (theGridItem != nullptr && theGridItem->IsSkeletonPile() && theGridItem->mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
+        return;
+    }
     bool aIsPiercingSpike = theGridItem != nullptr && IsPiercingSpike(this);
     if (aIsPiercingSpike && HasHitGridItem(this, theGridItem)) {
         return;
@@ -1549,12 +1545,15 @@ GridItem *Projectile::FindCollisionTargetGridItem() {
 
     Rect aProjectileRect = GetProjectileRect();
     while (mBoard->IterateGridItems(aGridItem)) {
+        if (!aGridItem->IsPlantAttackTarget()) {
+            continue;
+        }
         // 修复对空发射的尖刺会被墓碑阻挡
         if (mProjectileType == ProjectileType::PROJECTILE_SPIKE && mDamageRangeFlags == DamageRangeFlags::DAMAGES_SUBMERGED) {
             continue;
         }
 
-        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
+        if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile()) {
             if (mRow != aGridItem->mGridY) {
                 continue;
             }
@@ -1799,7 +1798,7 @@ void Projectile::CheckForCollision() {
             return;
         }
         DoImpact(aZombie);
-    } else if (mApp->IsVSMode()) {
+    } else {
         GridItem *aGridItem = FindCollisionTargetGridItem();
         if (aGridItem) {
             DoImpactGridItem(aGridItem);
@@ -1844,13 +1843,7 @@ bool Projectile::IsZombieHitBySplash(Zombie *theZombie) {
 }
 
 bool Projectile::IsGridItemHitBySplash(GridItem *theGridItem) {
-    if (theGridItem == nullptr) {
-        return false;
-    }
-
-    GridItemType aGridItemType = theGridItem->mGridItemType;
-    bool isSplashTarget = aGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE || aGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND;
-    if (!isSplashTarget) {
+    if (theGridItem == nullptr || !theGridItem->IsPlantAttackTarget()) {
         return false;
     }
 

@@ -357,6 +357,7 @@ public:
     static bool IsDisposable(SeedType theSeedType);
     bool IsInvulnerable();
     bool FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon);
+    bool FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon);
     ReanimationID GetPlantReanimationIDByIndex(int index) const;
     void SyncAnimationToClient();
     void SyncPingPongAnimationToClient();
@@ -366,6 +367,7 @@ public:
     void UpdateSquash();
     void UpdateIcebergLettuce();
     void UpdateCeleryStalker();
+    void SetCeleryStalkerState(PlantState theState);
     void UpdateBonkChoy();
     void UpdateSweetPotato();
     void UpdateEndurian();

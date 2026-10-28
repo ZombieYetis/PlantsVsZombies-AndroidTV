@@ -28,6 +28,7 @@
 
 class Board;
 class Reanimation;
+class Zombie;
 
 class MotionTrailFrame {
 public:
@@ -106,6 +107,11 @@ public:
     void UpdateScaryPot();
     void UpdateBurialMound();
     void UpdatePole();
+    bool IsSkeletonPile() const { return mGridItemType == GridItemType::GRIDITEM_SKELETON; }
+    bool IsPlantAttackTarget() const;
+    void UpdateSkeletonPile();
+    void StartSkeletonRebirth();
+    void RestoreSkeleton(Zombie *theZombie);
     int GetMoundUpgradeCost() const;
     void DrawStinky(Sexy::Graphics *g);
     void DrawSquirrel(Sexy::Graphics *g) const;
