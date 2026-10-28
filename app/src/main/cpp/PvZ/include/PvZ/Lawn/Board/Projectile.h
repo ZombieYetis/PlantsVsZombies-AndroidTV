@@ -100,6 +100,7 @@ public:
     void BoomerangReturn();
     void DoImpact(Zombie *theZombie);
     void DoImpactGridItem(GridItem *theGridItem);
+    void SpawnSporeShroom(int theGridX, int theGridY);
     void CheckForCollision();
     Zombie *FindCollisionMindControlledTarget();
     GridItem *FindCollisionTargetGridItem();

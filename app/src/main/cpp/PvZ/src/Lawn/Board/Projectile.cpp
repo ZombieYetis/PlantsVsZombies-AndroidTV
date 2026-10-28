@@ -1162,7 +1162,8 @@ void Projectile::DoImpact(Zombie *theZombie) {
         return;
     }
 
-    const bool aIsSporeImpact = mProjectileType == ProjectileType::PROJECTILE_SPORE && theZombie != nullptr;
+    // 骷髅倒下后仍会留下骨堆，摧毁骨堆才算孢子弹完成击杀。
+    const bool aIsSporeImpact = mProjectileType == ProjectileType::PROJECTILE_SPORE && theZombie != nullptr && theZombie->mZombieType != ZombieType::ZOMBIE_SKELETON;
 
     bool aWasAliveBeforeImpact = false;
     bool aCouldLoseBodyPartsBeforeImpact = false;
@@ -1257,11 +1258,8 @@ void Projectile::DoImpact(Zombie *theZombie) {
         }
     }
 
-    if (aShouldSpawnSporeShroom && mBoard->CanPlantAt(aSporeGridX, aSporeGridY, SeedType::SEED_SPORESHROOM) == PlantingReason::PLANTING_OK) {
-        Plant *aPlant = mBoard->AddPlant(aSporeGridX, aSporeGridY, SeedType::SEED_SPORESHROOM, SeedType::SEED_NONE, -1, false);
-        if (aPlant != nullptr) {
-            aPlant->PlayBodyReanim("anim_grow", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 12.0f);
-        }
+    if (aShouldSpawnSporeShroom) {
+        SpawnSporeShroom(aSporeGridX, aSporeGridY);
     }
 
     float aLastPosX = mPosX - mVelX;
@@ -1355,6 +1353,16 @@ void Projectile::DoImpact(Zombie *theZombie) {
     }
 }
 
+void Projectile::SpawnSporeShroom(int theGridX, int theGridY) {
+    if (mBoard->CanPlantAt(theGridX, theGridY, SeedType::SEED_SPORESHROOM) != PlantingReason::PLANTING_OK) {
+        return;
+    }
+    Plant *aPlant = mBoard->AddPlant(theGridX, theGridY, SeedType::SEED_SPORESHROOM, SeedType::SEED_NONE, -1, false);
+    if (aPlant != nullptr) {
+        aPlant->PlayBodyReanim("anim_grow", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 12.0f);
+    }
+}
+
 void Projectile::DoImpactGridItem(GridItem *theGridItem) {
     // 骨堆开始重生后，已经在途的子弹也不能再造成伤害。
     if (theGridItem != nullptr && theGridItem->IsSkeletonPile() && theGridItem->mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
@@ -1409,7 +1417,13 @@ void Projectile::DoImpactGridItem(GridItem *theGridItem) {
             }
             return;
         }
+        const bool aWasLivingSkeletonPile = mProjectileType == ProjectileType::PROJECTILE_SPORE && theGridItem->IsSkeletonPile() && !theGridItem->mDead;
+
         theGridItem->TakeDamage(GetProjectileImpactDamage(this), 0U);
+
+        if (aWasLivingSkeletonPile && theGridItem->mDead) {
+            SpawnSporeShroom(theGridItem->mGridX, theGridItem->mGridY);
+        }
     }
 
     float aLastPosX = mPosX - mVelX;
