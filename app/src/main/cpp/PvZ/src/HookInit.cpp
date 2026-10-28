@@ -429,6 +429,9 @@ void InitHookFunction() {
     homura::HookFunc(Plant_UpdateGraveBusterAddr, &Plant::UpdateGraveBuster, nullptr);
     homura::HookFunc(Plant_UpdateMagnetShroomAddr, &Plant::UpdateMagnetShroom, nullptr);
     homura::HookFunc(Plant_UpdateSquashAddr, &Plant::UpdateSquash, nullptr);
+    homura::HookFunc(Plant_UpdatePotatoAddr, &Plant::UpdatePotato, nullptr);
+    homura::HookFunc(Plant_UpdateSpikeweedAddr, &Plant::UpdateSpikeweed, nullptr);
+    homura::HookFunc(Plant_DoSquashDamageAddr, &Plant::DoSquashDamage, nullptr);
     homura::HookFunc(Plant_CobCannonFireAddr, &Plant::CobCannonFire, nullptr);
     homura::HookFunc(Plant_UpdateCobCannonAddr, &Plant::UpdateCobCannon, nullptr);
     // homura::HookFunc(Plant_UpdateReanimAddr, Plant_UpdateReanim, &old_Plant_UpdateReanim);

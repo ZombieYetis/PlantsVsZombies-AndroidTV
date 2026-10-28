@@ -261,11 +261,12 @@ public:
     MagnetItem *GetFreeMagnetItem() {
         return reinterpret_cast<MagnetItem *(*)(Plant *)>(Plant_GetFreeMagnetItemAddr)(this);
     }
-    void DoSquashDamage() {
-        return reinterpret_cast<void (*)(Plant *)>(Plant_DoSquashDamageAddr)(this);
-    }
+    void DoSquashDamage();
     Zombie *FindSquashTarget() {
         return reinterpret_cast<Zombie *(*)(Plant *)>(Plant_FindSquashTargetAddr)(this);
+    }
+    int DistanceToClosestZombie() {
+        return reinterpret_cast<int (*)(Plant *)>(Plant_DistanceToClosestZombieAddr)(this);
     }
     void UpdateNeedsFood() {
         reinterpret_cast<void (*)(Plant *)>(Plant_UpdateNeedsFoodAddr)(this);
@@ -365,6 +366,8 @@ public:
     void UpdateGraveBuster();
     void UpdateMagnetShroom();
     void UpdateSquash();
+    void UpdatePotato();
+    void UpdateSpikeweed();
     void UpdateIcebergLettuce();
     void UpdateCeleryStalker();
     void SetCeleryStalkerState(PlantState theState);

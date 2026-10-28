@@ -1018,7 +1018,7 @@ void GridItem::TakeDamage(int theDamage, unsigned int theDamageFlags) {
 
 void GridItem::TakeDamage_Origin(int theDamage, unsigned int theDamageFlags) {
     if (IsSkeletonPile()) {
-        if (mDead || mVSGraveStoneHealth <= 0) {
+        if (mDead || mVSGraveStoneHealth <= 0 || mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
             return;
         }
         mVSGraveStoneHealth -= theDamage;

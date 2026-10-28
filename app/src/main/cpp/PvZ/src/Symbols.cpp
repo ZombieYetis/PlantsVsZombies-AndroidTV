@@ -863,6 +863,9 @@ bool LoadGameMain() {
     Plant_DoSquashDamageAddr = GetLibGameMain().GetSymbol("_ZN5Plant14DoSquashDamageEv");
     Plant_FindSquashTargetAddr = GetLibGameMain().GetSymbol("_ZN5Plant16FindSquashTargetEv");
     Plant_UpdateSquashAddr = GetLibGameMain().GetSymbol("_ZN5Plant12UpdateSquashEv");
+    Plant_UpdatePotatoAddr = GetLibGameMain().GetSymbol("_ZN5Plant12UpdatePotatoEv");
+    Plant_UpdateSpikeweedAddr = GetLibGameMain().GetSymbol("_ZN5Plant15UpdateSpikeweedEv");
+    Plant_DistanceToClosestZombieAddr = GetLibGameMain().GetSymbol("_ZN5Plant23DistanceToClosestZombieEv");
     Plant_IsUpgradableToAddr = GetLibGameMain().GetSymbol("_ZN5Plant14IsUpgradableToE8SeedType");
     Plant_MagnetShroomAttactItemAddr = GetLibGameMain().GetSymbol("_ZN5Plant22MagnetShroomAttactItemEP6Zombie");
     Plant_GetFreeMagnetItemAddr = GetLibGameMain().GetSymbol("_ZN5Plant17GetFreeMagnetItemEv");
