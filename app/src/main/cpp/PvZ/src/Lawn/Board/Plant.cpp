@@ -2039,7 +2039,8 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
                 if (!aGridItem->IsPlantAttackTarget()) {
                     continue;
                 }
-                if (aGridItem->mGridY == theRow && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile())) {
+                if (aGridItem->mGridY == theRow
+                    && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile())) {
                     aHasGravestoneInRow = true;
                     break;
                 }
@@ -2062,7 +2063,8 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
                     continue;
                 }
 
-                const bool aIsGravestone = aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile();
+                const bool aIsGravestone =
+                    aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile();
 
                 const Rect aGridItemRect = aGridItem->GetItemRect();
                 if (aGridItemRect.mX + aGridItemRect.mWidth <= aOriginX) {
@@ -2629,6 +2631,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_PEA_HEAD:
         case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_MOUND:
+        case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
         case SeedType::SEED_ZOMBIE_SKELETON:
             return 50;
         case SeedType::SEED_SQUASH:
@@ -2670,7 +2673,6 @@ static int GetVSCostDefault(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_DANCER:
         case SeedType::SEED_ZOMBIE_DIGGER:
         case SeedType::SEED_ZOMBIE_LADDER:
-        case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
         case SeedType::SEED_ZOMBIE_JACKSON:
@@ -2711,7 +2713,6 @@ static int GetVSRefreshTimeDefault(SeedType theSeedType) {
             case SeedType::SEED_ZOMBIE_DIGGER:
             case SeedType::SEED_ZOMBIE_BUNGEE:
             case SeedType::SEED_ZOMBIE_LADDER:
-            case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
             case SeedType::SEED_ZOMBIE_BOBSLED:
             case SeedType::SEED_ZOMBIE_YETI:
             case SeedType::SEED_ZOMBIE_IMP:
@@ -2729,6 +2730,8 @@ static int GetVSRefreshTimeDefault(SeedType theSeedType) {
             case SeedType::SEED_ZOMBIE_TELEPORTATION:
             case SeedType::SEED_ZOMBIE_CROSSING_GUARD:
             case SeedType::SEED_ZOMBIE_SCIENTIST:
+            case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
+            case SeedType::SEED_ZOMBIE_SKELETON:
                 return 3000;
             case SeedType::SEED_ZOMBIE_NEWSPAPER:
             case SeedType::SEED_ZOMBIE_SCREEN_DOOR:
@@ -4096,8 +4099,7 @@ void Plant::SyncAnimationToClient() {
 }
 
 
-bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon)
-{
+bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon) {
     Zombie *aTargetZombie = FindTargetZombie(theRow, thePlantWeapon);
     GridItem *aTargetGridItem = FindTargetGridItem(theRow, thePlantWeapon);
     if (aTargetGridItem == nullptr && aTargetZombie == nullptr) {
@@ -4113,54 +4115,39 @@ bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon)
     }
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     Reanimation *aHeadReanim = mApp->ReanimationTryToGet(mHeadReanimID);
-    if (mSeedType == SEED_SPLITPEA && thePlantWeapon == WEAPON_SECONDARY)
-    {
+    if (mSeedType == SEED_SPLITPEA && thePlantWeapon == WEAPON_SECONDARY) {
         Reanimation *aHeadReanim2 = mApp->ReanimationGet(mHeadReanimID2);
         aHeadReanim2->StartBlend(20);
         aHeadReanim2->mLoopType = REANIM_PLAY_ONCE_AND_HOLD;
         aHeadReanim2->SetAnimRate(35.0f);
         aHeadReanim2->SetFramesForLayer("anim_splitpea_shooting");
         mShootingCounter = 26;
-    }
-    else if (aHeadReanim != nullptr && aHeadReanim->TrackExists("anim_shooting"))
-    {
+    } else if (aHeadReanim != nullptr && aHeadReanim->TrackExists("anim_shooting")) {
         aHeadReanim->StartBlend(20);
         aHeadReanim->mLoopType = REANIM_PLAY_ONCE_AND_HOLD;
         aHeadReanim->SetAnimRate(35.0f);
         aHeadReanim->SetFramesForLayer("anim_shooting");
         mShootingCounter = 35;
 
-        if (mSeedType == SEED_SPLITPEA || mSeedType == SEED_REPEATER || mSeedType == SEED_LEFTPEATER)
-        {
+        if (mSeedType == SEED_SPLITPEA || mSeedType == SEED_REPEATER || mSeedType == SEED_LEFTPEATER) {
             aHeadReanim->SetAnimRate(45.0f);
             mShootingCounter = 26;
-        }
-        else if (mSeedType == SEED_GATLINGPEA)
-        {
+        } else if (mSeedType == SEED_GATLINGPEA) {
             aHeadReanim->SetAnimRate(38.0f);
             mShootingCounter = 100;
         }
-    }
-    else if (mState == STATE_CACTUS_HIGH)
-    {
+    } else if (mState == STATE_CACTUS_HIGH) {
         PlayBodyReanim("anim_shootinghigh", REANIM_PLAY_ONCE_AND_HOLD, 20, 35.0f);
         mShootingCounter = 23;
-    }
-    else if (mSeedType == SEED_GLOOMSHROOM)
-    {
+    } else if (mSeedType == SEED_GLOOMSHROOM) {
         PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 14.0f);
         mShootingCounter = 200;
-    }
-    else if (mSeedType == SEED_CATTAIL)
-    {
+    } else if (mSeedType == SEED_CATTAIL) {
         PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 10, 30.0f);
         mShootingCounter = 50;
-    }
-    else if (aBodyReanim != nullptr && aBodyReanim->TrackExists("anim_shooting"))
-    {
+    } else if (aBodyReanim != nullptr && aBodyReanim->TrackExists("anim_shooting")) {
         PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 35.0f);
-        switch (mSeedType)
-        {
+        switch (mSeedType) {
             case SEED_FUMESHROOM:
                 mShootingCounter = 50;
                 break;
@@ -4178,8 +4165,7 @@ bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon)
                 mShootingCounter = 36;
                 break;
             case SEED_KERNELPULT:
-                if (Rand(4) == 0)
-                {
+                if (Rand(4) == 0) {
                     Reanimation *aButterReanim = mApp->ReanimationGet(mBodyReanimID);
                     aButterReanim->AssignRenderGroupToPrefix("Cornpult_butter", 0);
                     aButterReanim->AssignRenderGroupToPrefix("Cornpult_kernal", -1);
@@ -4194,9 +4180,7 @@ bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon)
                 mShootingCounter = 29;
                 break;
         }
-    }
-    else
-    {
+    } else {
         Fire(aTargetZombie, theRow, thePlantWeapon, aTargetGridItem);
     }
     return true;

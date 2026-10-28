@@ -76,7 +76,7 @@ void GridItem::GridItemDie() {
     bool processVsDie = mApp->IsVSMode();
     if (processVsDie) {
         if (mGridItemType == GridItemType::GRIDITEM_GRAVESTONE) {
-            if ((unsigned int)(Challenge::gVSResourseDropMode - 2) <= 1 && Challenge::gVSResourceDropCount > 0) {
+            if ((Challenge::gVSResourseDropMode == 2 || Challenge::gVSResourseDropMode == 3) && Challenge::gVSResourceDropCount > 0) {
                 for (int i = 0; i < Challenge::gVSResourceDropCount; ++i) {
                     int x = mBoard->GridToPixelX(mGridX, mGridY);
                     int y = mBoard->GridToPixelY(mGridX, mGridY);
@@ -378,8 +378,9 @@ bool GridItem::IsPlantAttackTarget() const {
     if (IsSkeletonPile()) {
         return mVSGraveStoneHealth > 0 && mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_WAITING && mSummonIndex == 0;
     }
-    return mApp->IsVSMode() && (mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND
-        || (mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && mVSTargetZombieHealth > 0));
+    return mApp->IsVSMode()
+        && (mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND
+            || (mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && mVSTargetZombieHealth > 0));
 }
 
 void GridItem::StartSkeletonRebirth() {

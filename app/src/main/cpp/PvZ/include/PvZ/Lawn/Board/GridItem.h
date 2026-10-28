@@ -107,7 +107,9 @@ public:
     void UpdateScaryPot();
     void UpdateBurialMound();
     void UpdatePole();
-    bool IsSkeletonPile() const { return mGridItemType == GridItemType::GRIDITEM_SKELETON; }
+    bool IsSkeletonPile() const {
+        return mGridItemType == GridItemType::GRIDITEM_SKELETON;
+    }
     bool IsPlantAttackTarget() const;
     void UpdateSkeletonPile();
     void StartSkeletonRebirth();

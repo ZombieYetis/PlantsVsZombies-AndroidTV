@@ -452,11 +452,9 @@ public:
     void LaunchTrafficCone(Zombie *theTarget);
     void UpdateZombieGraveDigger();
     void SetSkeletonVariant(bool theColorful);
-    bool FindGraveDiggerTarget(int &theGridX, int &theGridY);
-    bool HasGraveDiggerUsedCell(int theGridX) const;
-    void MarkGraveDiggerCellUsed(int theGridX);
-    void SetGraveDiggerPhase(ZombiePhase thePhase, int theGridX = -1, int theGridY = -1);
-    void LaunchBone(int theGridX, int theGridY);
+    GridItem *FindGraveDiggerTarget();
+    bool IsValidGraveDiggerTarget(GridItem *theTarget) const;
+    void SetGraveDiggerPhase(ZombiePhase thePhase, GridItem *theTarget = nullptr);
     void ApplyGraveDiggerDig();
     bool IsValidTeleportationTarget();
     void ApplyTrafficCone();

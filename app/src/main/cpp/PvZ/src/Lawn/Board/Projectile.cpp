@@ -44,7 +44,6 @@ using namespace Sexy;
 namespace {
 constexpr int SPIKE_PIERCE_DAMAGE[MAX_PIERCE_HIT_COUNT] = {30, 15, 10};
 constexpr int TRAFFIC_CONE_FLIGHT_TICKS = 60;
-constexpr int BONE_FLIGHT_TICKS = 60;
 constexpr int ACKEE_MAX_HITS = 4;
 constexpr int ACKEE_BOUNCE_GRID_RANGE = 3;
 constexpr float ACKEE_BOUNCE_VELOCITY_Z = -6.0f;
@@ -72,7 +71,6 @@ ProjectileType ResolveInitialProjectileType(ProjectileType theProjectileType) {
         case ProjectileType::PROJECTILE_BOOMERANG:
         case ProjectileType::PROJECTILE_TELEPORTATION:
         case ProjectileType::PROJECTILE_TRAFFIC_CONE:
-        case ProjectileType::PROJECTILE_BONE:
             return theProjectileType;
         default:
             break;
@@ -314,7 +312,6 @@ ProjectileDefinition gExtendedProjectileDefinition[] = {
     {ProjectileType::PROJECTILE_TELEPORTATION, 0, 0},
     {ProjectileType::PROJECTILE_TRAFFIC_CONE, 0, 0},
     {ProjectileType::PROJECTILE_ACKEE, 0, 60},
-    {ProjectileType::PROJECTILE_BONE, 0, 0},
     {ProjectileType::PROJECTILE_RED_STINGER, 0, 30},
 };
 
@@ -417,12 +414,6 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
         case ProjectileType::PROJECTILE_TRAFFIC_CONE:
             mRotation = RandRangeFloat(0.0f, 2.0f * std::numbers::pi_v<float>);
             mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
-            break;
-        case ProjectileType::PROJECTILE_BONE:
-            mMotionType = ProjectileMotion::MOTION_LOBBED;
-            mRotationSpeed = 0.1f;
-            mWidth = addonImages.IMAGE_PROJECTILEBONE->GetCelWidth();
-            mHeight = addonImages.IMAGE_PROJECTILEBONE->GetCelHeight();
             break;
         case ProjectileType::PROJECTILE_ACKEE:
             mLastPortalX = 0;
@@ -684,14 +675,6 @@ void Projectile::UpdateMotion() {
         return;
     }
 
-    if (mProjectileType == ProjectileType::PROJECTILE_BONE) {
-        // 目标落点已包含屋顶和高地的高度，无需再次补偿地形高度。
-        UpdateLobMotion();
-        mX = int(mPosX);
-        mY = int(mPosY + mPosZ);
-        return;
-    }
-
     int aOldRow = mRow;
     float aOldY = mBoard->GetPosYBasedOnRow(mPosX, mRow);
     if (mProjectileType == ProjectileType::PROJECTILE_BOOMERANG) {
@@ -835,37 +818,6 @@ void Projectile::UpdateAckeeMotion() {
 
 
 void Projectile::UpdateLobMotion() {
-    if (mProjectileType == ProjectileType::PROJECTILE_BONE) {
-        const int aCol = mHitTorchwoodGridX;
-        const int aRow = mCobTargetRow;
-        if (aCol < 0 || aCol >= MAX_GRID_SIZE_X || aRow < 0 || aRow >= (mBoard->StageHas6Rows() ? 6 : 5)) {
-            Die();
-            return;
-        }
-        const float aTargetX = float(mBoard->GridToPixelX(aCol, aRow)) + 40.0f - mWidth * 0.5f;
-        const float aTargetY = float(mBoard->GridToPixelY(aCol, aRow)) + 80.0f - mHeight;
-        const int aTicksRemaining = std::max(1, BONE_FLIGHT_TICKS - mProjectileAge + 1);
-        mPosX += (aTargetX - mPosX) / float(aTicksRemaining);
-        mPosY += (aTargetY - mPosY) / float(aTicksRemaining);
-        const float aProgress = std::min(1.0f, float(mProjectileAge) / float(BONE_FLIGHT_TICKS));
-        mPosZ = -20.0f * (1.0f - aProgress) - 120.0f * 4.0f * aProgress * (1.0f - aProgress);
-        mShadowY = mPosY + mHeight;
-        if (aProgress >= 0.5f) {
-            mRow = aRow;
-        }
-        if (mProjectileAge >= BONE_FLIGHT_TICKS) {
-            if (!IsRemoteClientOrViewer() && mBoard->CanGraveDiggerPlaceGraveAt(aCol, aRow)) {
-                mBoard->AddAGraveStone(aCol, aRow);
-                mApp->PlayFoley(FoleyType::FOLEY_GRAVESTONE_RUMBLE);
-                if (IsRemoteServer()) {
-                    U8_Event event = {{EventType::EVENT_SERVER_BOARD_PLAY_FOLEY}, uint8_t(FoleyType::FOLEY_GRAVESTONE_RUMBLE)};
-                    netplay::PutEvent(event);
-                }
-            }
-            Die();
-        }
-        return;
-    }
     if (mProjectileType == ProjectileType::PROJECTILE_TRAFFIC_CONE) {
         Zombie *aZombie = mBoard->ZombieTryToGet(mTargetZombieID);
         if (aZombie == nullptr || aZombie->IsDeadOrDying() || !aZombie->mHasHead || aZombie->mMindControlled != (mLastPortalX != 0) || aZombie->mHelmType != HelmType::HELMTYPE_NONE
@@ -1626,7 +1578,7 @@ GridItem *Projectile::FindCollisionTargetGridItem() {
 }
 
 void Projectile::CheckForCollision() {
-    if (mProjectileType == ProjectileType::PROJECTILE_TRAFFIC_CONE || mProjectileType == ProjectileType::PROJECTILE_BONE) {
+    if (mProjectileType == ProjectileType::PROJECTILE_TRAFFIC_CONE) {
         return;
     }
 
@@ -1930,8 +1882,6 @@ void Projectile::Draw(Graphics *g) {
         aScaleX = 0.8f;
         aScaleY = 0.8f;
         aImage = IMAGE_REANIM_ZOMBIE_CONE1;
-    } else if (mProjectileType == ProjectileType::PROJECTILE_BONE) {
-        aImage = addonImages.IMAGE_PROJECTILEBONE;
     } else if (mProjectileType == ProjectileType::PROJECTILE_ACKEE) {
         aImage = addonImages.IMAGE_PROJECTILEACKEE;
     } else if (mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
