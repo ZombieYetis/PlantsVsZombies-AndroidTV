@@ -52,10 +52,8 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     mBoard->AddWidget(mGlobalBpButton);
 
     mExtraPacketMode = mApp->mPlayerInfo->mVSExtraPacketMode;
-    mExtendedSeedsMode = !Challenge::msVSClassicMode;
     mBanMode = mApp->mPlayerInfo->mVSBanMode;
-    mBalancePatchMode = !Challenge::msVSClassicMode;
-    if (!mExtendedSeedsMode) {
+    if (Challenge::msVSClassicMode) {
         ResetGlobalBpState();
     }
     mPlantAIMode = mApp->mPlayerInfo->mVSPlantAIMode;
@@ -64,9 +62,6 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
     mAIDraftDisabledMode = mApp->mPlayerInfo->mVSAIDraftDisabledMode;
     mAITemplateDeckDisabledMode = mApp->mPlayerInfo->mVSAITemplateDeckDisabledMode;
     mTimedDraftMode = mApp->mPlayerInfo->mVSTimedDraftMode;
-    msBalancePatchMode = mBalancePatchMode;
-    msExtraPacketMode = mExtraPacketMode;
-    msExtendedSeedsMode = mExtendedSeedsMode;
     msPlantAIMode = mPlantAIMode;
     msZombieAIMode = mZombieAIMode;
     msAIEnhancementMode = mAIEnhancementMode;
@@ -173,7 +168,7 @@ void VSSetupAddonWidget::UpdateGlobalBpButtonState() const {
         return;
     }
 
-    const bool enabled = mBanModeCheckbox->mVisible && mBanMode && mExtendedSeedsMode;
+    const bool enabled = mBanModeCheckbox->mVisible && mBanMode && !Challenge::msVSClassicMode;
     mGlobalBpButton->SetVisible(enabled);
     mGlobalBpButton->mDisabled = !enabled || gIsReplayMode;
     switch (msGlobalBpMode) {
@@ -283,7 +278,6 @@ void VSSetupAddonWidget::SetAddonMode(int theId, bool checked, bool saveDetails)
         case VSSetupAddonWidget_ExtraPacket:
             mExtraPacketMode = checked;
             mExtraPacketCheckbox->SetChecked(mExtraPacketMode, false);
-            msExtraPacketMode = mExtraPacketMode;
             if (saveDetails) {
                 mApp->mPlayerInfo->mVSExtraPacketMode = mExtraPacketMode;
             }

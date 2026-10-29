@@ -95,26 +95,21 @@ bool IsLocalChooserInputAllowed(SeedChooserScreen *screen) {
     return controlledSide == chooserSide;
 }
 
-bool IsExtendedSeedsModeEnabled(SeedChooserScreen *screen) {
+bool IsExtendedSeedsModeEnabled(const SeedChooserScreen *screen) {
     if (screen == nullptr || screen->mApp == nullptr || !screen->mApp->IsVSMode()) {
         return false;
     }
 
-    VSSetupMenu *vsSetup = screen->mApp->mVSSetupMenu;
-    if (vsSetup == nullptr || vsSetup->mAddonWidget == nullptr) {
-        return false;
-    }
-
-    return vsSetup->mAddonWidget->mExtendedSeedsMode;
+    return !Challenge::msVSClassicMode;
 }
 
 int GetZombieFirstPageSeedCount(const SeedChooserScreen *screen) {
-    const SeedType lastSeedType = screen->mShowExtendedSeeds ? SeedType::SEED_ZOMBIE_BALLOON : SeedType::SEED_ZOMBIE_GARGANTUAR;
+    const SeedType lastSeedType = IsExtendedSeedsModeEnabled(screen) ? SeedType::SEED_ZOMBIE_BALLOON : SeedType::SEED_ZOMBIE_GARGANTUAR;
     return int(lastSeedType) - int(SeedType::SEED_ZOMBIE_GRAVESTONE) + 1;
 }
 
 SeedType GetZombieFirstPageLastSeedType(const SeedChooserScreen *screen) {
-    return screen->mShowExtendedSeeds ? SeedType::SEED_ZOMBIE_BALLOON : SeedType::SEED_ZOMBIE_GARGANTUAR;
+    return IsExtendedSeedsModeEnabled(screen) ? SeedType::SEED_ZOMBIE_BALLOON : SeedType::SEED_ZOMBIE_GARGANTUAR;
 }
 
 void NormalizeLocalPoint(SeedChooserScreen *screen, int &x, int &y) {
@@ -590,7 +585,8 @@ bool IsBuiltinAICandidate(SeedChooserScreen *screen, SeedType seedType) {
     if (!screen->mBanningPhase && !screen->mIsZombieChooser && (seedType == SeedType::SEED_TALLNUT || (seedType == SeedType::SEED_BLOVER && !HasBuiltinAIOpponentBalloon(screen)))) {
         return false;
     }
-    if (!screen->mShowExtendedSeeds && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE))) {
+    if (!IsExtendedSeedsModeEnabled(screen)
+        && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE))) {
         return false;
     }
 
@@ -1287,7 +1283,8 @@ SeedType FindBuiltinAILegalProgressCandidate(SeedChooserScreen *screen) {
     for (int seedIndex = 0; seedIndex < storageCount; ++seedIndex) {
         const SeedType seedType = screen->mIsZombieChooser ? screen->GetZombieSeedType(seedIndex) : screen->GetPlantSeedType(seedIndex);
         if (seedType == SeedType::SEED_NONE || seedType == SeedType::SEED_IMITATER || (!screen->mIsZombieChooser && Plant::IsUpgrade(seedType))
-            || (!screen->mShowExtendedSeeds && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE)))
+            || (!IsExtendedSeedsModeEnabled(screen)
+                && ((screen->mIsZombieChooser && seedType > SeedType::SEED_ZOMBIE_GARGANTUAR) || (!screen->mIsZombieChooser && seedType >= SeedType::SEED_ICEBERG_LETTUCE)))
             || !screen->HasPacket(seedType, screen->mIsZombieChooser) || screen->GetChosenSeed(seedIndex).mSeedState != ChosenSeedState::SEED_IN_CHOOSER || screen->SeedNotAllowedToPick(seedType)) {
             continue;
         }
@@ -1398,7 +1395,7 @@ SeedType FindBuiltinAIBanCandidate(SeedChooserScreen *screen, const SeedType *fa
 }
 
 int GetBuiltinAIPageForSeed(const SeedChooserScreen *screen, SeedType seedType) {
-    if (!screen->mShowExtendedSeeds) {
+    if (!IsExtendedSeedsModeEnabled(screen)) {
         return 0;
     }
     if (screen->mIsZombieChooser) {
@@ -1553,7 +1550,7 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
     mToolTip1 = new ToolTipWidget();
     mToolTip2 = new ToolTipWidget();
 
-    if (VSSetupAddonWidget::msExtendedSeedsMode) {
+    if (mApp->IsVSMode() && !Challenge::msVSClassicMode) {
         mToolTip1->mTitleFont = mToolTip2->mTitleFont = addonFonts.JN_BOBO_HEI20;
         mToolTip1->mWarningTextFont = mToolTip2->mWarningTextFont = addonFonts.JN_BOBO_HEI20;
     }
@@ -1839,9 +1836,7 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
         }
 
         mBanningPhase = mApp->mVSSetupMenu->mAddonWidget->mBanMode;
-        mShowExtendedSeeds = mApp->mVSSetupMenu->mAddonWidget->mExtendedSeedsMode;
-        mHas7Packets = mApp->mVSSetupMenu->mAddonWidget->mExtraPacketMode;
-        if (mShowExtendedSeeds) {
+        if (IsExtendedSeedsModeEnabled(this)) {
             mPageButton = MakeNewButton(SeedChooserScreen::SeedChooserScreen_Page, this, this, "", nullptr, Sexy::IMAGE_ZEN_NEXTGARDEN, Sexy::IMAGE_ZEN_NEXTGARDEN, Sexy::IMAGE_ZEN_NEXTGARDEN);
             mPageButton->Resize(mIsZombieChooser ? 225 : 25, 525, 60, 60);
         }
@@ -2534,7 +2529,7 @@ bool SeedChooserScreen::SeedNotAllowedToPick(SeedType theSeedType) {
                 return true;
             }
         }
-        if (mShowExtendedSeeds && theSeedType == SeedType::SEED_BLOVER) {
+        if (IsExtendedSeedsModeEnabled(this) && theSeedType == SeedType::SEED_BLOVER) {
             return false;
         }
     }
@@ -2631,7 +2626,7 @@ int SeedChooserScreen::GetCurrentPageSeedCount() const {
         return NUM_SEEDS_IN_CHOOSER;
     }
 
-    return mShowExtendedSeeds ? EXTENDED_NUM_SEED_TYPES : 0;
+    return IsExtendedSeedsModeEnabled(this) ? EXTENDED_NUM_SEED_TYPES : 0;
 }
 
 int SeedChooserScreen::GetPageSeedStorageIndex(int theSeedIndex) const {
@@ -4560,7 +4555,7 @@ void SeedChooserScreen::MouseUp(int x, int y) {
 
 int SeedChooserScreen::GetNextSeedInDir(int theNumSeed, SeedDir theMoveDirection) {
     if (mIsZombieChooser) {
-        if (!mShowExtendedSeeds) {
+        if (!IsExtendedSeedsModeEnabled(this)) {
             // 右下角边缘
             if ((theNumSeed == 14 && theMoveDirection == SeedDir::SEED_DIR_DOWN) || //
                 (theNumSeed == 18 && theMoveDirection == SeedDir::SEED_DIR_RIGHT)) {
@@ -4592,7 +4587,7 @@ int SeedChooserScreen::GetNextSeedInDir(int theNumSeed, SeedDir theMoveDirection
             }
             break;
         case SeedDir::SEED_DIR_DOWN: {
-            int aMaxRow = mIsZombieChooser ? (mShowExtendedSeeds ? 4 : 3) // 拓展僵尸选卡适配键盘选取
+            int aMaxRow = mIsZombieChooser ? (IsExtendedSeedsModeEnabled(this) ? 4 : 3) // 拓展僵尸选卡适配键盘选取
                                            : (Has7Rows() ? 5 : 4);
             if (mPageIndex == 1) {
                 aMaxRow = 1;
@@ -4671,7 +4666,7 @@ void SeedChooserScreen::Draw(Graphics *g) { // Early returns for dialogsif (mApp
             aNumSeeds = 48;
         }
     } else {
-        if (mShowExtendedSeeds) {
+        if (IsExtendedSeedsModeEnabled(this)) {
             if (mPageIndex == 0) {
                 aNumSeeds = GetZombieFirstPageSeedCount(this);
             } else if (mPageIndex == 1) {
@@ -5068,7 +5063,7 @@ void SeedChooserScreen::DrawBanIcon(Sexy::Graphics *g) {
         if (theSeedPacketIndex < firstPageSeedCount) {
             return 0;
         }
-        if (mShowExtendedSeeds && theSeedPacketIndex >= secondPageStorageStart) {
+        if (IsExtendedSeedsModeEnabled(this) && theSeedPacketIndex >= secondPageStorageStart) {
             return 1;
         }
         return -1;

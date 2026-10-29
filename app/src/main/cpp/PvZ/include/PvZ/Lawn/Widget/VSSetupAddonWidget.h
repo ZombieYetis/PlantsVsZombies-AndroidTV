@@ -64,9 +64,6 @@ public:
         GLOBALBP_BO5,
     };
 
-    static inline bool msBalancePatchMode = false;
-    static inline bool msExtraPacketMode = false;
-    static inline bool msExtendedSeedsMode = false;
     static inline bool msPlantAIMode = false;
     static inline bool msZombieAIMode = false;
     static inline bool msAIEnhancementMode = false;
@@ -89,9 +86,7 @@ public:
     Sexy::Checkbox *mTimedDraftCheckbox = nullptr;
     AISettingsWidget *mAISettingsWidget = nullptr;
     bool mExtraPacketMode = false;
-    bool mExtendedSeedsMode = false;
     bool mBanMode = false;
-    bool mBalancePatchMode = false;
     bool mPlantAIMode = false;
     bool mZombieAIMode = false;
     bool mAIEnhancementMode = false;

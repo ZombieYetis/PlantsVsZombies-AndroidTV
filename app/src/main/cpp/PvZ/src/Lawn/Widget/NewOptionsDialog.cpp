@@ -135,7 +135,6 @@ void NewOptionsDialog::ButtonDepress(int theId) {
                     }
                     const bool plantWin = (mApp->mGameScene == SCENE_PLANTS_WON);
                     netplay::MetricsSetVsBackground(int(gVSBackground));
-                    netplay::MetricsSetVsMode(Challenge::msVSShuffleMode, Challenge::msVSClassicMode);
                     netplay::MetricsSendSettlement(plantWin, mApp->mBoard->mMainCounter);
                 }
 

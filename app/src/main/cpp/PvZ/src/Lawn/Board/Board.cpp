@@ -2335,7 +2335,6 @@ void Board::processClientEvent(const BaseEvent *event) {
             if (mApp->IsVSMode() && IsRemoteServer()) {
                 const bool plantWin = (mApp->mGameScene == SCENE_PLANTS_WON);
                 netplay::MetricsSetVsBackground(int(gVSBackground));
-                netplay::MetricsSetVsMode(Challenge::msVSShuffleMode, Challenge::msVSClassicMode);
                 netplay::MetricsSendSettlement(plantWin, mMainCounter);
             }
 
@@ -8981,8 +8980,6 @@ void Board::PlantsWon(GridItem *theGridItem) {
     if (mApp->IsVSMode() && IsRemoteServer()) {
         // 所选对战场地
         netplay::MetricsSetVsBackground(int(gVSBackground));
-        // 对战游戏模式
-        netplay::MetricsSetVsMode(Challenge::msVSShuffleMode, Challenge::msVSClassicMode);
         // 植物胜利的对局时间
         netplay::MetricsSendSettlement(true, mMainCounter);
     }

@@ -554,8 +554,6 @@ inline int gMetricsServerPort = 0;
 inline int gMetricsRoomId = 0;
 inline int gMetricsVsBackground = -1;
 inline int gMetricsBattleType = -1; // 9 quick, 10 custom, 11 random
-inline bool gMetricsShuffleMode = false;
-inline bool gMetricsClassicMode = false;
 inline bool gMetricsExtraPacket = false;
 inline bool gMetricsBanMode = false;
 inline int gMetricsMowerLoss = 0;
@@ -631,7 +629,6 @@ void MetricsSetRoomId(int roomId);
 void MetricsResetSettlementEvents();
 void MetricsRecordSeedEvent(bool zombieSide, bool banEvent, int seedType);
 void MetricsSetBattleType(int battleType);
-void MetricsSetVsMode(bool shuffleMode, bool classicMode);
 void MetricsSetAddonFlags(bool extraPacket, bool banMode);
 void MetricsSetVsBackground(int background);
 void MetricsRecordPlantUsed(int seedType);

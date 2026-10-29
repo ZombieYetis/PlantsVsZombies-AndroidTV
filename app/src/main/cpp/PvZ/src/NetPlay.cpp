@@ -20,6 +20,7 @@
 #include "PvZ/NetPlay.h"
 #include "Homura/Logger.h"
 #include "PvZ/GlobalVariable.h"
+#include "PvZ/Lawn/Board/Challenge.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/ReplaySystem.h"
@@ -146,8 +147,6 @@ void netplay::MetricsResetSettlementEvents() {
     gMetricsTargetLoss = 0;
     gMetricsGraveLoss = 0;
     gMetricsSunflowerLoss = 0;
-    gMetricsShuffleMode = false;
-    gMetricsClassicMode = false;
     gMetricsPlantUseCount.clear();
     gMetricsZombieUseCount.clear();
     gMetricsHostSendNameAllowed = true;
@@ -167,10 +166,6 @@ void netplay::MetricsRecordSeedEvent(bool zombieSide, bool banEvent, int seedTyp
 
 void netplay::MetricsSetBattleType(int battleType) {
     gMetricsBattleType = battleType;
-}
-void netplay::MetricsSetVsMode(bool shuffleMode, bool classicMode) {
-    gMetricsShuffleMode = shuffleMode;
-    gMetricsClassicMode = classicMode;
 }
 void netplay::MetricsSetAddonFlags(bool extraPackets, bool banMode) {
     gMetricsExtraPacket = extraPackets;
@@ -299,7 +294,7 @@ bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
             o << items[i].first << ':' << items[i].second;
         }
     };
-    const char *gameMode = gMetricsClassicMode ? "CLASSIC" : gMetricsShuffleMode ? "SHUFFLE" : "NORMAL";
+    const char *gameMode = Challenge::msVSClassicMode ? "CLASSIC" : Challenge::msVSShuffleMode ? "SHUFFLE" : "NORMAL";
     oss << "|bg=" << gMetricsVsBackground << "&battle=" << gMetricsBattleType << "&game_mode=" << gameMode << "&addon_ep=" << (gMetricsExtraPacket ? 1 : 0)
         << "&addon_ban=" << (gMetricsBanMode ? 1 : 0) << "&mower_loss=" << gMetricsMowerLoss << "&target_loss=" << gMetricsTargetLoss << "&grave_loss=" << gMetricsGraveLoss
         << "&sunflower_loss=" << gMetricsSunflowerLoss << "&plant_use=";

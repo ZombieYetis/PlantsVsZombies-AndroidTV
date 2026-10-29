@@ -93,7 +93,7 @@ ProjectileType ResolveInitialProjectileType(ProjectileType theProjectileType) {
 }
 
 bool IsPiercingSpike(const Projectile *theProjectile) {
-    return theProjectile->mApp->IsVSMode() && (VSSetupAddonWidget::msBalancePatchMode || Challenge::msVSShuffleMode) && theProjectile->mProjectileType == ProjectileType::PROJECTILE_SPIKE;
+    return theProjectile->mApp->IsVSMode() && !Challenge::msVSClassicMode && theProjectile->mProjectileType == ProjectileType::PROJECTILE_SPIKE;
 }
 
 int FindHitZombieSlot(const Projectile *theProjectile, Zombie *theZombie) {
@@ -1210,7 +1210,7 @@ void Projectile::DoImpact(Zombie *theZombie) {
                 return;
             }
 
-            if (VSSetupAddonWidget::msBalancePatchMode || Challenge::msVSShuffleMode) {
+            if (!Challenge::msVSClassicMode) {
                 int aHitIndex = mPierceHitCount;
                 int aDamage = SPIKE_PIERCE_DAMAGE[aHitIndex];
                 if (theZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR || theZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER || theZombie->mShieldType == ShieldType::SHIELDTYPE_TRASHCAN

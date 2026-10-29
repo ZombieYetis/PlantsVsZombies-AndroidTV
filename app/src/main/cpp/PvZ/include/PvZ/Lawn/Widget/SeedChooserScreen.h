@@ -154,8 +154,6 @@ public:
     int mSeedsInBanned = 0;
     BannedSeed mBannedSeed[EXTENDED_NUM_SEEDS_IN_CHOOSER]{};
     bool mBanningPhase = false;
-    bool mShowExtendedSeeds = false;
-    bool mHas7Packets = false;
     bool mGlobalBpBansApplied = false;
     ChosenSeed mChosenSeedsExtended[EXTENDED_NUM_SEED_TYPES]{};
     GameButton *mMainMenuButton = nullptr;

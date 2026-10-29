@@ -2369,7 +2369,7 @@ void Zombie::UpdateZombieJackInTheBox() {
             bool doPop = false;
             if (!IsRemoteClientOrViewer()) {
                 if (mApp->IsVSMode()) {
-                    if (VSSetupAddonWidget::msBalancePatchMode) {
+                    if (!Challenge::msVSClassicMode) {
                         if (mIsEating) {
                             Plant *aPlant = FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW);
                             if (aPlant != nullptr && !Plant::IsDefender(aPlant->mSeedType)) {
@@ -5627,8 +5627,6 @@ void Zombie::CheckForBoardEdge() {
                 if (mApp->IsVSMode()) {
                     // 所选对战场地
                     netplay::MetricsSetVsBackground(int(gVSBackground));
-                    // 对战游戏模式
-                    netplay::MetricsSetVsMode(Challenge::msVSShuffleMode, Challenge::msVSClassicMode);
                     // 僵尸胜利的对局时间
                     netplay::MetricsSendSettlement(false, mBoard->mMainCounter);
                 }
@@ -5886,7 +5884,7 @@ void Zombie::EatPlant(Plant *thePlant) {
         if (mApp->IsIZombieLevel()) {
             return true;
         }
-        if (mApp->IsVSMode() && VSSetupAddonWidget::msBalancePatchMode) {
+        if (mApp->IsVSMode() && !Challenge::msVSClassicMode) {
             return mZombieType != ZombieType::ZOMBIE_NORMAL && mZombieType != ZombieType::ZOMBIE_BOBSLED && mZombieType != ZombieType::ZOMBIE_PEA_HEAD && mZombieType != ZombieType::ZOMBIE_DOG;
         }
         return false;

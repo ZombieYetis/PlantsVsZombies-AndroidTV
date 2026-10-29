@@ -182,66 +182,56 @@ void SeedPacket::Activate() {
 void SeedPacket::SetPacketType(SeedType theSeedType, SeedType theImitaterType) {
     old_SeedPacket_SetPacketType(this, theSeedType, theImitaterType);
 
-    // 此处修改对战开局的初始冷却
-    if (mApp->IsVSMode()) {
-        bool aIsBalancePatch = VSSetupAddonWidget::msBalancePatchMode;
-        bool aIsStageNight = mBoard->StageIsNight();
-        switch (theSeedType) {
-            case SEED_PUFFSHROOM:
-            case SEED_ZOMBIE_NORMAL:
-                if (aIsBalancePatch) {
-                    mRefreshTime = 1000;
-                    mRefreshing = true;
-                    mActive = false;
-                }
-                break;
-            case SEED_SUNSHROOM:
-                if (aIsStageNight) { // 清除阳光菇的初始冷却
-                    mRefreshTime = 0;
-                    mRefreshing = false;
-                    mActive = true;
-                }
-                break;
-            case SEED_PUMPKINSHELL:
-                if (aIsBalancePatch) {
-                    mRefreshTime = 0; // 35 -> 0
-                    mRefreshing = false;
-                    mActive = true;
-                }
-                break;
-            case SEED_ZOMBONI:
-            case SEED_ZOMBIE_CATAPULT:
-                if (aIsBalancePatch) {
-                    mRefreshTime = 2000; // 35 -> 20
-                }
-                break;
-            case SEED_ZOMBIE_TRAFFIC_CONE:
-            case SEED_ZOMBIE_BOBSLED:
-            case SEED_ZOMBIE_SNORKEL:
-            case SEED_ZOMBIE_DOLPHIN_RIDER:
-            case SEED_ZOMBIE_ZOMBLOB:
-                if (aIsBalancePatch) {
-                    mRefreshTime = 3500; // 20 -> 35
-                }
-                break;
-            case SEED_BEGHOULED_BUTTON_SHUFFLE:
-            case SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE:
-                mRefreshTime = 0;
-                mRefreshing = false;
-                mActive = true;
-                break;
-            default:
-                break;
-        }
+    if (!mApp->IsVSMode()) {
+        return;
+    }
 
-        bool aIsProducer = Challenge::IsMPResourceProducer(mPacketType);
-        bool aIsShuffle = mPacketType == SEED_BEGHOULED_BUTTON_SHUFFLE || mPacketType == SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE;
-        if (Challenge::msVSShuffleMode) {
-            if (!aIsProducer && !aIsShuffle) {
-                mRefreshTime = 0;
-                mRefreshing = false;
-                mActive = true;
-            }
+    // 所有对战模式共用的初始冷却处理
+    if ((theSeedType == SEED_SUNSHROOM && mBoard->StageIsNight()) || theSeedType == SEED_BEGHOULED_BUTTON_SHUFFLE || theSeedType == SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE) {
+        mRefreshTime = 0;
+        mRefreshing = false;
+        mActive = true;
+    }
+
+    if (Challenge::msVSClassicMode) {
+        return;
+    }
+
+    // 平衡调整开局的初始冷却
+    switch (theSeedType) {
+        case SEED_PUFFSHROOM:
+        case SEED_ZOMBIE_NORMAL:
+            mRefreshTime = 1000;
+            mRefreshing = true;
+            mActive = false;
+            break;
+        case SEED_PUMPKINSHELL:
+            mRefreshTime = 0; // 35 -> 0
+            mRefreshing = false;
+            mActive = true;
+            break;
+        case SEED_ZOMBONI:
+        case SEED_ZOMBIE_CATAPULT:
+            mRefreshTime = 2000; // 35 -> 20
+            break;
+        case SEED_ZOMBIE_TRAFFIC_CONE:
+        case SEED_ZOMBIE_BOBSLED:
+        case SEED_ZOMBIE_SNORKEL:
+        case SEED_ZOMBIE_DOLPHIN_RIDER:
+        case SEED_ZOMBIE_ZOMBLOB:
+            mRefreshTime = 3500; // 20 -> 35
+            break;
+        default:
+            break;
+    }
+
+    if (Challenge::msVSShuffleMode) {
+        const bool aIsProducer = Challenge::IsMPResourceProducer(mPacketType);
+        const bool aIsShuffle = mPacketType == SEED_BEGHOULED_BUTTON_SHUFFLE || mPacketType == SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE;
+        if (!aIsProducer && !aIsShuffle) {
+            mRefreshTime = 0;
+            mRefreshing = false;
+            mActive = true;
         }
     }
 }

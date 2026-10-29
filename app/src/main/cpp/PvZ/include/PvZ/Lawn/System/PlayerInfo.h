@@ -100,9 +100,7 @@ public:
     bool mAchievements[AchievementType::NUM_ACHIEVEMENT_TYPES]; // 147 ~ 149, 从mPurchases[80]分出来的
     unsigned short mVSRoomPort;                                 // 150 ~
     bool mVSExtraPacketMode;
-    bool mVSExtendedSeedsMode;
     bool mVSBanMode;
-    bool mVSBalancePatchMode;
     bool mVSResultsSendPlayerName;
     bool mVSResultsAutoSaveReplay;
     bool mHostAllowSpectate;
@@ -114,7 +112,7 @@ public:
     bool mVSAIDraftDisabledMode;
     bool mVSAITemplateDeckDisabledMode;
     bool mVSTimedDraftMode;
-    bool mUnused676[63];
+    bool mUnused676[65];
     bool mHapticFeedbackEnabled;
     bool mZombatarEnabled;
     unsigned char mZombatarHat;

@@ -2609,7 +2609,7 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                     continue;
                 }
                 if (mSeedType == SeedType::SEED_PUFFSHROOM || mSeedType == SeedType::SEED_SEASHROOM) {
-                    //                    if (VSSetupAddonWidget::msBalancePatchMode && aGridX - mPlantCol > 2) {
+                    //                    if (!Challenge::msVSClassicMode && aGridX - mPlantCol > 2) {
                     //                        continue;
                     //                    }
                     // 如果是小喷菇或水兵菇，则索敌三格以内的墓碑
@@ -2697,7 +2697,7 @@ PlantDefinition &GetPlantDefinition(SeedType theSeedType) {
     return gPlantDefs[theSeedType];
 }
 
-static int GetVSCostDefault(SeedType theSeedType) {
+static int GetVSCostClassic(SeedType theSeedType) {
     switch (theSeedType) {
         case SeedType::SEED_INSTANT_COFFEE:
         case SeedType::SEED_ZOMBIE_NORMAL:
@@ -2779,7 +2779,7 @@ static int GetVSCostDefault(SeedType theSeedType) {
     }
 }
 
-static int GetVSRefreshTimeDefault(SeedType theSeedType) {
+static int GetVSRefreshTimeClassic(SeedType theSeedType) {
     if (Challenge::IsMPSeedType(theSeedType)) {
         switch (theSeedType) {
             case SeedType::SEED_ZOMBIE_TRASHCAN:
@@ -2852,8 +2852,8 @@ static int GetVSRefreshTimeDefault(SeedType theSeedType) {
     }
 }
 
-static int GetVSCostBalanced(SeedType theSeedType) {
-    int aCost = GetVSCostDefault(theSeedType);
+static int GetVSCost(SeedType theSeedType) {
+    int aCost = GetVSCostClassic(theSeedType);
     switch (theSeedType) {
         case SeedType::SEED_SUNSHROOM:
             aCost = 0;
@@ -2927,7 +2927,7 @@ static int GetVSCostBalanced(SeedType theSeedType) {
 }
 
 static int GetVSCostShuffle(SeedType theSeedType) {
-    int aCost = GetVSCostDefault(theSeedType);
+    int aCost = GetVSCostClassic(theSeedType);
     switch (theSeedType) {
         case SeedType::SEED_ICESHROOM: // 75 -> 50
             return 50;
@@ -2963,8 +2963,8 @@ static int GetVSCostShuffle(SeedType theSeedType) {
     return aCost;
 }
 
-static int GetVSRefreshTimeBalanced(SeedType theSeedType) {
-    int aRefreshTime = GetVSRefreshTimeDefault(theSeedType);
+static int GetVSRefreshTime(SeedType theSeedType) {
+    int aRefreshTime = GetVSRefreshTimeClassic(theSeedType);
     switch (theSeedType) {
         case SeedType::SEED_REPEATER:               // 7.5 -> 15
         case SeedType::SEED_PUFFSHROOM:             // 7.5 -> 15
@@ -2986,7 +2986,7 @@ static int GetVSRefreshTimeBalanced(SeedType theSeedType) {
 }
 
 static int GetVSRefreshTimeShuffle(SeedType theSeedType) {
-    int aRefreshTime = GetVSRefreshTimeDefault(theSeedType);
+    int aRefreshTime = GetVSRefreshTimeClassic(theSeedType);
     switch (theSeedType) {
             //        case SeedType::SEED_SNOWPEA:  // 7.5 -> 15
             //        case SeedType::SEED_REPEATER: // 7.5 -> 15
@@ -3051,7 +3051,7 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType) {
         if (Challenge::msVSShuffleMode) {
             return GetVSCostShuffle(theSeedType);
         }
-        return VSSetupAddonWidget::msBalancePatchMode ? GetVSCostBalanced(theSeedType) : GetVSCostDefault(theSeedType);
+        return Challenge::msVSClassicMode ? GetVSCostClassic(theSeedType) : GetVSCost(theSeedType);
     } else {
         switch (theSeedType) {
             case SeedType::SEED_SLOT_MACHINE_SUN:
@@ -3121,8 +3121,7 @@ int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType) {
         if (theSeedType == SeedType::SEED_IMITATER && theImitaterType != SeedType::SEED_NONE) {
             theSeedType = theImitaterType;
         }
-        int aRefreshTime =
-            Challenge::msVSShuffleMode ? GetVSRefreshTimeShuffle(theSeedType) : (VSSetupAddonWidget::msBalancePatchMode ? GetVSRefreshTimeBalanced(theSeedType) : GetVSRefreshTimeDefault(theSeedType));
+        int aRefreshTime = Challenge::msVSShuffleMode ? GetVSRefreshTimeShuffle(theSeedType) : (Challenge::msVSClassicMode ? GetVSRefreshTimeClassic(theSeedType) : GetVSRefreshTime(theSeedType));
         if (gLawnApp->mBoard->mChallenge->IsMPSuddenDeath() && Challenge::gVSSuddenDeathMode == 1) {
             // sd 不减冷却的卡片
             if (IsDefender(theSeedType)) {
@@ -3141,7 +3140,7 @@ int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType) {
                 case SeedType::SEED_ICESHROOM:
                 case SeedType::SEED_ICEBERG_LETTUCE:
                 case SeedType::SEED_CHILLY_PEPPER:
-                    if (Challenge::msVSShuffleMode || VSSetupAddonWidget::msBalancePatchMode) {
+                    if (!Challenge::msVSClassicMode) {
                         return aRefreshTime / 2;
                     }
                     [[fallthrough]];
@@ -3298,7 +3297,7 @@ pvzstl::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterTy
 }
 
 pvzstl::string Plant::GetToolTip(SeedType theSeedType) {
-    if (theSeedType == SeedType::SEED_CACTUS && VSSetupAddonWidget::msBalancePatchMode) {
+    if (theSeedType == SeedType::SEED_CACTUS && gLawnApp->IsVSMode() && !Challenge::msVSClassicMode) {
         return TodStringTranslate("[CACTUS_TOOLTIP_VS]");
     }
 
