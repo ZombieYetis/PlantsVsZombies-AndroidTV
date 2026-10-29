@@ -1077,11 +1077,10 @@ bool Challenge::IsMPResourceProducer(SeedType theSeedType) {
 
 bool Challenge::IsMPZombieTypeAddInRow(ZombieType theZombieType) {
     return theZombieType == ZombieType::ZOMBIE_DANCER || theZombieType == ZombieType::ZOMBIE_ZAMBONI || theZombieType == ZombieType::ZOMBIE_JACK_IN_THE_BOX
-        || theZombieType == ZombieType::ZOMBIE_DIGGER || theZombieType == ZombieType::ZOMBIE_CATAPULT || theZombieType == ZombieType::ZOMBIE_GARGANTUAR
-        || theZombieType == ZombieType::ZOMBIE_DUCKY_TUBE || theZombieType == ZombieType::ZOMBIE_SNORKEL || theZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER
-        || theZombieType == ZombieType::ZOMBIE_BALLOON || theZombieType == ZombieType::ZOMBIE_REDEYE_GARGANTUAR || theZombieType == ZombieType::ZOMBIE_BOBSLED
-        || theZombieType == ZombieType::ZOMBIE_JACKSON || theZombieType == ZombieType::ZOMBIE_EXPLORER || theZombieType == ZombieType::ZOMBIE_GIGA_GARGANTUAR
-        || theZombieType == ZombieType::ZOMBIE_DOGWALKER || theZombieType == ZombieType::ZOMBIE_SUPER_NOVA_GARGANTUAR;
+        || theZombieType == ZombieType::ZOMBIE_DIGGER || theZombieType == ZombieType::ZOMBIE_CATAPULT || theZombieType == ZombieType::ZOMBIE_DUCKY_TUBE || theZombieType == ZombieType::ZOMBIE_SNORKEL
+        || theZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER || theZombieType == ZombieType::ZOMBIE_BALLOON || theZombieType == ZombieType::ZOMBIE_BOBSLED
+        || theZombieType == ZombieType::ZOMBIE_JACKSON || theZombieType == ZombieType::ZOMBIE_EXPLORER || theZombieType == ZombieType::ZOMBIE_DOGWALKER || theZombieType == ZombieType::ZOMBIE_SCIENTIST
+        || Zombie::IsGargantuar(theZombieType);
 }
 
 bool Challenge::IsMPZombieTypeCanGoInPool(ZombieType theZombieType) {

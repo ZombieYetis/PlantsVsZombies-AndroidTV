@@ -1210,27 +1210,28 @@ void Projectile::DoImpact(Zombie *theZombie) {
                 return;
             }
 
-            if (!Challenge::msVSClassicMode) {
-                int aHitIndex = mPierceHitCount;
-                int aDamage = SPIKE_PIERCE_DAMAGE[aHitIndex];
-                if (theZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR || theZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER || theZombie->mShieldType == ShieldType::SHIELDTYPE_TRASHCAN
-                    || theZombie->mZombieType == ZombieType::ZOMBIE_ZAMBONI) {
-                    aDamage = 0;
-                    for (int i = aHitIndex; i < MAX_PIERCE_HIT_COUNT; ++i) {
-                        aDamage += SPIKE_PIERCE_DAMAGE[i];
-                    }
-                    mPierceHitCount = MAX_PIERCE_HIT_COUNT;
-                } else {
-                    ++mPierceHitCount;
-                }
-
-                theZombie->TakeDamage(aDamage, aDamageFlags);
-                mHitZombieIDs[aHitIndex] = mBoard->ZombieGetID(theZombie);
-                if (mPierceHitCount >= MAX_PIERCE_HIT_COUNT) {
-                    Die();
-                }
-            } else {
+            if (Challenge::msVSClassicMode) {
                 theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
+                Die();
+                return;
+            }
+
+            int aHitIndex = mPierceHitCount;
+            int aDamage = SPIKE_PIERCE_DAMAGE[aHitIndex];
+            if (theZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR || theZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER || theZombie->mShieldType == ShieldType::SHIELDTYPE_TRASHCAN
+                || theZombie->mZombieType == ZombieType::ZOMBIE_ZAMBONI) {
+                aDamage = 0;
+                for (int i = aHitIndex; i < MAX_PIERCE_HIT_COUNT; ++i) {
+                    aDamage += SPIKE_PIERCE_DAMAGE[i];
+                }
+                mPierceHitCount = MAX_PIERCE_HIT_COUNT;
+            } else {
+                ++mPierceHitCount;
+            }
+
+            theZombie->TakeDamage(aDamage, aDamageFlags);
+            mHitZombieIDs[aHitIndex] = mBoard->ZombieGetID(theZombie);
+            if (mPierceHitCount >= MAX_PIERCE_HIT_COUNT) {
                 Die();
             }
             return;

@@ -8414,9 +8414,13 @@ void Board::KillAllPlantsInRadius(int theX, int theY, int theRadius) {
     }
 }
 
-void Board::PlantsTakeDamageInGrid(int theGridX, int theGridY, int theDamage) {
-    Plant *aPlant = GetTopPlantAt(theGridX, theGridY, PlantPriority::TOPPLANT_EATING_ORDER);
-    if (aPlant != nullptr && !aPlant->IsInvulnerable()) {
+void Board::PlantsTakeDamageInRadius(int theRow, int theX, int theY, int theRadius, int theDamage) {
+    for (int aCol = 0; aCol < MAX_GRID_SIZE_X; ++aCol) {
+        Plant *aPlant = GetTopPlantAt(aCol, theRow, PlantPriority::TOPPLANT_EATING_ORDER);
+        if (aPlant == nullptr || aPlant->mPlantCol != aCol || aPlant->mRow != theRow || aPlant->NotOnGround() || aPlant->IsInvulnerable()
+            || !GetCircleRectOverlap(theX, theY, theRadius, aPlant->GetPlantRect())) {
+            continue;
+        }
         aPlant->mPlantHealth -= theDamage;
         aPlant->mEatenFlashCountdown = std::max(aPlant->mEatenFlashCountdown, 50);
     }

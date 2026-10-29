@@ -781,7 +781,7 @@ public:
     }
     int KillAllZombiesInRadius_Custom(int theRow, int theX, int theY, int theRadius, int theRowRange, bool theBurn, int theDamageRangeFlags);
     void KillAllPlantsInRadius(int theX, int theY, int theRadius);
-    void PlantsTakeDamageInGrid(int theGridX, int theGridY, int theDamage);
+    void PlantsTakeDamageInRadius(int theRow, int theX, int theY, int theRadius, int theDamage);
     void RemoveCutsceneZombies();
     int CountZombiesOnScreen();
     float GetPosYBasedOnRow(float thePosX, int theRow);

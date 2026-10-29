@@ -405,7 +405,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
         case ZombieType::ZOMBIE_GRAVEDIGGER:
             mBodyHealth = 270;
             mHelmType = HelmType::HELMTYPE_GRAVEDIGGER;
-            mHelmHealth = 100;
+            mHelmHealth = 150;
             mHasObject = true;
             mVariant = false;
             mZombieAttackRect = Rect(20, 0, 50, 115);
@@ -414,7 +414,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
             break;
 
         case ZombieType::ZOMBIE_SKELETON:
-            mBodyHealth = 190;
+            mBodyHealth = 300;
             mZombieAttackRect = Rect(20, 0, 50, 115);
             SetSkeletonVariant(IsOnBoard() && Rand(1000) == 0);
             break;
@@ -2255,10 +2255,10 @@ ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCo
     aZombie->RiseFromGrave(theCol, theRow);
     aZombie->mBodyHealth -= aZombie->mBodyMaxHealth / 3;
     if (aZombie->mHelmHealth > 0) {
-        aZombie->TakeHelmDamage(aZombie->mHelmMaxHealth * 2 / 3 + 2, 0U);
+        aZombie->TakeHelmDamage(aZombie->mHelmMaxHealth / 2, 0U);
     }
     if (aZombie->mShieldHealth > 0) {
-        aZombie->TakeShieldDamage(aZombie->mShieldMaxHealth * 2 / 3 + 2, 0U);
+        aZombie->TakeShieldDamage(aZombie->mShieldMaxHealth / 2, 0U);
     }
     aZombie->mHasArm = false;
     aZombie->SetupLostArmReanim();
@@ -3387,6 +3387,8 @@ void Zombie::UpdateGigaGargantuar() {
         if (aGigaImp == nullptr) {
             return;
         }
+        // 每轮三发依次落在第 1/2、2/3、3/4 列交界处。
+        aGigaImp->mTargetCol = mSummonCounter - 1;
 
         if (IsRemoteServer()) {
             U16U16U16UNI32UNI32_Event event{};
@@ -3846,6 +3848,12 @@ void Zombie::UpdateGigaImp() {
         }
 
         if (mAltitude <= 0.0f) {
+            if (!mMindControlled) {
+                mPosX = float(mBoard->GridToPixelX(mTargetCol + 1, mRow) - mWidth / 2);
+                mPosY = GetPosYBasedOnRow(mRow);
+                mX = int(mPosX);
+                mY = int(mPosY);
+            }
             mAltitude = 0.0f;
             doPop = true;
         }
@@ -4232,12 +4240,13 @@ void Zombie::ZombieImpThrown(Zombie *theThrowerZombie, float theOffsetDistance) 
         mBodyMaxHealth *= mScaleZombie * mScaleZombie;
         mChilledCounter = theThrowerZombie->mChilledCounter;
 
-        const auto aTargetX = float(mBoard->GridToPixelX(mTargetCol, mRow));
+        // mPosX 是僵尸左边缘，爆炸中心需要对齐格子交界。
+        const auto aTargetX = float(mBoard->GridToPixelX(mTargetCol + 1, mRow) - mWidth / 2);
         const float aThrowingDistance = std::max(0.0f, mPosX - aTargetX);
-        mVelX = GIGA_IMP_FLY_SPEED;
 
         const int aFlightFrames = std::max(1, int(std::ceil(aThrowingDistance / GIGA_IMP_FLY_SPEED)));
         const auto aFrames = float(aFlightFrames);
+        mVelX = aThrowingDistance / aFrames;
         float aGroundHeightDifference = 0.0f;
         if (mBoard->StageHasRoof()) {
             // 按整数帧后的实际落点补偿屋顶坡度，避免滞空延长后飞入小推车。
@@ -4557,7 +4566,10 @@ void Zombie::UpdateZombieSquashHead() {
         netplay::PutEvent(event);
     };
 
-    if (!IsRemoteClientOrViewer() && mHasHead && mIsEating && mZombiePhase == ZombiePhase::PHASE_SQUASH_PRE_LAUNCH) {
+    if (!IsRemoteClientOrViewer() && mHasHead && mIsEating
+        && mZombiePhase == ZombiePhase::PHASE_SQUASH_PRE_LAUNCH
+        // 对战模式窝瓜僵尸半血及以下触发碾压
+        && (!mApp->IsVSMode() || mBodyHealth <= mBodyMaxHealth / 2)) {
         StopEating();
         PlayZombieReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 12.0f);
         mHasHead = false;
@@ -5834,10 +5846,6 @@ void Zombie::EatPlant(Plant *thePlant) {
 
     StartEating();
 
-    if (mZombieType == ZombieType::ZOMBIE_SQUASH_HEAD && mZombiePhase == ZombiePhase::PHASE_SQUASH_PRE_LAUNCH && mSquashHeadCol == -1) {
-        mSquashHeadCol = thePlant->mPlantCol; // 修复窝瓜僵尸索敌冰冻生菜时被冻住，解冻后头部飘移
-    }
-
     if (thePlant->mSeedType == SeedType::SEED_JALAPENO || thePlant->mSeedType == SeedType::SEED_CHERRYBOMB || thePlant->mSeedType == SeedType::SEED_DOOMSHROOM
         || thePlant->mSeedType == SeedType::SEED_ICESHROOM || thePlant->mSeedType == SeedType::SEED_HYPNOSHROOM || thePlant->mState == PlantState::STATE_FLOWERPOT_INVULNERABLE
         || thePlant->mState == PlantState::STATE_LILYPAD_INVULNERABLE || thePlant->mState == PlantState::STATE_SQUASH_LOOK || thePlant->mState == PlantState::STATE_SQUASH_PRE_LAUNCH
@@ -5875,8 +5883,6 @@ void Zombie::EatPlant(Plant *thePlant) {
         }
     }
 
-    thePlant->mPlantHealth -= DAMAGE_PER_EAT;
-    thePlant->mRecentlyEatenCountdown = 50;
     auto absorbedEating = [this, &thePlant]() {
         if (!Plant::IsDefender(thePlant->mSeedType) || mJustGotShotCounter >= -500) {
             return false;
@@ -5892,16 +5898,23 @@ void Zombie::EatPlant(Plant *thePlant) {
     if (absorbedEating()) {
         thePlant->mPlantHealth -= DAMAGE_PER_EAT;
     }
+
+    int aDamageMultiplier = 1;
     if (mZombieType == ZombieType::ZOMBIE_SUNDAY_EDITION) {
         if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD) {
-            thePlant->mPlantHealth -= DAMAGE_PER_EAT * 3; // 4 倍啃咬伤害
+            aDamageMultiplier = 4;
         } else {
-            thePlant->mPlantHealth -= DAMAGE_PER_EAT; // 2 倍啃咬伤害
+            aDamageMultiplier = 2;
         }
     }
     if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        thePlant->mPlantHealth -= DAMAGE_PER_EAT; // 僵尸狗固定为 2 倍啃咬伤害
+        aDamageMultiplier = 2;
     }
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && mHasObject) {
+        aDamageMultiplier = 2;
+    }
+    thePlant->mPlantHealth -= DAMAGE_PER_EAT * aDamageMultiplier;
+    thePlant->mRecentlyEatenCountdown = 50;
 
     if (thePlant->mPlantHealth <= 0) {
         if (!IsRemoteClientOrViewer()) {
@@ -7958,6 +7971,9 @@ Plant *Zombie::FindPlantTarget(ZombieAttackType theAttackType) {
 
     Plant *aPlant = nullptr;
     while (mBoard->IteratePlants(aPlant)) {
+        if (mZombieType == ZombieType::ZOMBIE_SQUASH_HEAD && aPlant->mSeedType == SeedType::SEED_ICEBERG_LETTUCE) {
+            continue; // 窝瓜僵尸不索敌冰冻生菜
+        }
         if (aPlant->mRow == mRow) {
             Rect aPlantRect = aPlant->GetPlantRect();
             if (GetRectOverlap(aAttackRect, aPlantRect) >= 20 && CanTargetPlant(aPlant, theAttackType)) {
@@ -9455,7 +9471,7 @@ void Zombie::UpdateAnimSpeed() {
         if (mZombieType == ZombieType::ZOMBIE_POLEVAULTER || mZombieType == ZombieType::ZOMBIE_BALLOON || mZombieType == ZombieType::ZOMBIE_IMP || mZombieType == ZombieType::ZOMBIE_DIGGER
             || mZombieType == ZombieType::ZOMBIE_CROSSING_GUARD || mZombieType == ZombieType::ZOMBIE_JACK_IN_THE_BOX || mZombieType == ZombieType::ZOMBIE_SNORKEL
             || mZombieType == ZombieType::ZOMBIE_YETI || mZombieType == ZombieType::ZOMBIE_SUPER_FAN_IMP || mZombieType == ZombieType::ZOMBIE_GIGA_IMP
-            || mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER || IsZomblob(mZombieType)) {
+            || mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER || mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER || IsZomblob(mZombieType)) {
             ApplyAnimRate(20.0f);
         } else {
             ApplyAnimRate(36.0f);
@@ -10047,10 +10063,8 @@ void Zombie::DoSpecial() {
 
             int aPosX = mX + mWidth / 2;
             int aPosY = mY + mHeight / 2;
-            int aGridX = mBoard->PixelToGridXKeepOnBoard(aPosX, aPosY);
-            int aGridY = mBoard->PixelToGridYKeepOnBoard(aPosX, aPosY);
             if (mMindControlled) {
-                mBoard->KillAllZombiesInRadius_Custom(mRow, aPosX, aPosY, SuperFanImpZombieRadius, 1, true, 127);
+                mBoard->KillAllZombiesInRadius_Custom(mRow, aPosX, aPosY, SuperFanImpZombieRadius, 0, true, 127);
             } else {
                 int aDamage = SUPER_FAN_IMP_POP_DAMAGE;
                 if (mZombieType == ZombieType::ZOMBIE_GIGA_IMP) {
@@ -10060,8 +10074,8 @@ void Zombie::DoSpecial() {
                         aParticle->OverrideScale(nullptr, 0.5f);
                     }
                 }
-                mBoard->KillAllZombiesInRadius_Custom(mRow, aPosX, aPosY, SuperFanImpZombieRadius, 1, true, 255);
-                mBoard->PlantsTakeDamageInGrid(aGridX, aGridY, aDamage);
+                mBoard->KillAllZombiesInRadius_Custom(mRow, aPosX, aPosY, SuperFanImpZombieRadius, 0, true, 255);
+                mBoard->PlantsTakeDamageInRadius(mRow, aPosX, aPosY, SuperFanImpPlantRadius, aDamage);
             }
             break;
         }
