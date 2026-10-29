@@ -2890,6 +2890,7 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_MELONPULT: // 300 -> 200
             aCost = 200;
             break;
+        case SeedType::SEED_THREEPEATER:       // 200 -> 225
         case SeedType::SEED_ZOMBIE_GARGANTUAR: // 250 -> 225
             aCost = 225;
             break;

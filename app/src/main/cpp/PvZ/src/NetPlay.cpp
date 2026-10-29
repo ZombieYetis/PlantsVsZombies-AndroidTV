@@ -295,7 +295,7 @@ bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
         }
     };
     const char *gameMode = Challenge::msVSClassicMode ? "CLASSIC" : Challenge::msVSShuffleMode ? "SHUFFLE" : "NORMAL";
-    oss << "|bg=" << gMetricsVsBackground << "&battle=" << gMetricsBattleType << "&game_mode=" << gameMode << "&addon_ep=" << (gMetricsExtraPacket ? 1 : 0)
+    oss << "|bg=" << gMetricsVsBackground << "&battle=" << gMetricsBattleType << "&game_mode=" << gameMode << "&netplay_version=" << NETPLAY_VERSION << "&addon_ep=" << (gMetricsExtraPacket ? 1 : 0)
         << "&addon_ban=" << (gMetricsBanMode ? 1 : 0) << "&mower_loss=" << gMetricsMowerLoss << "&target_loss=" << gMetricsTargetLoss << "&grave_loss=" << gMetricsGraveLoss
         << "&sunflower_loss=" << gMetricsSunflowerLoss << "&plant_use=";
     appendUsage(oss, gMetricsPlantUseCount);
