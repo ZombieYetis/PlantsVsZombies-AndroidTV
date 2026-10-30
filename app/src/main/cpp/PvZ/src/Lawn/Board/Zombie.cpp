@@ -1000,17 +1000,22 @@ void Zombie::UnbindRealatedZombie() {
 
 Zombie *Zombie::FindCrossingGuardTarget() {
     Zombie *aBestZombie = nullptr;
-    bool aBestIsSameRow = false;
+    float aBestDistance = 0.0f;
+    const float aX = mPosX + float(mWidth / 2);
+    const float aY = mPosY + float(mHeight / 2);
     Zombie *aZombie = nullptr;
     while (mBoard->IterateZombies(aZombie)) {
         if (!IsValidCrossingGuardTarget(aZombie, true) || IsTrafficConeTargetReserved(aZombie)) {
             continue;
         }
 
-        const bool aIsSameRow = aZombie->mRow == mRow;
-        if (aBestZombie == nullptr || (aIsSameRow && !aBestIsSameRow) || (aIsSameRow == aBestIsSameRow && aZombie->mPosX < aBestZombie->mPosX)) {
+        const float aTargetX = aZombie->mPosX + float(aZombie->mWidth / 2);
+        const float aTargetY = aZombie->mPosY + float(aZombie->mHeight / 2);
+        // 参考磁力菇，每跨一行额外计入 80 距离。
+        const float aDistance = Distance2D(aX, aY, aTargetX, aTargetY) + std::abs(aZombie->mRow - mRow) * 80.0f;
+        if (aBestZombie == nullptr || aDistance < aBestDistance) {
             aBestZombie = aZombie;
-            aBestIsSameRow = aIsSameRow;
+            aBestDistance = aDistance;
         }
     }
 
