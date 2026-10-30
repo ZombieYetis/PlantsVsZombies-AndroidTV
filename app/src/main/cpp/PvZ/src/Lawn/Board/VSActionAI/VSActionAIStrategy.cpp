@@ -76,7 +76,7 @@ std::uint32_t DeckSignature(const VSGameState &state, VSSide side) {
         }
         seeds.push_back(card.seedType);
     }
-    std::sort(seeds.begin(), seeds.end());
+    std::ranges::sort(seeds, std::less{});
 
     // FNV-1a over sorted 16-bit seed ids. Keep this byte-for-byte aligned
     // with the external replay extractor: deck order is UI noise, whereas
@@ -566,9 +566,8 @@ bool IsReadyCard(const VSCardState &card, int resource) {
 }
 
 int ReadyPlantAreaCounterCount(const VSGameState &state) {
-    return static_cast<int>(std::count_if(state.seedBanks[0].begin(), state.seedBanks[0].end(), [&state](const VSCardState &card) {
-        return IsAreaCounterSeed(static_cast<SeedType>(card.seedType)) && IsReadyCard(card, state.plantSun);
-    }));
+    return static_cast<int>(
+        std::ranges::count_if(state.seedBanks[0], [&state](const VSCardState &card) { return IsAreaCounterSeed(static_cast<SeedType>(card.seedType)) && IsReadyCard(card, state.plantSun); }));
 }
 
 int PlantAreaCounterExposure(const VSGameState &state, int row) {
@@ -604,9 +603,8 @@ bool IsZombieBreakthroughSeed(SeedType seed) {
 }
 
 bool HasReadyZombieBreakthroughCard(const VSGameState &state) {
-    return std::any_of(state.seedBanks[1].begin(), state.seedBanks[1].end(), [&state](const VSCardState &card) {
-        return IsZombieBreakthroughSeed(static_cast<SeedType>(card.seedType)) && IsReadyCard(card, state.zombieBrains);
-    });
+    return std::ranges::any_of(state.seedBanks[1],
+                               [&state](const VSCardState &card) { return IsZombieBreakthroughSeed(static_cast<SeedType>(card.seedType)) && IsReadyCard(card, state.zombieBrains); });
 }
 
 bool IsHeavyZombieSeed(SeedType seed) {

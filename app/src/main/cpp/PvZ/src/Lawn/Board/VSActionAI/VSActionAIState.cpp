@@ -24,20 +24,17 @@ bool IsDeadOrOutside(const VSPlantState &plant) {
 }
 
 bool HasPlantAt(const VSGameState &state, VSGridPosition position) {
-    return std::any_of(state.plants.begin(), state.plants.end(), [position](const VSPlantState &plant) {
-        return !IsDeadOrOutside(plant) && plant.position.col == position.col && plant.position.row == position.row;
-    });
+    return std::ranges::any_of(state.plants, [position](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.col == position.col && plant.position.row == position.row; });
 }
 
 bool HasPlantTypeAt(const VSGameState &state, SeedType seedType, VSGridPosition position) {
-    return std::any_of(state.plants.begin(), state.plants.end(), [seedType, position](const VSPlantState &plant) {
+    return std::ranges::any_of(state.plants, [seedType, position](const VSPlantState &plant) {
         return !IsDeadOrOutside(plant) && plant.seedType == static_cast<std::uint16_t>(seedType) && plant.position.col == position.col && plant.position.row == position.row;
     });
 }
 
 bool HasGridItemAt(const VSGameState &state, VSGridPosition position) {
-    return std::any_of(
-        state.gridItems.begin(), state.gridItems.end(), [position](const VSGridItemState &item) { return !item.dead && item.position.col == position.col && item.position.row == position.row; });
+    return std::ranges::any_of(state.gridItems, [position](const VSGridItemState &item) { return !item.dead && item.position.col == position.col && item.position.row == position.row; });
 }
 
 const VSZombieState *FindClosestZombie(const VSGameState &state, int row) {
@@ -54,15 +51,15 @@ const VSZombieState *FindClosestZombie(const VSGameState &state, int row) {
 }
 
 int CountPlantsInRow(const VSGameState &state, int row) {
-    return static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row; }));
+    return static_cast<int>(std::ranges::count_if(state.plants, [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row; }));
 }
 
 int CountZombiesInRow(const VSGameState &state, int row) {
-    return static_cast<int>(std::count_if(state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row; }));
+    return static_cast<int>(std::ranges::count_if(state.zombies, [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row; }));
 }
 
 int CountActiveZombies(const VSGameState &state) {
-    return static_cast<int>(std::count_if(state.zombies.begin(), state.zombies.end(), [](const VSZombieState &zombie) { return !zombie.dead && zombie.row >= 0; }));
+    return static_cast<int>(std::ranges::count_if(state.zombies, [](const VSZombieState &zombie) { return !zombie.dead && zombie.row >= 0; }));
 }
 
 int CountActiveZombieRows(const VSGameState &state) {
@@ -76,21 +73,18 @@ int CountActiveZombieRows(const VSGameState &state) {
 }
 
 int CountPlantType(const VSGameState &state, SeedType seedType) {
-    return static_cast<int>(
-        std::count_if(state.plants.begin(), state.plants.end(), [seedType](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.seedType == static_cast<std::uint16_t>(seedType); }));
+    return static_cast<int>(std::ranges::count_if(state.plants, [seedType](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.seedType == static_cast<std::uint16_t>(seedType); }));
 }
 
 bool HasPlantTypeInRow(const VSGameState &state, SeedType seedType, int row) {
-    return std::any_of(state.plants.begin(), state.plants.end(), [seedType, row](const VSPlantState &plant) {
-        return !IsDeadOrOutside(plant) && plant.position.row == row && plant.seedType == static_cast<std::uint16_t>(seedType);
-    });
+    return std::ranges::any_of(state.plants,
+                               [seedType, row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && plant.seedType == static_cast<std::uint16_t>(seedType); });
 }
 
 bool HasActiveDeckCard(const VSGameState &state, VSSide side, SeedType seedType) {
     const std::size_t sideIndex = side == VSSide::Plants ? 0 : 1;
-    return std::any_of(state.seedBanks[sideIndex].begin(), state.seedBanks[sideIndex].end(), [seedType](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(seedType);
-    });
+    return std::ranges::any_of(state.seedBanks[sideIndex],
+                               [seedType](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(seedType); });
 }
 
 bool IsHeavyZombie(std::uint16_t zombieType) {
@@ -145,13 +139,12 @@ bool IsDecisiveCounterZombie(std::uint16_t zombieType) {
 }
 
 bool HasZombieTypeInRow(const VSGameState &state, int row, ZombieType zombieType) {
-    return std::any_of(state.zombies.begin(), state.zombies.end(), [row, zombieType](const VSZombieState &zombie) {
-        return !zombie.dead && zombie.row == row && zombie.zombieType == static_cast<std::uint16_t>(zombieType);
-    });
+    return std::ranges::any_of(state.zombies,
+                               [row, zombieType](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row && zombie.zombieType == static_cast<std::uint16_t>(zombieType); });
 }
 
 bool HasMindControlledZombieInRow(const VSGameState &state, int row) {
-    return std::any_of(state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row && zombie.mindControlled; });
+    return std::ranges::any_of(state.zombies, [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row && zombie.mindControlled; });
 }
 
 bool IsMowerInMotion(const VSGameState &state, int row) {
@@ -164,8 +157,7 @@ bool HasZombieInHomeColumn(const VSGameState &state, int row) {
     }
 
     constexpr float kHomeColumnX = static_cast<float>(LAWN_XMIN + 80);
-    return std::any_of(
-        state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) { return !zombie.dead && !zombie.mindControlled && zombie.row == row && zombie.positionX <= kHomeColumnX; });
+    return std::ranges::any_of(state.zombies, [row](const VSZombieState &zombie) { return !zombie.dead && !zombie.mindControlled && zombie.row == row && zombie.positionX <= kHomeColumnX; });
 }
 
 bool IsMowerAboutToTrigger(const VSGameState &state, int row) {
@@ -184,7 +176,7 @@ bool IsNutBypassZombieApproaching(const VSGameState &state, int row) {
     }
 
     constexpr float kApproachingHeavyX = 760.0f;
-    return std::any_of(state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) {
+    return std::ranges::any_of(state.zombies, [row](const VSZombieState &zombie) {
         if (zombie.dead || zombie.mindControlled || zombie.row != row) {
             return false;
         }

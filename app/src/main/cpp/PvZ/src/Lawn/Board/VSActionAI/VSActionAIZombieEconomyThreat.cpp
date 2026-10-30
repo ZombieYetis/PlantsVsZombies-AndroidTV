@@ -299,12 +299,12 @@ int MostVulnerableZombieEconomyRow(const VSGameState &state) {
 
 int MostThreatenedEconomyRow(const VSGameState &state) {
     const auto IsLiveZombieTargetRow = [&state](int row) {
-        return std::any_of(state.gridItems.begin(), state.gridItems.end(), [row](const VSGridItemState &item) {
+        return std::ranges::any_of(state.gridItems, [row](const VSGridItemState &item) {
             return !item.dead && item.health > 0 && item.position.row == row && item.gridItemType == static_cast<std::uint16_t>(GridItemType::GRIDITEM_MP_TARGET_ZOMBIE);
         });
     };
-    const bool hasZombieTargets = std::any_of(
-        state.gridItems.begin(), state.gridItems.end(), [](const VSGridItemState &item) { return item.gridItemType == static_cast<std::uint16_t>(GridItemType::GRIDITEM_MP_TARGET_ZOMBIE); });
+    const bool hasZombieTargets =
+        std::ranges::any_of(state.gridItems, [](const VSGridItemState &item) { return item.gridItemType == static_cast<std::uint16_t>(GridItemType::GRIDITEM_MP_TARGET_ZOMBIE); });
     int bestRow = 0;
     int bestScore = std::numeric_limits<int>::min();
     for (int row = 0; row < state.rows; ++row) {
@@ -398,9 +398,8 @@ int PlantLaneWeaknessScore(const VSGameState &state, int row) {
 }
 
 int EconomyPlantsInRow(const VSGameState &state, int row) {
-    return static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [&state, row](const VSPlantState &plant) {
-        return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantEconomySeed(state, plant.seedType);
-    }));
+    return static_cast<int>(
+        std::ranges::count_if(state.plants, [&state, row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantEconomySeed(state, plant.seedType); }));
 }
 
 int ZombieLaneAttackScore(const VSGameState &state, int row) {

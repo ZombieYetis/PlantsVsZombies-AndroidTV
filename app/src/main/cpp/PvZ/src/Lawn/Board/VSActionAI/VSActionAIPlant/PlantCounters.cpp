@@ -210,12 +210,10 @@ std::optional<VSAction> PlantAIPlanning::TryPotatoMine(const VSGameState &state,
 std::optional<VSAction> PlantAIPlanning::TrySnowpeaBonkPressure(const VSGameState &state, int preferredRow, int protectedSun) {
     const VSCardState *snowpea = PlantAIPlanning::FindReadyCard(state, SeedType::SEED_SNOWPEA);
     const VSCardState *bonk = PlantAIPlanning::FindReadyCard(state, SeedType::SEED_BONK_CHOY);
-    const bool hasSnowpeaDeck = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SNOWPEA);
-    });
-    const bool hasBonkDeck = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_BONK_CHOY);
-    });
+    const bool hasSnowpeaDeck =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SNOWPEA); });
+    const bool hasBonkDeck =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_BONK_CHOY); });
     if (!hasSnowpeaDeck || !hasBonkDeck) {
         return std::nullopt;
     }
@@ -277,9 +275,8 @@ std::optional<VSAction> PlantAIPlanning::TrySnowpeaBonkPressure(const VSGameStat
 }
 
 std::optional<VSAction> PlantAIPlanning::TryStarfruitChomperPressure(const VSGameState &state, int preferredRow, int protectedSun) {
-    const bool hasStarfruitDeck = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_STARFRUIT);
-    });
+    const bool hasStarfruitDeck =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_STARFRUIT); });
     const VSCardState *chomper = PlantAIPlanning::FindReadyCard(state, SeedType::SEED_CHOMPER);
     if (!hasStarfruitDeck || chomper == nullptr || CountPlantType(state, SeedType::SEED_STARFRUIT) == 0 || state.plantSun - chomper->cost < protectedSun) {
         return std::nullopt;
@@ -317,12 +314,10 @@ std::optional<VSAction> PlantAIPlanning::TryStarfruitChomperPressure(const VSGam
 }
 
 std::optional<VSAction> PlantAIPlanning::TryKernelCeleryPressure(const VSGameState &state, int preferredRow, int protectedSun) {
-    const bool hasKernelCarry = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_KERNELPULT);
-    });
-    const bool hasRepeaterCarry = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_REPEATER);
-    });
+    const bool hasKernelCarry =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_KERNELPULT); });
+    const bool hasRepeaterCarry =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_REPEATER); });
     const VSCardState *celery = PlantAIPlanning::FindReadyCard(state, SeedType::SEED_CELERY_STALKER);
     const bool hasRearCore = CountPlantType(state, SeedType::SEED_KERNELPULT) > 0 || CountPlantType(state, SeedType::SEED_REPEATER) > 0;
     if ((!hasKernelCarry && !hasRepeaterCarry) || !hasRearCore || celery == nullptr || state.plantSun - celery->cost < protectedSun) {
@@ -484,7 +479,7 @@ std::optional<VSAction> PlantAIPlanning::TryHypnoshroom(const VSGameState &state
                 continue;
             }
             if (!state.isNight) {
-                const int zombiesOnPlantCell = static_cast<int>(std::count_if(state.zombies.begin(), state.zombies.end(), [&target](const VSZombieState &other) {
+                const int zombiesOnPlantCell = static_cast<int>(std::ranges::count_if(state.zombies, [&target](const VSZombieState &other) {
                     return !other.dead && !other.mindControlled && other.row == target.row && PlantAIPlanning::ZombieColumn(other) == target.col;
                 }));
                 // Like Ice-shroom and Doom-shroom, a daytime Hypno-shroom

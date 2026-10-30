@@ -80,7 +80,7 @@ VSGridPosition PlantAIPlanning::FindSustainedOutputCell(const VSGameState &state
 }
 
 bool PlantAIPlanning::HasReadySustainedOutputCard(const VSGameState &state, int protectedSun) const {
-    return std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [&](const VSCardState &card) {
+    return std::ranges::any_of(state.seedBanks[0], [&](const VSCardState &card) {
         if (IsSlotBlocked(card.slot) || !IsReadyCard(card, state.plantSun) || !IsSustainedOutputSeed(static_cast<SeedType>(card.seedType))) {
             return false;
         }
@@ -105,7 +105,7 @@ std::optional<VSAction> PlantAIPlanning::TryRecycleIncomeForOutput(const VSGameS
         if (!HasLiveZombieTargetInRow(state, row)) {
             continue;
         }
-        const bool hasReadyLobbedOutput = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [&](const VSCardState &card) {
+        const bool hasReadyLobbedOutput = std::ranges::any_of(state.seedBanks[0], [&](const VSCardState &card) {
             if (!IsReadyCard(card, state.plantSun) || !IsLobbedOutputSeed(static_cast<SeedType>(card.seedType))) {
                 return false;
             }
@@ -395,20 +395,19 @@ bool PlantAIPlanning::HasIncomeSeed(const VSGameState &state) const {
     if (state.isSuddenDeath) {
         return false;
     }
-    return std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [&state](const VSCardState &card) {
+    return std::ranges::any_of(state.seedBanks[0], [&state](const VSCardState &card) {
         return !card.matchRestricted
             && (card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SUNFLOWER) || (state.isNight && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SUNSHROOM)));
     });
 }
 
 bool PlantAIPlanning::HasSunshroomSeed(const VSGameState &state) const {
-    return !state.isSuddenDeath && std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SUNSHROOM);
-    });
+    return !state.isSuddenDeath
+        && std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SUNSHROOM); });
 }
 
 bool PlantAIPlanning::HasEconomyPressurePlan(const VSGameState &state) const {
-    return std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
+    return std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) {
         if (card.matchRestricted || !card.active) {
             return false;
         }
@@ -429,7 +428,7 @@ int PlantAIPlanning::PrimaryOutputCost(const VSGameState &state) const {
         }
         int outputCost = std::max(0, card.cost);
         if (!state.isNight && PlantAIPlanning::IsDaytimeCoffeeMushroom(seed)) {
-            const auto coffee = std::find_if(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &candidate) {
+            const auto coffee = std::ranges::find_if(state.seedBanks[0], [](const VSCardState &candidate) {
                 return !candidate.matchRestricted && candidate.active && candidate.seedType == static_cast<std::uint16_t>(SeedType::SEED_INSTANT_COFFEE);
             });
             if (coffee == state.seedBanks[0].end()) {
@@ -489,7 +488,7 @@ int PlantAIPlanning::EconomyPressureIncomeTarget(const VSGameState &state) const
         }
         int outputCost = std::max(0, card.cost);
         if (!state.isNight && PlantAIPlanning::IsDaytimeCoffeeMushroom(seed)) {
-            const auto coffee = std::find_if(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &candidate) {
+            const auto coffee = std::ranges::find_if(state.seedBanks[0], [](const VSCardState &candidate) {
                 return !candidate.matchRestricted && candidate.active && candidate.seedType == static_cast<std::uint16_t>(SeedType::SEED_INSTANT_COFFEE);
             });
             if (coffee == state.seedBanks[0].end()) {

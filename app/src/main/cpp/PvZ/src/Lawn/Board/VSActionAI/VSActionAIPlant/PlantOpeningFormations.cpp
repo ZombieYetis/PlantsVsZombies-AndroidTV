@@ -382,7 +382,7 @@ std::optional<VSAction> PlantAIPlanning::TryPeaPuffTempoOpening(const VSGameStat
     int bestScore = std::numeric_limits<int>::min();
     for (int offset = 0; offset < state.rows; ++offset) {
         const int row = (preferredRow + offset) % state.rows;
-        const bool hasAwakePuff = std::any_of(state.plants.begin(), state.plants.end(), [row](const VSPlantState &plant) {
+        const bool hasAwakePuff = std::ranges::any_of(state.plants, [row](const VSPlantState &plant) {
             return !IsDeadOrOutside(plant) && plant.position.row == row && plant.seedType == static_cast<std::uint16_t>(SeedType::SEED_PUFFSHROOM) && !plant.asleep;
         });
         if (!hasAwakePuff || HasPlantTypeInRow(state, SeedType::SEED_PEASHOOTER, row) || PlantAIPlanning::ShouldYieldLaneToMower(state, row) || IsRangedOutputTradeUnfavorable(state, row)) {

@@ -30,7 +30,7 @@
 namespace vsai::detail {
 
 bool ZombieAIPlanning::HasLobbedPlantInRow(const VSGameState &state, int row) {
-    return std::any_of(state.plants.begin(), state.plants.end(), [row](const VSPlantState &plant) {
+    return std::ranges::any_of(state.plants, [row](const VSPlantState &plant) {
         if (IsDeadOrOutside(plant) || plant.position.row != row) {
             return false;
         }
@@ -82,7 +82,7 @@ int ZombieAIPlanning::HeavyZombieReserve(const VSGameState &state) const {
 }
 
 bool ZombieAIPlanning::HasReadyFrontlineProbe(const VSGameState &state) const {
-    return std::any_of(state.seedBanks[1].begin(), state.seedBanks[1].end(), [&](const VSCardState &card) {
+    return std::ranges::any_of(state.seedBanks[1], [&](const VSCardState &card) {
         return !IsSlotBlocked(card.slot) && card.active && !card.matchRestricted && IsZombieFrontlineProbeSeed(static_cast<SeedType>(card.seedType)) && IsReadyCard(card, state.zombieBrains);
     });
 }
@@ -128,7 +128,7 @@ bool ZombieAIPlanning::IsEarlyHeavyCommitCard(const VSGameState &state, SeedType
 }
 
 bool ZombieAIPlanning::HasReadyEarlyHeavyCommit(const VSGameState &state, const ZombieDecisionContext &context) const {
-    return std::any_of(state.seedBanks[1].begin(), state.seedBanks[1].end(), [&](const VSCardState &card) {
+    return std::ranges::any_of(state.seedBanks[1], [&](const VSCardState &card) {
         const SeedType seed = static_cast<SeedType>(card.seedType);
         return !IsSlotBlocked(card.slot) && card.active && !card.matchRestricted && IsReadyCard(card, state.zombieBrains) && IsEarlyHeavyCommitCard(state, seed, context);
     });
@@ -139,8 +139,8 @@ std::optional<VSAction> ZombieAIPlanning::TryTemplateSundayRelease(const VSGameS
     const bool normalNewsImpSundayTemplate = profile.Has(ZombieTemplate::NormalNewsImpSunday);
     const bool impPailSledSundayTemplate = profile.Has(ZombieTemplate::ImpSledSunday);
     const bool peaHeadSundayTemplate = profile.Has(ZombieTemplate::PeaHeadSunday);
-    const int peaHeadCount = static_cast<int>(std::count_if(
-        state.zombies.begin(), state.zombies.end(), [](const VSZombieState &zombie) { return !zombie.dead && zombie.zombieType == static_cast<std::uint16_t>(ZombieType::ZOMBIE_PEA_HEAD); }));
+    const int peaHeadCount = static_cast<int>(
+        std::ranges::count_if(state.zombies, [](const VSZombieState &zombie) { return !zombie.dead && zombie.zombieType == static_cast<std::uint16_t>(ZombieType::ZOMBIE_PEA_HEAD); }));
     const int maximumCounterExposure = impPailSledSundayTemplate || peaHeadSundayTemplate ? 145 : 150;
     const ZombieTempoPolicy &tempo = context.tempo;
     const bool releaseWindow =

@@ -61,7 +61,7 @@ void TodParticleLoadDefinitions(ParticleParams *theParticleParamArray, int thePa
     // 只扩展完整的游戏参数表；空扩展表和编辑器的 (nullptr, 0) 调用直接透传。
     if (!gExtendedParticleParamArray.empty() && theParticleParamArraySize == NUM_PARTICLES) {
         std::copy_n(theParticleParamArray, NUM_PARTICLES, gMergedParticleParamArray.begin());
-        std::copy(gExtendedParticleParamArray.begin(), gExtendedParticleParamArray.end(), gMergedParticleParamArray.begin() + NUM_PARTICLES);
+        std::ranges::copy(gExtendedParticleParamArray, gMergedParticleParamArray.begin() + NUM_PARTICLES);
 
         // 原加载器每读一个定义会增加 6 个完成任务，同步扩展总任务数。
         if (Sexy::gSexyAppBase != nullptr) {

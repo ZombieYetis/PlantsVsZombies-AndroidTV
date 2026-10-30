@@ -1211,7 +1211,7 @@ SeedType FindBuiltinAIPlantDeckCandidate(SeedChooserScreen *screen, const SeedTy
             SeedType::SEED_JALAPENO,
             SeedType::SEED_CHILLY_PEPPER,
         };
-        return std::none_of(std::begin(kHigherPriorityAnswers), std::end(kHigherPriorityAnswers), [&](SeedType answer) { return IsCompatible(answer); });
+        return std::ranges::none_of(kHigherPriorityAnswers, [&](SeedType answer) { return IsCompatible(answer); });
     };
 
     if (priorityCount > 0) {

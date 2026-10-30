@@ -133,9 +133,8 @@ std::optional<VSAction> PlantAIPlanning::TrySpikeweed(const VSGameState &state, 
 }
 
 std::optional<VSAction> PlantAIPlanning::TryCactusSpikeweedPressure(const VSGameState &state, int preferredRow, int protectedSun) {
-    const bool hasCactusCard = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_CACTUS);
-    });
+    const bool hasCactusCard =
+        std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_CACTUS); });
     if (!hasCactusCard || CountPlantType(state, SeedType::SEED_CACTUS) == 0 || PlantAIPlanning::FindReadyCard(state, SeedType::SEED_SPIKEWEED) == nullptr) {
         return std::nullopt;
     }
@@ -201,9 +200,8 @@ std::optional<VSAction> PlantAIPlanning::TryImpactDistraction(const VSGameState 
     // A front plant already absorbs the next Squash Head or Giga Football
     // tackle. Adding another disposable body behind it spends a card without
     // buying any additional time for the protected carry.
-    const bool hasExistingPad = std::any_of(state.plants.begin(), state.plants.end(), [&](const VSPlantState &plant) {
-        return !IsDeadOrOutside(plant) && plant.position.row == row && plant.position.col > protectedColumn && plant.position.col <= impactColumn;
-    });
+    const bool hasExistingPad = std::ranges::any_of(
+        state.plants, [&](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && plant.position.col > protectedColumn && plant.position.col <= impactColumn; });
     if (hasExistingPad) {
         return std::nullopt;
     }
@@ -321,7 +319,7 @@ std::optional<VSAction> PlantAIPlanning::TryFallbackPlant(const VSGameState &sta
                                            : (requiresExactRow ? FindPlantCellInExactRow(state, row, firstColumn, lastColumn) : FindPlantCellInColumns(state, row, firstColumn, lastColumn)));
         if (target.col >= 0 && target.row >= 0 && (!IsPlantCombatSeed(static_cast<std::uint16_t>(seed)) || IsPlantPlacementSafe(state, seed, target))) {
             if (!state.isNight && (seed == SeedType::SEED_ICESHROOM || seed == SeedType::SEED_DOOMSHROOM)) {
-                const int zombiesOnPlantCell = static_cast<int>(std::count_if(state.zombies.begin(), state.zombies.end(), [&target](const VSZombieState &zombie) {
+                const int zombiesOnPlantCell = static_cast<int>(std::ranges::count_if(state.zombies, [&target](const VSZombieState &zombie) {
                     return !zombie.dead && !zombie.mindControlled && zombie.row == target.row && PlantAIPlanning::ZombieColumn(zombie) == target.col;
                 }));
                 if (zombiesOnPlantCell >= 2) {

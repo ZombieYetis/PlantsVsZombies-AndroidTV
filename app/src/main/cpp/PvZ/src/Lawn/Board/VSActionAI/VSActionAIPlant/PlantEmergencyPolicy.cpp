@@ -38,7 +38,7 @@ PlantDecisionResult PlantAIPlanning::TryEmergencyPolicy(const VSGameState &state
     // is its direct counter, so check every threatened row before spending
     // a broader ash answer elsewhere.
     for (int row = 0; row < state.rows; ++row) {
-        const bool hasLitExplorer = std::any_of(state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) {
+        const bool hasLitExplorer = std::ranges::any_of(state.zombies, [row](const VSZombieState &zombie) {
             return !zombie.dead && !zombie.mindControlled && zombie.row == row && zombie.zombieType == static_cast<std::uint16_t>(ZombieType::ZOMBIE_EXPLORER) && zombie.explorerTorchLit;
         });
         if (hasLitExplorer) {

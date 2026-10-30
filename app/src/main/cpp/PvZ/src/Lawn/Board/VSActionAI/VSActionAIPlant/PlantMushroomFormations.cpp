@@ -346,9 +346,8 @@ std::optional<VSAction> PlantAIPlanning::TryPeaPuffPressure(const VSGameState &s
 }
 
 std::optional<VSAction> PlantAIPlanning::TrySporePuffPressure(const VSGameState &state, int preferredRow, int protectedSun) {
-    const bool hasSporeCarry = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SPORESHROOM);
-    });
+    const bool hasSporeCarry = std::ranges::any_of(
+        state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SPORESHROOM); });
     const VSCardState *puff = PlantAIPlanning::FindReadyCard(state, SeedType::SEED_PUFFSHROOM);
     if (!hasSporeCarry || puff == nullptr || EffectivePlantEconomyCount(state) < 3) {
         return std::nullopt;

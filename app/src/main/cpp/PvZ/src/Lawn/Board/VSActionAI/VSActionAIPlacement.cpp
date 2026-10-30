@@ -403,9 +403,8 @@ VSGridPosition FindSpikeweedCell(const VSGameState &state, int row) {
     for (int column = 5; column >= 4; --column) {
         const VSGridPosition target{static_cast<std::int8_t>(column), static_cast<std::int8_t>(row)};
         const float cellCenterX = PlantCellCenterX(target);
-        const bool willBeCrossed = std::any_of(state.zombies.begin(), state.zombies.end(), [row, cellCenterX](const VSZombieState &zombie) {
-            return !zombie.dead && !zombie.mindControlled && zombie.row == row && zombie.positionX >= cellCenterX - 20.0f;
-        });
+        const bool willBeCrossed = std::ranges::any_of(
+            state.zombies, [row, cellCenterX](const VSZombieState &zombie) { return !zombie.dead && !zombie.mindControlled && zombie.row == row && zombie.positionX >= cellCenterX - 20.0f; });
         if (willBeCrossed && IsPlantableVSTile(state, target) && !HasPlantAt(state, target) && !HasGridItemAt(state, target) && IsPlantPlacementSafe(state, SeedType::SEED_SPIKEWEED, target)) {
             return target;
         }
@@ -443,7 +442,7 @@ bool CanInvestZombieEconomyInRow(const VSGameState &state, int row) {
 VSGridPosition FindZombieEconomyCell(const VSGameState &state, int preferredRow) {
     preferredRow = std::clamp(preferredRow, 0, std::max(0, state.rows - 1));
     auto HasBlockingGridItem = [&](VSGridPosition position) {
-        return std::any_of(state.gridItems.begin(), state.gridItems.end(), [position](const VSGridItemState &item) {
+        return std::ranges::any_of(state.gridItems, [position](const VSGridItemState &item) {
             // VS creates a target marker at column 8 for every row. The
             // engine permits a grave on that marker, so it must not consume
             // the back-column economy slot in the AI's board snapshot.
@@ -562,7 +561,7 @@ bool IsCardReadyForZombieTarget(const VSCardState &card, const VSGameState &stat
 }
 
 int CountZombieEconomy(const VSGameState &state) {
-    return static_cast<int>(std::count_if(state.gridItems.begin(), state.gridItems.end(), [](const VSGridItemState &item) {
+    return static_cast<int>(std::ranges::count_if(state.gridItems, [](const VSGridItemState &item) {
         return !item.dead && (item.gridItemType == GridItemType::GRIDITEM_GRAVESTONE || item.gridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND);
     }));
 }
@@ -579,7 +578,7 @@ int StrategyBucket(int value) {
 }
 
 int CountLivePlants(const VSGameState &state) {
-    return static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [](const VSPlantState &plant) { return !IsDeadOrOutside(plant); }));
+    return static_cast<int>(std::ranges::count_if(state.plants, [](const VSPlantState &plant) { return !IsDeadOrOutside(plant); }));
 }
 
 int CountPlantIncome(const VSGameState &state) {

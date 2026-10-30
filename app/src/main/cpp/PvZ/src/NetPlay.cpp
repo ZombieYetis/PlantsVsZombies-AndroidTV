@@ -52,7 +52,7 @@ static std::string ToBase36(long long value) {
         out.push_back(kDigits[value % 36]);
         value /= 36;
     }
-    std::reverse(out.begin(), out.end());
+    std::ranges::reverse(out);
     return out;
 }
 
@@ -287,7 +287,7 @@ bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
     }
     auto appendUsage = [](std::ostringstream &o, const std::unordered_map<int, int> &m) {
         std::vector<std::pair<int, int>> items(m.begin(), m.end());
-        std::sort(items.begin(), items.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        std::ranges::sort(items, [](const auto &a, const auto &b) { return a.first < b.first; });
         for (size_t i = 0; i < items.size(); ++i) {
             if (i)
                 o << ',';

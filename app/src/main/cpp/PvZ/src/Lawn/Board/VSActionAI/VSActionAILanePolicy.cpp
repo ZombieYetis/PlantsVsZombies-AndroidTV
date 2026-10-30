@@ -44,7 +44,7 @@ int MowerlessLaneAttackScoreBonus(const VSGameState &state, const ZombieLanePoli
         return 0;
     }
     const bool hasAttackPlant =
-        std::any_of(state.plants.begin(), state.plants.end(), [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantCombatSeed(plant.seedType); });
+        std::ranges::any_of(state.plants, [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantCombatSeed(plant.seedType); });
     if (!hasAttackPlant) {
         // A live target behind a spent mower and a row containing only
         // Sunflowers/support has no practical recovery. This must beat the
@@ -73,7 +73,7 @@ int MowerlessLaneCommitmentBonus(const VSGameState &state, const ZombieLanePolic
         return 0;
     }
     const bool hasAttackPlant =
-        std::any_of(state.plants.begin(), state.plants.end(), [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantCombatSeed(plant.seedType); });
+        std::ranges::any_of(state.plants, [row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantCombatSeed(plant.seedType); });
     if (!hasAttackPlant) {
         return zombieCount == 0 ? 3020 : 2640;
     }

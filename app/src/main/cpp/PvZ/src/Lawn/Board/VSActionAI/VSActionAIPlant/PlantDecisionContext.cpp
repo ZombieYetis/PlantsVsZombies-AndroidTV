@@ -78,13 +78,10 @@ PlantDecisionContext PlantAIPlanning::BuildDecisionContext(const VSGameState &st
     }
     context.weakestFirepower = AssessPlantLaneFirepower(state, context.firepowerRow);
     context.largestFirepowerDeficit = largestFirepowerDeficit;
-    context.counterCombatPlants = static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [&context](const VSPlantState &plant) {
-        return !IsDeadOrOutside(plant) && plant.position.row == context.counterRow && IsPlantCombatSeed(plant.seedType);
-    }));
-    const int combatPlantCount =
-        static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && IsPlantCombatSeed(plant.seedType); }));
-    const bool hasCombatSeed =
-        std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) { return card.active && !card.matchRestricted && IsPlantCombatSeed(card.seedType); });
+    context.counterCombatPlants = static_cast<int>(std::ranges::count_if(
+        state.plants, [&context](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == context.counterRow && IsPlantCombatSeed(plant.seedType); }));
+    const int combatPlantCount = static_cast<int>(std::ranges::count_if(state.plants, [](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && IsPlantCombatSeed(plant.seedType); }));
+    const bool hasCombatSeed = std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && IsPlantCombatSeed(card.seedType); });
     const bool hasGargantuar = HasZombieTypeInRow(state, context.counterRow, ZombieType::ZOMBIE_GARGANTUAR) || HasZombieTypeInRow(state, context.counterRow, ZombieType::ZOMBIE_GIGA_GARGANTUAR);
     const bool hasGigaPoleVaulter = HasZombieTypeInRow(state, context.counterRow, ZombieType::ZOMBIE_GIGA_POLEVAULTER);
     float closestZamboniX = std::numeric_limits<float>::max();
@@ -125,9 +122,8 @@ PlantDecisionContext PlantAIPlanning::BuildDecisionContext(const VSGameState &st
     const int economyStrikeIncomeFloor = context.economyZombieDeck ? std::max(2, context.minimumIncomeBeforeOutput - 1) : context.minimumIncomeBeforeOutput;
     context.canStrikeZombieEconomy = (state.isSuddenDeath || context.incomePlantCount >= economyStrikeIncomeFloor) && hasEconomyPressurePlan && CountZombieEconomy(state) > 0
         && context.danger.danger < 150 && !context.immediateCounterThreat;
-    const bool hasSporeCarry = std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) {
-        return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SPORESHROOM);
-    });
+    const bool hasSporeCarry = std::ranges::any_of(
+        state.seedBanks[0], [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_SPORESHROOM); });
     context.maximumOutputCount = std::max(1, state.rows * (hasSporeCarry ? 3 : 2));
     context.desiredOutputCount = state.isSuddenDeath ? context.maximumOutputCount : std::min(context.maximumOutputCount, std::max(1, (context.incomePlantCount + 1) / 2));
     if (!state.isSuddenDeath && context.incomePlantCount >= context.openingIncomeTarget) {

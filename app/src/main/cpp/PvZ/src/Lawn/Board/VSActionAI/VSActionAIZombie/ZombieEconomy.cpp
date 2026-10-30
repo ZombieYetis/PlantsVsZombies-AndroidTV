@@ -59,9 +59,9 @@ std::optional<VSAction> ZombieAIPlanning::TryProtectEconomy(const VSGameState &s
 
     const VSCardState *bestCard = nullptr;
     int bestScore = std::numeric_limits<int>::min();
-    const bool plantHasMagnet = std::any_of(state.seedBanks[0].begin(),
-                                            state.seedBanks[0].end(),
-                                            [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_MAGNETSHROOM); })
+    const bool plantHasMagnet =
+        std::ranges::any_of(state.seedBanks[0],
+                            [](const VSCardState &card) { return card.active && !card.matchRestricted && card.seedType == static_cast<std::uint16_t>(SeedType::SEED_MAGNETSHROOM); })
         || CountPlantType(state, SeedType::SEED_MAGNETSHROOM) > 0;
     for (const VSCardState &card : state.seedBanks[1]) {
         const SeedType seed = static_cast<SeedType>(card.seedType);

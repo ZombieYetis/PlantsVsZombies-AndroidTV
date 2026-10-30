@@ -41,8 +41,8 @@ ZombieDecisionContext ZombieAIPlanning::BuildDecisionContext(const VSGameState &
     context.plantHasHighValueCarryCard = HasActiveDeckCard(state, VSSide::Plants, SeedType::SEED_MELONPULT) || HasActiveDeckCard(state, VSSide::Plants, SeedType::SEED_SPORESHROOM)
         || HasActiveDeckCard(state, VSSide::Plants, SeedType::SEED_STARFRUIT) || HasActiveDeckCard(state, VSSide::Plants, SeedType::SEED_REPEATER)
         || HasActiveDeckCard(state, VSSide::Plants, SeedType::SEED_THREEPEATER);
-    context.peaHeadCount = static_cast<int>(std::count_if(
-        state.zombies.begin(), state.zombies.end(), [](const VSZombieState &zombie) { return !zombie.dead && zombie.zombieType == static_cast<std::uint16_t>(ZombieType::ZOMBIE_PEA_HEAD); }));
+    context.peaHeadCount = static_cast<int>(
+        std::ranges::count_if(state.zombies, [](const VSZombieState &zombie) { return !zombie.dead && zombie.zombieType == static_cast<std::uint16_t>(ZombieType::ZOMBIE_PEA_HEAD); }));
     for (int row = 0; row < state.rows && row < static_cast<int>(context.rowScoreFacts.size()); ++row) {
         ZombieRowScoreFacts &facts = context.rowScoreFacts[static_cast<std::size_t>(row)];
         facts.hasSnowPea = HasPlantTypeInRow(state, SeedType::SEED_SNOWPEA, row);

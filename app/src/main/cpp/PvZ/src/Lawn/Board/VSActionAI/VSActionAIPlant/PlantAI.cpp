@@ -263,7 +263,7 @@ std::optional<VSAction> PlantAIPlanning::TryRemoveLadderedNut(const VSGameState 
         if (IsDeadOrOutside(plant) || (plant.seedType != static_cast<std::uint16_t>(SeedType::SEED_WALLNUT) && plant.seedType != static_cast<std::uint16_t>(SeedType::SEED_TALLNUT))) {
             continue;
         }
-        const bool laddered = std::any_of(state.gridItems.begin(), state.gridItems.end(), [&plant](const VSGridItemState &item) {
+        const bool laddered = std::ranges::any_of(state.gridItems, [&plant](const VSGridItemState &item) {
             return !item.dead && item.gridItemType == static_cast<std::uint16_t>(GridItemType::GRIDITEM_LADDER) && item.position.row == plant.position.row && item.position.col == plant.position.col;
         });
         if (!laddered) {
@@ -356,7 +356,7 @@ PlantAIPlanning::AshTarget PlantAIPlanning::FindBestAshTarget(const VSGameState 
                 continue;
             }
             if (!state.isNight && (seedType == SeedType::SEED_ICESHROOM || seedType == SeedType::SEED_DOOMSHROOM)) {
-                const int zombiesOnPlantCell = static_cast<int>(std::count_if(state.zombies.begin(), state.zombies.end(), [&target](const VSZombieState &zombie) {
+                const int zombiesOnPlantCell = static_cast<int>(std::ranges::count_if(state.zombies, [&target](const VSZombieState &zombie) {
                     return !zombie.dead && !zombie.mindControlled && zombie.row == target.row && PlantAIPlanning::ZombieColumn(zombie) == target.col;
                 }));
                 // Daytime burst mushrooms need a second click for Coffee.
@@ -505,7 +505,7 @@ std::optional<VSAction> PlantAIPlanning::TryUmbrellaDefense(const VSGameState &s
         }
     }
     if (!hasRaidThreat) {
-        hasRaidThreat = std::any_of(state.zombies.begin(), state.zombies.end(), [](const VSZombieState &zombie) {
+        hasRaidThreat = std::ranges::any_of(state.zombies, [](const VSZombieState &zombie) {
             const ZombieType type = static_cast<ZombieType>(zombie.zombieType);
             return !zombie.dead && !zombie.mindControlled && (type == ZombieType::ZOMBIE_BUNGEE || type == ZombieType::ZOMBIE_CATAPULT);
         });

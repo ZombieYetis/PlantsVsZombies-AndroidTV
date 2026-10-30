@@ -124,7 +124,7 @@ bool HasLiveZombieTargetInRow(const VSGameState &state, int row) {
 }
 
 bool HasDestroyedZombieTargetInRow(const VSGameState &state, int row) {
-    return std::any_of(state.gridItems.begin(), state.gridItems.end(), [row](const VSGridItemState &item) {
+    return std::ranges::any_of(state.gridItems, [row](const VSGridItemState &item) {
         return item.gridItemType == static_cast<std::uint16_t>(GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) && item.position.row == row && (item.dead || item.health <= 0);
     });
 }
@@ -163,7 +163,7 @@ bool IsMowerlessThirdColumnEmergency(const VSGameState &state, int row) {
     // Plant columns are zero based. Once a zombie crosses the right edge of
     // column two, it has reached the third plant column with no mower left.
     constexpr float kThirdColumnBoundary = static_cast<float>(LAWN_XMIN + 3 * 80);
-    return std::any_of(state.zombies.begin(), state.zombies.end(), [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row && zombie.positionX < kThirdColumnBoundary; });
+    return std::ranges::any_of(state.zombies, [row](const VSZombieState &zombie) { return !zombie.dead && zombie.row == row && zombie.positionX < kThirdColumnBoundary; });
 }
 
 int CounterPressureScoreInRow(const VSGameState &state, int row) {
@@ -519,9 +519,8 @@ int LeastDevelopedPlantRow(const VSGameState &state) {
     int bestScore = std::numeric_limits<int>::max();
     for (int row = 0; row < state.rows; ++row) {
         const PlantLaneAssessment assessment = AssessPlantLane(state, row);
-        const int incomeCount = static_cast<int>(std::count_if(state.plants.begin(), state.plants.end(), [&state, row](const VSPlantState &plant) {
-            return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantEconomySeed(state, plant.seedType);
-        }));
+        const int incomeCount = static_cast<int>(std::ranges::count_if(
+            state.plants, [&state, row](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && plant.position.row == row && IsPlantEconomySeed(state, plant.seedType); }));
         const int score = assessment.defense + assessment.plantCount * 12 + incomeCount * 15;
         if (score < bestScore) {
             bestScore = score;
@@ -593,7 +592,7 @@ bool IsPlantProtectedByUmbrella(const VSGameState &state, VSGridPosition positio
     if (position.col < 0 || position.row < 0) {
         return false;
     }
-    return std::any_of(state.plants.begin(), state.plants.end(), [position](const VSPlantState &plant) {
+    return std::ranges::any_of(state.plants, [position](const VSPlantState &plant) {
         return !IsDeadOrOutside(plant) && plant.seedType == static_cast<std::uint16_t>(SeedType::SEED_UMBRELLA) && std::abs(static_cast<int>(plant.position.col) - static_cast<int>(position.col)) <= 1
             && std::abs(static_cast<int>(plant.position.row) - static_cast<int>(position.row)) <= 1;
     });
@@ -640,8 +639,7 @@ int SustainedOutputValue(SeedType seedType) {
 }
 
 int CountSustainedOutputPlants(const VSGameState &state) {
-    return static_cast<int>(
-        std::count_if(state.plants.begin(), state.plants.end(), [](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && IsSustainedOutputSeed(static_cast<SeedType>(plant.seedType)); }));
+    return static_cast<int>(std::ranges::count_if(state.plants, [](const VSPlantState &plant) { return !IsDeadOrOutside(plant) && IsSustainedOutputSeed(static_cast<SeedType>(plant.seedType)); }));
 }
 
 int SustainedOutputScoreInRow(const VSGameState &state, int row) {
@@ -684,7 +682,7 @@ int PlantEconomyValueInRow(const VSGameState &state, int row) {
 }
 
 bool HasSustainedOutputSeed(const VSGameState &state) {
-    return std::any_of(state.seedBanks[0].begin(), state.seedBanks[0].end(), [](const VSCardState &card) { return IsSustainedOutputSeed(static_cast<SeedType>(card.seedType)); });
+    return std::ranges::any_of(state.seedBanks[0], [](const VSCardState &card) { return IsSustainedOutputSeed(static_cast<SeedType>(card.seedType)); });
 }
 
 } // namespace vsai::detail

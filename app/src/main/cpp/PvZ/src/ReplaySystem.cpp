@@ -324,7 +324,7 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
             continue;
         }
         std::string extension = entry.path().extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::ranges::transform(extension, extension.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (extension != ".rpl") {
             continue;
         }
@@ -376,7 +376,7 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
         const auto savedAt = entry.last_write_time(timeError);
         files.push_back({std::move(info), timeError ? fs::file_time_type::min() : savedAt});
     }
-    std::sort(files.begin(), files.end(), [](const ReplayFile &a, const ReplayFile &b) {
+    std::ranges::sort(files, [](const ReplayFile &a, const ReplayFile &b) {
         // 最近保存或导入的回放置顶，与回放内记录的对局时间无关。
         if (a.savedAt != b.savedAt) {
             return a.savedAt > b.savedAt;
