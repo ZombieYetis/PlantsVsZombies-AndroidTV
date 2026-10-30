@@ -537,8 +537,8 @@ void Plant::AnimateEndurian() {
 void Plant::Update() {
     // 用于修复植物受击闪光、生产发光、铲子下方植物发光，同时实现技能无冷却
 
-    if (abilityFastCoolDown && !IsOnlineServerModeActive() && !gIsReplayMode && mSeedType != SeedType::SEED_SPIKEWEED
-        && mSeedType != SeedType::SEED_SPIKEROCK) { // 修复地刺和地刺王开启技能无冷却后不攻击敌人
+    if (abilityFastCoolDown && !IsOnlineServerModeActive() && !gIsReplayMode && mSeedType != SeedType::SEED_SPIKEWEED && mSeedType != SeedType::SEED_SPIKEROCK
+        && mSeedType != SeedType::SEED_ENDURIAN) { // 保留地刺、地刺王和榴莲的正常攻击间隔
         if (mStateCountdown > 10) {
             mStateCountdown = 10;
         }
