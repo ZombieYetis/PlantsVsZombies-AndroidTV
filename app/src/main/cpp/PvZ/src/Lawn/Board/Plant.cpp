@@ -4464,16 +4464,36 @@ void Plant::UpdateGraveBuster() {
 }
 
 void Plant::UpdateChomper() {
+    auto syncBiteState = [this]() {
+        if (IsRemoteServer()) {
+            U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_CHOMPER_STATE}, uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
+            netplay::PutEvent(event);
+        }
+    };
+
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (mState == PlantState::STATE_READY) {
+        // 只由主机索敌起咬，客机收到通知后播放相同的固定动画。
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
         if (FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY)) {
             PlayBodyReanim("anim_bite", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
             mState = PlantState::STATE_CHOMPER_BITING;
             mStateCountdown = 70;
+            syncBiteState();
         }
     } else if (mState == PlantState::STATE_CHOMPER_BITING) {
+        // 客机等待主机的吞食/咬空结果，不按本地僵尸位置自行分支。
+        if (IsRemoteClientOrViewer()) {
+            return;
+        }
         if (mStateCountdown == 0) {
             mApp->PlayFoley(FoleyType::FOLEY_BIGCHOMP);
+            if (IsRemoteServer()) {
+                U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLAY_FOLEY}, uint16_t(FoleyType::FOLEY_BIGCHOMP)};
+                netplay::PutEvent(event);
+            }
 
             Zombie *aZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
             bool doBite = false;
@@ -4493,21 +4513,24 @@ void Plant::UpdateChomper() {
 
             if (doBite) {
                 mApp->PlayFoley(FoleyType::FOLEY_SPLAT);
+                if (IsRemoteServer()) {
+                    U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLAY_FOLEY}, uint16_t(FoleyType::FOLEY_SPLAT)};
+                    netplay::PutEvent(event);
+                }
                 aZombie->TakeDamage(40, 0U);
                 mState = PlantState::STATE_CHOMPER_BITING_MISSED;
             } else if (doMiss) {
                 mState = PlantState::STATE_CHOMPER_BITING_MISSED;
             } else {
-                if (IsRemoteClientOrViewer())
-                    return;
-
                 if (IsRemoteServer()) {
                     U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_CHOMPER_BIT}, uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mBoard->mZombies.DataArrayGetID(aZombie))};
                     netplay::PutEvent(event);
                 }
-
                 aZombie->DieWithLoot();
                 mState = PlantState::STATE_CHOMPER_BITING_GOT_ONE;
+            }
+            if (mState == PlantState::STATE_CHOMPER_BITING_MISSED) {
+                syncBiteState();
             }
         }
     } else if (mState == PlantState::STATE_CHOMPER_BITING_GOT_ONE) {

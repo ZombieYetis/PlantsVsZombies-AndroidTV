@@ -2863,6 +2863,23 @@ void Board::processServerEvent(const BaseEvent *event) {
                 aPlant->mState = PlantState::STATE_CHOMPER_BITING_GOT_ONE;
             }
         } break;
+        case EVENT_SERVER_BOARD_PLANT_CHOMPER_STATE: {
+            const auto *stateEvent = static_cast<const U16U16_Event *>(event);
+            uint16_t clientPlantID = 0;
+            if (homura::FindInMap(serverPlantIDMap, stateEvent->data1, clientPlantID)) {
+                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
+                if (!aPlant->mDead && aPlant->mSeedType == SeedType::SEED_CHOMPER) {
+                    const auto state = PlantState(stateEvent->data2);
+                    if (state == PlantState::STATE_CHOMPER_BITING) {
+                        aPlant->PlayBodyReanim("anim_bite", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
+                        aPlant->mStateCountdown = 70;
+                        aPlant->mState = state;
+                    } else if (state == PlantState::STATE_CHOMPER_BITING_MISSED) {
+                        aPlant->mState = state;
+                    }
+                }
+            }
+        } break;
         case EVENT_SERVER_BOARD_PLANT_MAGNETSHROOM_ATTACK: {
             auto *eventMagnetshroomAttack = static_cast<const U16U16_Event *>(event);
             uint16_t serverPlantID = eventMagnetshroomAttack->data1;
