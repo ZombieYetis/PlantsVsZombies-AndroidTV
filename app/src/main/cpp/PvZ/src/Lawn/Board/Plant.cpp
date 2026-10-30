@@ -1689,6 +1689,12 @@ void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon
     if (IsRemoteClientOrViewer())
         return;
 
+    // 投手按实际位置选择更近的骨堆
+    if ((IsLobber(mSeedType) || (mSeedType == SeedType::SEED_RED_STINGER && GetRedStingerForm() == 2)) && theTargetZombie != nullptr && theTargetGridItem != nullptr
+        && theTargetGridItem->IsSkeletonPile() && theTargetGridItem->GetItemRect().mX < theTargetZombie->GetZombieRect().mX) {
+        theTargetZombie = nullptr;
+    }
+
     if (IsRemoteServer()) {
         U16U16U16UNI32UNI32_Event event{};
 
@@ -2486,8 +2492,18 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
     // 原版函数BUG：植物还会索敌梯子和毁灭菇弹坑，故重写以修复BUG。
 
     if (mSeedType == SEED_SPLITPEA && thePlantWeapon == WEAPON_SECONDARY) {
-        // 如果是裂荚射手朝后的头，就直接不开火
-        return nullptr;
+        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
+        GridItem *aBestPile = nullptr;
+        GridItem *aPile = nullptr;
+        while (mBoard->IterateGridItems(aPile)) {
+            if (!aPile->IsSkeletonPile() || !aPile->IsPlantAttackTarget() || aPile->mGridY != theRow || GetRectOverlap(aAttackRect, aPile->GetItemRect()) < 0) {
+                continue;
+            }
+            if (aBestPile == nullptr || aPile->GetItemRect().mX > aBestPile->GetItemRect().mX) {
+                aBestPile = aPile;
+            }
+        }
+        return aBestPile;
     }
 
     if (IsSpiky() || mSeedType == SeedType::SEED_ENDURIAN) {
@@ -2532,11 +2548,15 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
     }
 
     if (mSeedType == SeedType::SEED_CELERY_STALKER) {
+        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
         GridItem *aGridItem = nullptr;
         GridItem *aBestGridItem = nullptr;
         while (mBoard->IterateGridItems(aGridItem)) {
-            // 潜伏芹菜只攻击本行身后的相邻一格。
-            if (!aGridItem->IsPlantAttackTarget() || aGridItem->mGridY != theRow || aGridItem->mGridX != mPlantCol - 1) {
+            if (!aGridItem->IsPlantAttackTarget() || aGridItem->mGridY != theRow) {
+                continue;
+            }
+            // 骨堆按实际碰撞框判断身后的攻击范围，其他场地物仍按相邻格判断。
+            if (aGridItem->IsSkeletonPile() ? GetRectOverlap(aAttackRect, aGridItem->GetItemRect()) < 0 : aGridItem->mGridX != mPlantCol - 1) {
                 continue;
             }
             if (aBestGridItem == nullptr || aGridItem->GetItemRect().mX > aBestGridItem->GetItemRect().mX) {
@@ -2548,9 +2568,11 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
 
     if (mSeedType == SeedType::SEED_BONK_CHOY) {
         static constexpr int kBonkChoyGridItemRange = 2;
+        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
+        const int aPlantCenterX = mX + 40;
 
         GridItem *aBestGridItem = nullptr;
-        int aBestDistance = kBonkChoyGridItemRange + 1;
+        int aBestDistance = (kBonkChoyGridItemRange + 1) * 80;
         bool aBestIsBehind = true;
 
         GridItem *aGridItem = nullptr;
@@ -2572,12 +2594,23 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 continue;
             }
 
-            const int aDistance = std::abs(aGridItem->mGridX - mPlantCol);
-            if (aDistance < 1 || aDistance > kBonkChoyGridItemRange) {
-                continue;
+            int aDistance;
+            bool aGridItemIsBehind;
+            if (aGridItem->IsSkeletonPile()) {
+                const Rect aPileRect = aGridItem->GetItemRect();
+                if (GetRectOverlap(aAttackRect, aPileRect) < 0) {
+                    continue;
+                }
+                aDistance = std::abs(std::clamp(aPlantCenterX, aPileRect.mX, aPileRect.mX + aPileRect.mWidth) - aPlantCenterX);
+                aGridItemIsBehind = aPileRect.mX + aPileRect.mWidth / 2 < aPlantCenterX;
+            } else {
+                aDistance = std::abs(aGridItem->mGridX - mPlantCol) * 80;
+                if (aDistance < 80 || aDistance > kBonkChoyGridItemRange * 80) {
+                    continue;
+                }
+                aGridItemIsBehind = aGridItem->mGridX < mPlantCol;
             }
 
-            const bool aGridItemIsBehind = aGridItem->mGridX < mPlantCol;
             if (aBestGridItem == nullptr || aDistance < aBestDistance || (aDistance == aBestDistance && !aGridItemIsBehind && aBestIsBehind)) {
                 aBestGridItem = aGridItem;
                 aBestDistance = aDistance;
@@ -2588,7 +2621,7 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
         return aBestGridItem;
     }
 
-    int aLastGridX = 0;
+    int aLastTargetX = 0;
     GridItem *aBestGridItem = nullptr;
 
     GridItem *aGridItem = nullptr;
@@ -2620,7 +2653,8 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 continue;
             }
 
-            if (aBestGridItem == nullptr || aGridX < aLastGridX) {
+            const int aTargetX = aGridItem->IsSkeletonPile() ? aGridItem->GetItemRect().mX : mBoard->GridToPixelX(aGridX, aGridY);
+            if (aBestGridItem == nullptr || aTargetX < aLastTargetX) {
                 if ((mSeedType == SeedType::SEED_FUMESHROOM || mSeedType == SeedType::SEED_PEANUT) && aGridX - mPlantCol > 3) {
                     // 如果是大喷菇或花生射手，则索敌三格以内的靶子或墓碑
                     continue;
@@ -2640,7 +2674,7 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 }
 
                 aBestGridItem = aGridItem;
-                aLastGridX = aGridX;
+                aLastTargetX = aTargetX;
             }
         }
     }
@@ -3576,8 +3610,8 @@ void Plant::BurnRow(int theRow) {
 
     GridItem *aGridItem = nullptr;
     while (mBoard->IterateGridItems(aGridItem)) {
-        if (aGridItem->IsSkeletonPile() && aGridItem->IsPlantAttackTarget() && aGridItem->mGridY == theRow) {
-            aGridItem->TakeDamage(1800, 18U);
+        if (aGridItem->IsSkeletonPile() && aGridItem->mSummonIndex == 0 && aGridItem->mGridY == theRow) {
+            aGridItem->GridItemDie();
         }
         if (aGridItem->mGridY == theRow && (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER || aGridItem->mGridItemType == GridItemType::GRIDITEM_POLE)) {
             aGridItem->GridItemDie();
@@ -3763,7 +3797,7 @@ void Plant::UpdateRedStingerShooting() {
         const float aFireTime = aForm == 2 ? 8.0f / 17.0f : 25.0f / 35.0f;
         if (aBodyReanim->ShouldTriggerTimedEvent(aFireTime)) {
             Zombie *aZombie = aForm == 2 ? FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
-            GridItem *aGridItem = aForm == 2 && aZombie == nullptr ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
+            GridItem *aGridItem = aForm == 2 ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
             Fire(aZombie, mRow, PlantWeapon::WEAPON_PRIMARY, aGridItem);
         }
     }
@@ -4950,7 +4984,6 @@ void Plant::UpdateCeleryStalker() {
 }
 
 void Plant::UpdateBonkChoy() {
-    static constexpr int kBonkChoyGridItemRange = 2;
     static constexpr int kBonkChoyAttackInterval = 40;
     static constexpr int kBonkChoyPunchDamage = 15;
     static constexpr int kBonkChoyUppercutDamage = 35;
@@ -4981,7 +5014,6 @@ void Plant::UpdateBonkChoy() {
     Zombie *aBestZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
 
     GridItem *aBestGridItem = aBestZombie == nullptr ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
-    const int aBestGridItemDistance = aBestGridItem != nullptr ? std::abs(aBestGridItem->mGridX - mPlantCol) : kBonkChoyGridItemRange + 1;
     bool aBestTargetIsBehind = false;
 
     if (aBestZombie != nullptr) {
@@ -4990,7 +5022,8 @@ void Plant::UpdateBonkChoy() {
 
         aBestTargetIsBehind = aZombieLeft + static_cast<float>(aZombieRect.mWidth) * 0.5f < aPlantCenterX;
     } else if (aBestGridItem != nullptr) {
-        aBestTargetIsBehind = aBestGridItem->mGridX < mPlantCol;
+        const Rect aTargetRect = aBestGridItem->GetItemRect();
+        aBestTargetIsBehind = aBestGridItem->IsSkeletonPile() ? aTargetRect.mX + aTargetRect.mWidth * 0.5f < aPlantCenterX : aBestGridItem->mGridX < mPlantCol;
     }
 
     if (aBestZombie == nullptr && aBestGridItem == nullptr) {
@@ -4999,7 +5032,11 @@ void Plant::UpdateBonkChoy() {
 
     if (aBestGridItem != nullptr) {
         const int aGridItemHealth = aBestGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE ? aBestGridItem->mVSTargetZombieHealth : aBestGridItem->mVSGraveStoneHealth;
-        const bool aUseUppercut = aBestGridItemDistance == 1 && aGridItemHealth > 0 && aGridItemHealth <= kBonkChoyUppercutDamage;
+        const Rect aTargetRect = aBestGridItem->GetItemRect();
+        const bool aWithinUppercutRange = aBestGridItem->IsSkeletonPile()
+            ? std::abs(std::clamp(aPlantCenterX, float(aTargetRect.mX), float(aTargetRect.mX + aTargetRect.mWidth)) - aPlantCenterX) <= 80.0f
+            : std::abs(aBestGridItem->mGridX - mPlantCol) == 1;
+        const bool aUseUppercut = aWithinUppercutRange && aGridItemHealth > 0 && aGridItemHealth <= kBonkChoyUppercutDamage;
 
         const char *anAttackTrack = aUseUppercut ? "anim_rightuppercut" : "anim_rightpunch";
         const float aAnimRate = aUseUppercut ? 30.0f : 45.0f;

@@ -507,6 +507,7 @@ public:
     Plant *FindFriendPlantTarget();
     bool CanTargetPlant(Plant *thePlant, ZombieAttackType theAttackType);
     Zombie *FindZombieTarget();
+    GridItem *FindSkeletonPileTarget();
     Zombie *FindFriendZombieTarget();
     Zombie *FindZombieGigaFootball();
     void TakeDamage(int theDamage, unsigned int theDamageFlags);

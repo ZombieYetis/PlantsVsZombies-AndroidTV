@@ -892,9 +892,12 @@ void Board::DrawDebugObjectRects(Sexy::Graphics *g) {
         DebugTextMode tmp = mDebugTextMode;
         mDebugTextMode = DebugTextMode::DEBUG_TEXT_COLLISION;
         old_Board_DrawDebugObjectRects(this, g);
-        if (mApp->IsVSMode()) {
+        {
             GridItem *aGridItem = nullptr;
             while (IterateGridItems(aGridItem)) {
+                if (!mApp->IsVSMode() && !aGridItem->IsSkeletonPile()) {
+                    continue;
+                }
                 switch (aGridItem->mGridItemType) {
                     case GRIDITEM_MP_TARGET_ZOMBIE:
                     case GRIDITEM_MP_BURIAL_MOUND:
@@ -8392,7 +8395,11 @@ int Board::KillAllZombiesInRadius_Custom(int theRow, int theX, int theY, int the
     while (IterateGridItems(aGridItem)) {
         if (aGridItem->IsSkeletonPile() && (aGridItem->mSummonIndex != 0) == TestBit(theDamageRangeFlags, DamageRangeFlags::DAMAGES_ONLY_MINDCONTROLLED)
             && abs(aGridItem->mGridY - theRow) <= theRowRange && GetCircleRectOverlap(theX, theY, theRadius, aGridItem->GetItemRect())) {
-            aGridItem->TakeDamage(1800, 18U);
+            if (theBurn) {
+                aGridItem->GridItemDie();
+            } else {
+                aGridItem->TakeDamage(1800, 18U);
+            }
         }
         if (aGridItem->mGridItemType == GridItemType::GRIDITEM_LADDER || (theDamageRangeFlags == 127 && aGridItem->mGridItemType == GridItemType::GRIDITEM_POLE)) {
             if (GridInRange(aGridItem->mGridX, aGridItem->mGridY, aGridX, aGridY, theRowRange, theRowRange)) {

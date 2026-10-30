@@ -141,6 +141,13 @@ void GridItem::DrawGridItem(Graphics *g) {
         if (Reanimation *aReanim = mApp->ReanimationTryToGet(mGridItemReanimID)) {
             aReanim->Draw(g);
         }
+        if (showZombieBodyHealth && !IsOnlineServerModeActive()) {
+            const Rect aRect = GetItemRect();
+            g->SetColor(gColorWhite);
+            g->SetFont(Sexy::FONT_DWARVENTODCRAFT18);
+            g->DrawString(pvzstl::to_string(mVSGraveStoneHealth), aRect.mX + 20, aRect.mY - 10);
+            g->SetFont(nullptr);
+        }
         return;
     }
     if (mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND) {
@@ -965,8 +972,8 @@ void GridItem::DrawMPTarget(Graphics *g) {
 
 Rect GridItem::GetItemRect() const {
     if (IsSkeletonPile()) {
-        const int aOffsetX = mSummonIndex ? -13 : 30;
-        return {int(mPosX) + aOffsetX, int(mPosY - mGoalY) + 45, 103, 85};
+        const int aOffsetX = mSummonIndex ? -3 : 40;
+        return {int(mPosX) + aOffsetX, int(mPosY - mGoalY) + 45, 83, 85};
     }
     if (mGridItemType == GRIDITEM_POLE) {
         return {int(mPosX), int(mPosY), 30, 160};

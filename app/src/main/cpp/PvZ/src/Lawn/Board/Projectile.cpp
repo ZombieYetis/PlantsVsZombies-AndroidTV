@@ -981,6 +981,7 @@ void Projectile::UpdateLobMotion() {
 
     if (mProjectileType == ProjectileType::PROJECTILE_BASKETBALL || mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_PEA) {
         aPlantTarget = FindCollisionTargetPlant();
+        aGridTarget = FindCollisionTargetGridItem();
     } else {
         aZombieTarget = FindCollisionTarget();
         aGridTarget = FindCollisionTargetGridItem();
@@ -1410,8 +1411,18 @@ void Projectile::DoImpactGridItem(GridItem *theGridItem) {
     } else if (theGridItem) {
         if (aIsPiercingSpike) {
             int aHitIndex = mPierceHitCount;
-            ++mPierceHitCount;
-            theGridItem->TakeDamage(SPIKE_PIERCE_DAMAGE[aHitIndex], 0U);
+            int aDamage = SPIKE_PIERCE_DAMAGE[aHitIndex];
+            if (theGridItem->IsSkeletonPile()) {
+                // 骨堆和铁门一样，结算全部剩余穿透伤害后挡住尖刺。
+                aDamage = 0;
+                for (int i = aHitIndex; i < MAX_PIERCE_HIT_COUNT; ++i) {
+                    aDamage += SPIKE_PIERCE_DAMAGE[i];
+                }
+                mPierceHitCount = MAX_PIERCE_HIT_COUNT;
+            } else {
+                ++mPierceHitCount;
+            }
+            theGridItem->TakeDamage(aDamage, 0U);
             mHitGridItemIDs[aHitIndex] = mBoard->GridItemGetID(theGridItem);
             if (mPierceHitCount >= MAX_PIERCE_HIT_COUNT) {
                 Die();
@@ -1448,14 +1459,14 @@ void Projectile::DoImpactGridItem(GridItem *theGridItem) {
         mBoard->ShakeBoard(3, -4);
         Die();
         return;
-    } else if (mProjectileType == ProjectileType::PROJECTILE_PEA) {
+    } else if (mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_PEA) {
         aSplatPosX -= 15.0f;
         aEffect = ParticleEffect::PARTICLE_PEA_SPLAT;
     } else if (mProjectileType == ProjectileType::PROJECTILE_SNOWPEA) {
         aSplatPosX -= 15.0f;
         aEffect = ParticleEffect::PARTICLE_SNOWPEA_SPLAT;
-    } else if (mProjectileType == ProjectileType::PROJECTILE_FIREBALL) {
-        if (IsSplashDamage(nullptr)) {
+    } else if (mProjectileType == ProjectileType::PROJECTILE_FIREBALL || mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_FIREBALL) {
+        if (mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_FIREBALL || IsSplashDamage(nullptr)) {
             Reanimation *aFireReanim = mApp->AddReanimation(mPosX + 38.0f, mPosY - 20.0f, mRenderOrder + 1, ReanimationType::REANIM_JALAPENO_FIRE);
             aFireReanim->mAnimTime = 0.25f;
             aFireReanim->mAnimRate = 24.0f;
@@ -1509,10 +1520,17 @@ GridItem *Projectile::FindCollisionTargetGridItem() {
     GridItem *aBestGridItem = nullptr;
     GridItem *aGridItem = nullptr;
     bool aHasGravestoneInRow = false;
+    const bool aIsZombieProjectile = mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_PEA || mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_POLE
+        || mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_FIREBALL || mProjectileType == ProjectileType::PROJECTILE_BASKETBALL;
 
     Rect aProjectileRect = GetProjectileRect();
     while (mBoard->IterateGridItems(aGridItem)) {
-        if (!aGridItem->IsPlantAttackTarget()) {
+        // 僵尸子弹只命中敌方骨堆，植物子弹沿用原有目标筛选。
+        if (aIsZombieProjectile) {
+            if (!aGridItem->IsSkeletonPile() || aGridItem->mSummonIndex == 0 || aGridItem->mVSGraveStoneHealth <= 0 || aGridItem->mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
+                continue;
+            }
+        } else if (!aGridItem->IsPlantAttackTarget()) {
             continue;
         }
         // 修复对空发射的尖刺会被墓碑阻挡
@@ -1551,7 +1569,7 @@ GridItem *Projectile::FindCollisionTargetGridItem() {
                 }
                 if (!aBestGridItem || aBestGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
                     aBestGridItem = aGridItem;
-                } else if (aGridItem->mGridX < aBestGridItem->mGridX) {
+                } else if (aIsZombieProjectile ? aGridItem->GetItemRect().mX > aBestGridItem->GetItemRect().mX : aGridItem->mGridX < aBestGridItem->mGridX) {
                     aBestGridItem = aGridItem;
                 }
             }
@@ -1728,6 +1746,8 @@ void Projectile::CheckForCollision() {
                 return;
             }
             DoImpact(aZombie);
+        } else if (GridItem *aGridItem = FindCollisionTargetGridItem()) {
+            DoImpactGridItem(aGridItem);
         }
         return;
     } else if (mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_FIREBALL) {
@@ -1751,6 +1771,8 @@ void Projectile::CheckForCollision() {
                 return;
             }
             DoImpact(aZombie);
+        } else if (GridItem *aGridItem = FindCollisionTargetGridItem()) {
+            DoImpactGridItem(aGridItem);
         }
         return;
     }

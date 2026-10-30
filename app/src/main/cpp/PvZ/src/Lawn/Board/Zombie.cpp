@@ -533,6 +533,18 @@ void Zombie::CheckIfPreyCaught() {
         return;
     }
 
+    if (GridItem *aPile = FindSkeletonPileTarget()) {
+        int aDamage = DAMAGE_PER_EAT;
+        if (mZombieType == ZombieType::ZOMBIE_SUNDAY_EDITION) {
+            aDamage += mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD ? DAMAGE_PER_EAT * 3 : DAMAGE_PER_EAT;
+        } else if (mZombieType == ZombieType::ZOMBIE_DOG) {
+            aDamage += DAMAGE_PER_EAT;
+        }
+        aPile->TakeDamage(aDamage, 9U);
+        StartEating();
+        return;
+    }
+
     if (!mMindControlled) {
         Plant *aPlant = FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW);
         if (aPlant) {
@@ -1146,6 +1158,14 @@ bool Zombie::HasScientistTriggerTarget() {
     constexpr int SCIENTIST_TARGET_RANGE_INSET = 20;
     constexpr int SCIENTIST_FRIEND_RANGE_INSET = 40;
 
+    GridItem *aPile = nullptr;
+    while (mBoard->IterateGridItems(aPile)) {
+        if (aPile->IsSkeletonPile() && (aPile->mSummonIndex != 0) != mMindControlled && aPile->mVSGraveStoneHealth > 0 && aPile->mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_WAITING
+            && IsInScientistTargetRange(aPile->GetItemRect(), aPile->mGridY, SCIENTIST_TARGET_RANGE_INSET)) {
+            return true;
+        }
+    }
+
     if (!mMindControlled) {
         Plant *aPlant = nullptr;
         while (mBoard->IteratePlants(aPlant)) {
@@ -1217,6 +1237,14 @@ bool Zombie::ApplyScientistHealing() {
 void Zombie::ApplyScientistSpray() {
     constexpr int SCIENTIST_DAMAGE_PER_PULSE = 150;
     constexpr int SCIENTIST_TARGET_RANGE_INSET = 20;
+
+    GridItem *aPile = nullptr;
+    while (mBoard->IterateGridItems(aPile)) {
+        if (aPile->IsSkeletonPile() && (aPile->mSummonIndex != 0) != mMindControlled && aPile->mVSGraveStoneHealth > 0 && aPile->mGridItemState == GridItemState::GRIDITEM_STATE_SKELETON_WAITING
+            && IsInScientistTargetRange(aPile->GetItemRect(), aPile->mGridY, SCIENTIST_TARGET_RANGE_INSET)) {
+            aPile->TakeDamage(SCIENTIST_DAMAGE_PER_PULSE, 0U);
+        }
+    }
 
     if (!mMindControlled) {
         Plant *aPlant = nullptr;
@@ -3426,6 +3454,10 @@ void Zombie::UpdateGigaGargantuar() {
 
     if (mZombiePhase == ZombiePhase::PHASE_GARGANTUAR_SMASHING) {
         if (aBodyReanim->ShouldTriggerTimedEvent(0.64f)) {
+            if (GridItem *aPile = FindSkeletonPileTarget()) {
+                aPile->TakeDamage(1500, 0U);
+            }
+
             if (Zombie *aZombie = FindZombieTarget()) {
                 aZombie->TakeDamage(1500, 0U);
             }
@@ -3731,7 +3763,7 @@ void Zombie::UpdateGigaGargantuar() {
 
     bool doSmash = false;
 
-    if (FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW) || FindZombieTarget()) {
+    if (FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW) || FindZombieTarget() || FindSkeletonPileTarget()) {
         doSmash = true;
     }
 
@@ -3948,6 +3980,10 @@ void Zombie::UpdateSuperNovaGargantuar() {
 
     if (mZombiePhase == ZombiePhase::PHASE_GARGANTUAR_SMASHING) {
         if (aBodyReanim->ShouldTriggerTimedEvent(0.64f)) {
+            if (GridItem *aPile = FindSkeletonPileTarget()) {
+                aPile->TakeDamage(1500, 0U);
+            }
+
             if (Zombie *aZombie = FindZombieTarget()) {
                 aZombie->TakeDamage(1500, 0U);
             }
@@ -4015,7 +4051,7 @@ void Zombie::UpdateSuperNovaGargantuar() {
     }
 
     Plant *aTargetPlant = FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW);
-    bool doSmash = aTargetPlant != nullptr || FindZombieTarget() != nullptr;
+    bool doSmash = aTargetPlant != nullptr || FindZombieTarget() != nullptr || FindSkeletonPileTarget() != nullptr;
     if (mApp->IsScaryPotterLevel()) {
         const int aGridX = mBoard->PixelToGridX(int(mPosX), int(mPosY));
         doSmash = doSmash || mBoard->GetScaryPotAt(aGridX, mRow) != nullptr;
@@ -4052,6 +4088,10 @@ void Zombie::UpdateZombieGargantuar() {
     if (mZombiePhase == ZombiePhase::PHASE_GARGANTUAR_SMASHING) {
         Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
         if (aBodyReanim->ShouldTriggerTimedEvent(0.64f)) {
+            if (GridItem *aPile = FindSkeletonPileTarget()) {
+                aPile->TakeDamage(1500, 0U);
+            }
+
             Zombie *aZombie = FindZombieTarget();
             if (mMindControlled && aZombie) {
                 aZombie->TakeDamage(1500, 0U);
@@ -4189,7 +4229,7 @@ void Zombie::UpdateZombieGargantuar() {
     }
 
     bool doSmash = false;
-    if (FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW) || (mMindControlled && FindZombieTarget())) {
+    if (FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW) || (mMindControlled && FindZombieTarget()) || FindSkeletonPileTarget()) {
         doSmash = true;
     }
     if (mApp->IsScaryPotterLevel()) {
@@ -8126,6 +8166,24 @@ Zombie *Zombie::FindZombieTarget() {
         }
     }
 
+    return nullptr;
+}
+
+GridItem *Zombie::FindSkeletonPileTarget() {
+    if (mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING) {
+        return nullptr;
+    }
+    const Rect aAttackRect = GetZombieAttackRect();
+    GridItem *aPile = nullptr;
+    while (mBoard->IterateGridItems(aPile)) {
+        if (!aPile->IsSkeletonPile() || aPile->mGridY != mRow || (aPile->mSummonIndex != 0) == mMindControlled || aPile->mVSGraveStoneHealth <= 0
+            || aPile->mGridItemState != GridItemState::GRIDITEM_STATE_SKELETON_WAITING) {
+            continue;
+        }
+        if (GetRectOverlap(aAttackRect, aPile->GetItemRect()) >= 20) {
+            return aPile;
+        }
+    }
     return nullptr;
 }
 
