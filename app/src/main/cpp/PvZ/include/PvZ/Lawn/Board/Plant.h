@@ -339,6 +339,7 @@ public:
     void UpdateProductionPlant();
     void UpdateShooting();
     int GetRedStingerForm() const;
+    void UpdateRedStingerForm();
     void LaunchRedStinger();
     void UpdateRedStingerShooting();
     void RedStingerFire();

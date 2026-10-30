@@ -576,6 +576,10 @@ void Plant::Update() {
     // Plant_Die(plant);
     // Plant_UpdateReanim(plant);
 
+    if (mSeedType == SeedType::SEED_RED_STINGER) {
+        UpdateRedStingerForm();
+    }
+
     const PlantState previousState = mState;
     old_Plant_Update(this);
     if (IsRemoteServer() && !mDead && mSeedType == SEED_COBCANNON && mState != previousState) {
@@ -3743,6 +3747,19 @@ int Plant::GetRedStingerForm() const {
     return std::clamp(mPlantCol / aColumnsPerForm + 1, 1, 3);
 }
 
+void Plant::UpdateRedStingerForm() {
+    if (!IsInPlay() || NotOnGround() || mState == PlantState::STATE_RED_STINGER_DYING || mTargetX == GetRedStingerForm()) {
+        return;
+    }
+    if (mApp->ReanimationTryToGet(mBodyReanimID) == nullptr) {
+        return;
+    }
+
+    // 跨形态时先结束旧攻击，再应用当前位置的待机动画。
+    mShootingCounter = 0;
+    PlayIdleAnim(25.0f);
+}
+
 void Plant::LaunchRedStinger() {
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim == nullptr) {
@@ -3752,6 +3769,8 @@ void Plant::LaunchRedStinger() {
         return;
     }
 
+    // 联机攻击事件可能先于本帧植物更新到达，先同步形态再启动新攻击。
+    UpdateRedStingerForm();
     const int aForm = GetRedStingerForm();
     if (aForm == 3 && mState != PlantState::STATE_RED_STINGER_DYING) {
         return;
@@ -4133,6 +4152,7 @@ void Plant::PlayIdleAnim(float theRate) {
         const char *aTrack = "anim_idle";
         if (mSeedType == SeedType::SEED_RED_STINGER) {
             const int aForm = GetRedStingerForm();
+            mTargetX = aForm; // 红针花复用此字段记录已应用的形态，随植物存档保留。
             aTrack = aForm == 1 ? "anim_idle1" : (aForm == 2 ? "anim_idle2" : "anim_idle3");
         }
         PlayBodyReanim(aTrack, ReanimLoopType::REANIM_LOOP, 20, theRate);
