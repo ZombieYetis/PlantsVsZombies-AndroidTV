@@ -3564,6 +3564,9 @@ void Board::processServerEvent(const BaseEvent *event) {
             if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
                 if (aZombie != nullptr && !aZombie->IsDeadOrDying()) {
+                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
+                        aZombie->FinishZombieRiseFromGrave();
+                    }
                     aZombie->SetGraveDiggerPhase(ZombiePhase(aState->data2));
                 }
             }
