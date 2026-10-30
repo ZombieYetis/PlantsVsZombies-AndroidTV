@@ -9500,6 +9500,11 @@ void Zombie::UpdateZombieWalking() {
     if (ZombieNotWalking())
         return;
 
+    // 同伴啃食、受控或换行期间可能将行走动画速度置零，解除等待后重新计算。
+    if ((mZombieType == ZombieType::ZOMBIE_DOGWALKER && mHasObject) || mZombiePhase == ZombiePhase::PHASE_DOG_WALKING) {
+        UpdateAnimSpeed();
+    }
+
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim) {
         float aSpeed = NAN;
