@@ -309,6 +309,11 @@ bool replay::SaveCurrentMatchReplay(const ReplayMetaInfo &meta) {
 
 std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
     namespace fs = std::filesystem;
+    struct ReplayFile {
+        ReplayMetaInfo info;
+        fs::file_time_type savedAt;
+    };
+    std::vector<ReplayFile> files;
     std::vector<ReplayMetaInfo> infos;
     std::error_code ec;
     if (!fs::exists(kReplayDir, ec)) {
@@ -366,9 +371,22 @@ std::vector<ReplayMetaInfo> replay::ListReplayFiles() {
         if (info.winnerCamp != "Plant" && info.winnerCamp != "Zombie") {
             info.winnerCamp = ReadLegacyWinnerCamp(in, info);
         }
-        infos.push_back(std::move(info));
+        // 保存和导入都会重新写入本地文件，以修改时间记录最近加入列表的顺序。
+        std::error_code timeError;
+        const auto savedAt = entry.last_write_time(timeError);
+        files.push_back({std::move(info), timeError ? fs::file_time_type::min() : savedAt});
     }
-    std::sort(infos.begin(), infos.end(), [](const ReplayMetaInfo &a, const ReplayMetaInfo &b) { return a.fileName > b.fileName; });
+    std::sort(files.begin(), files.end(), [](const ReplayFile &a, const ReplayFile &b) {
+        // 最近保存或导入的回放置顶，与回放内记录的对局时间无关。
+        if (a.savedAt != b.savedAt) {
+            return a.savedAt > b.savedAt;
+        }
+        return a.info.fileName > b.info.fileName;
+    });
+    infos.reserve(files.size());
+    for (auto &file : files) {
+        infos.push_back(std::move(file.info));
+    }
     return infos;
 }
 

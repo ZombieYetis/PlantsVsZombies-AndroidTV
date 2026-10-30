@@ -49,6 +49,7 @@ using namespace Sexy;
 namespace {
 constexpr int kReplayRowHeight = 140;
 bool gReplayListDirty = false;
+bool gReplayImportSucceeded = false;
 
 bool IsReplayPlayable(const ReplayMetaInfo &item) {
     return item.netplayVersion == 0 || item.netplayVersion == NETPLAY_VERSION;
@@ -329,6 +330,12 @@ void ReplayManageWidget::RemovedFromManager(Sexy::WidgetManager *theWidgetManage
 void ReplayManageWidget::Draw(Graphics *g) {
     if (mNeedRefreshList || gReplayListDirty) {
         RefreshReplayList();
+        if (gReplayImportSucceeded) {
+            // 导入成功后回到顶部，选中最近加入的回放。
+            mSelectedReplayIndex = mScrollContent->mTotalItems > 0 ? 0 : -1;
+            mScrollWidget->ScrollToMin(false);
+            gReplayImportSucceeded = false;
+        }
         gReplayListDirty = false;
     }
     const bool hasReplay = mScrollContent->mTotalItems > 0;
@@ -488,6 +495,9 @@ void ReplayManageWidget::StartReplayByIndex(int index) const {
 namespace replayui {
 void OnReplayImportFinished(bool success, const char *message) {
     LOG_INFO("[REPLAY] import finished success={} msg={}", success, message ? message : "");
+    if (success) {
+        gReplayImportSucceeded = true;
+    }
     gReplayListDirty = true;
 }
 
