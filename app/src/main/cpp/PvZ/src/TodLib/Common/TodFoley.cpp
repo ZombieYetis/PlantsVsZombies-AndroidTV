@@ -110,6 +110,8 @@ auto GetNewLawnFoleyParamArray() -> FoleyParams (&)[FoleyType::EXTENDED_NUM_FOLE
             {FoleyType::FOLEY_BLOOMERANG, 0.0f, {&addonSounds.bloomerang}, 0U},
             {FoleyType::FOLEY_BONK_CHOY_PUNCH, 5.0f, {&addonSounds.bonk_choy_punch}, 0U},
             {FoleyType::FOLEY_BONK_CHOY_UPPERCUT, 0.0f, {&addonSounds.bonk_choy_uppercut}, 0U},
+            {FoleyType::FOLEY_RED_STINGER_PRIMARY, 0.0f, {&addonSounds.red_stinger_primary}, 0U},
+            {FoleyType::FOLEY_RED_STINGER_SECONDARY, 0.0f, {&addonSounds.red_stinger_secondary}, 0U},
         };
         std::ranges::copy(extendedArray, newArray + FoleyType::NUM_FOLEY);
     });

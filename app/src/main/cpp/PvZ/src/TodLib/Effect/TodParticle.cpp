@@ -27,8 +27,9 @@
 namespace {
 
 // 与 ParticleEffect 扩展区一一对应；文件名不包含最后的 .compiled。
-// 示例：{PARTICLE_MY_EFFECT, "addonFiles/compiled/particles/MyEffect.xml"},
-constexpr std::array<ParticleParams, EXTENDED_NUM_PARTICLES - NUM_PARTICLES> gExtendedParticleParamArray = {{}};
+constexpr std::array<ParticleParams, EXTENDED_NUM_PARTICLES - NUM_PARTICLES> gExtendedParticleParamArray = {{
+    {PARTICLE_RED_STINGER_SPLAT, "addonFiles/compiled/particles/RedStingerSplat.xml"},
+}};
 
 static_assert(NUM_PARTICLES == 108);
 static_assert(sizeof(ParticleParams) == 8);

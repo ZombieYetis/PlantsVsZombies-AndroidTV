@@ -355,6 +355,8 @@ void LawnApp::LoadAddonSounds() {
     addonSounds.giga_laugh2 = GetSoundByFileName("addonFiles/sounds/GigaGarg_PowerPole_Laugh2");
     addonSounds.giga_laugh3 = GetSoundByFileName("addonFiles/sounds/GigaGarg_PowerPole_Laugh3");
     addonSounds.teleportation = GetSoundByFileName("addonFiles/sounds/teleportation");
+    addonSounds.red_stinger_primary = GetSoundByFileName("addonFiles/sounds/red_stinger_primary");
+    addonSounds.red_stinger_secondary = GetSoundByFileName("addonFiles/sounds/red_stinger_secondary");
 
     int addonSoundsNum = (sizeof(addonSounds) / sizeof(int));
     mCompletedLoadingThreadTasks += 54 * addonSoundsNum;

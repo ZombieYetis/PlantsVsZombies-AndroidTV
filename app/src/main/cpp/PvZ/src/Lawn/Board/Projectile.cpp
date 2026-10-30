@@ -1319,6 +1319,12 @@ void Projectile::DoImpact(Zombie *theZombie) {
         if (theZombie) {
             theZombie->ApplyButter();
         }
+    } else if (mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
+        if (mMotionType == ProjectileMotion::MOTION_LOBBED) {
+            aSplatPosX = aLastPosX - 50.0f;
+            aSplatPosY = aLastPosY;
+        }
+        aEffect = ParticleEffect::PARTICLE_RED_STINGER_SPLAT;
     }
 
     if (aEffect != ParticleEffect::PARTICLE_NONE) {
@@ -1487,6 +1493,12 @@ void Projectile::DoImpactGridItem(GridItem *theGridItem) {
         aSplatPosX = aLastPosX - 20.0f;
         aSplatPosY = aLastPosY + 63.0f;
         aEffect = ParticleEffect::PARTICLE_BUTTER_SPLAT;
+    } else if (mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
+        if (mMotionType == ProjectileMotion::MOTION_LOBBED) {
+            aSplatPosX = aLastPosX;
+            aSplatPosY = aLastPosY;
+        }
+        aEffect = ParticleEffect::PARTICLE_RED_STINGER_SPLAT;
     } else {
         Die();
         return;

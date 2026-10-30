@@ -219,7 +219,7 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon) const {
         case SeedType::SEED_PEANUT:
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 9 : 1; // 下方的头可攻击地面僵尸和僵尸狗
         case SeedType::SEED_RED_STINGER:
-            return GetRedStingerForm() == 2 ? 13 : 1;
+            return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 13 : 1;
         case SeedType::SEED_CHERRYBOMB:
         case SeedType::SEED_JALAPENO:
         case SeedType::SEED_COBCANNON:
@@ -1694,7 +1694,7 @@ void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon
         return;
 
     // 投手按实际位置选择更近的骨堆
-    if ((IsLobber(mSeedType) || (mSeedType == SeedType::SEED_RED_STINGER && GetRedStingerForm() == 2)) && theTargetZombie != nullptr && theTargetGridItem != nullptr
+    if ((IsLobber(mSeedType) || (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon == PlantWeapon::WEAPON_SECONDARY)) && theTargetZombie != nullptr && theTargetGridItem != nullptr
         && theTargetGridItem->IsSkeletonPile() && theTargetGridItem->GetItemRect().mX < theTargetZombie->GetZombieRect().mX) {
         theTargetZombie = nullptr;
     }
@@ -1818,7 +1818,7 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags) {
 }
 
 void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem) {
-    if (mSeedType == SeedType::SEED_RED_STINGER && GetRedStingerForm() != 2) {
+    if (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon != PlantWeapon::WEAPON_SECONDARY) {
         RedStingerFire();
         return;
     }
@@ -1893,7 +1893,11 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
         aProjectileType = ProjectileType::PROJECTILE_BUTTER;
     }
 
-    mApp->PlayFoley(FoleyType::FOLEY_THROW);
+    FoleyType aFoleyType = FoleyType::FOLEY_THROW;
+    if (mSeedType == SeedType::SEED_RED_STINGER) {
+        aFoleyType = FoleyType::FOLEY_RED_STINGER_SECONDARY;
+    }
+    mApp->PlayFoley(aFoleyType);
     if (mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_WINTERMELON) {
         mApp->PlayFoley(FoleyType::FOLEY_SNOW_PEA_SPARKLES);
     } else if (mSeedType == SeedType::SEED_PUFFSHROOM || mSeedType == SeedType::SEED_SCAREDYSHROOM || mSeedType == SeedType::SEED_SEASHROOM) {
@@ -2144,7 +2148,7 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
     }
 
     if (mSeedType == SeedType::SEED_CABBAGEPULT || mSeedType == SeedType::SEED_KERNELPULT || mSeedType == SeedType::SEED_MELONPULT || mSeedType == SeedType::SEED_WINTERMELON
-        || mSeedType == SeedType::SEED_SPORESHROOM || mSeedType == SeedType::SEED_AKEE || mSeedType == SeedType::SEED_RED_STINGER) {
+        || mSeedType == SeedType::SEED_SPORESHROOM || mSeedType == SeedType::SEED_AKEE || (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon == PlantWeapon::WEAPON_SECONDARY)) {
         float aRangeX = NAN, aRangeY = NAN;
         if (theTargetZombie) {
             Rect aZombieRect = theTargetZombie->GetZombieRect();
@@ -3799,6 +3803,8 @@ void Plant::UpdateRedStingerShooting() {
         if (mShootingCounter < 0) {
             // 首发对齐原始动画帧 59；保持当前播放速度，不提前结束前摇。
             if (aBodyReanim->ShouldTriggerTimedEvent(15.0f / 40.0f)) {
+                // 整轮双发只在首发动作播放一次音效，客户端也按动画时机播放。
+                mApp->PlayFoley(FoleyType::FOLEY_RED_STINGER_PRIMARY);
                 Fire(nullptr, mRow, PlantWeapon::WEAPON_PRIMARY, nullptr);
                 mShootingCounter = 26;
             }
@@ -3815,9 +3821,10 @@ void Plant::UpdateRedStingerShooting() {
         // 二、三形态分别在原始动画帧 124 和 190 释放花瓣子弹。
         const float aFireTime = aForm == 2 ? 8.0f / 17.0f : 25.0f / 35.0f;
         if (aBodyReanim->ShouldTriggerTimedEvent(aFireTime)) {
-            Zombie *aZombie = aForm == 2 ? FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
-            GridItem *aGridItem = aForm == 2 ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
-            Fire(aZombie, mRow, PlantWeapon::WEAPON_PRIMARY, aGridItem);
+            const PlantWeapon aWeapon = aForm == 2 ? PlantWeapon::WEAPON_SECONDARY : PlantWeapon::WEAPON_PRIMARY;
+            Zombie *aZombie = aForm == 2 ? FindTargetZombie(mRow, aWeapon) : nullptr;
+            GridItem *aGridItem = aForm == 2 ? FindTargetGridItem(mRow, aWeapon) : nullptr;
+            Fire(aZombie, mRow, aWeapon, aGridItem);
         }
     }
     if (aBodyReanim->mLoopCount > 0) {
@@ -3835,7 +3842,9 @@ void Plant::RedStingerFire() {
     const int aCount = aBurst ? 12 : 1;
     const int aOriginX = mX + (aBurst ? 22 : 50);
     const int aOriginY = mY + 25 - (mBoard->GetFlowerPotAt(mPlantCol, mRow) ? 5 : 0);
-    mApp->PlayFoley(FoleyType::FOLEY_THROW);
+    if (aBurst) {
+        mApp->PlayFoley(FoleyType::FOLEY_RED_STINGER_SECONDARY);
+    }
     for (int i = 0; i < aCount; ++i) {
         Projectile *aProjectile = mBoard->AddProjectile(aOriginX, aOriginY, mRenderOrder - 1, mRow, ProjectileType::PROJECTILE_RED_STINGER);
         aProjectile->mDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
@@ -4128,6 +4137,8 @@ void Plant::UpdateShooter() {
             } else if (mState == PlantState::STATE_CACTUS_LOW) {
                 FindTargetAndFire(mRow, PlantWeapon::WEAPON_SECONDARY);
             }
+        } else if (mSeedType == SeedType::SEED_RED_STINGER) {
+            FindTargetAndFire(mRow, GetRedStingerForm() == 2 ? PlantWeapon::WEAPON_SECONDARY : PlantWeapon::WEAPON_PRIMARY);
         } else {
             FindTargetAndFire(mRow, PlantWeapon::WEAPON_PRIMARY);
         }
@@ -4364,6 +4375,8 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
         if (aForm == 3 || mShootingCounter != 0 || mState == PlantState::STATE_RED_STINGER_DYING) {
             return false;
         }
+        // 索敌和联机攻击事件使用当前形态对应的武器。
+        thePlantWeapon = aForm == 2 ? PlantWeapon::WEAPON_SECONDARY : PlantWeapon::WEAPON_PRIMARY;
         if (FindTargetZombie(theRow, thePlantWeapon) == nullptr && FindTargetGridItem(theRow, thePlantWeapon) == nullptr) {
             return false;
         }
