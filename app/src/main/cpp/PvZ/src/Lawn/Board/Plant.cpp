@@ -3830,6 +3830,36 @@ void Plant::RedStingerFire() {
     }
 }
 
+void Plant::LaunchThreepeater() {
+    const int aRowAbove = mRow - 1;
+    const int aRowBelow = mRow + 1;
+    const bool aCanFireAbove = mBoard->RowCanHaveZombies(aRowAbove);
+    const bool aCanFireBelow = mBoard->RowCanHaveZombies(aRowBelow);
+    if (!FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) && !FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY)
+        && !(aCanFireAbove && (FindTargetZombie(aRowAbove, PlantWeapon::WEAPON_PRIMARY) || FindTargetGridItem(aRowAbove, PlantWeapon::WEAPON_PRIMARY)))
+        && !(aCanFireBelow && (FindTargetZombie(aRowBelow, PlantWeapon::WEAPON_PRIMARY) || FindTargetGridItem(aRowBelow, PlantWeapon::WEAPON_PRIMARY)))) {
+        return;
+    }
+
+    const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSClassicMode;
+    const auto aStartHeadShooting = [this](ReanimationID theHeadReanimID, const char *theTrack) {
+        Reanimation *aHeadReanim = mApp->ReanimationGet(theHeadReanimID);
+        aHeadReanim->StartBlend(10);
+        aHeadReanim->mLoopType = ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD;
+        aHeadReanim->SetAnimRate(20.0f);
+        aHeadReanim->SetFramesForLayer(theTrack);
+    };
+    // 边路补偿仍由缺失侧线的头部播放攻击动画，出弹时再映射到本行。
+    if (aCanFireBelow || aCompensateEdge) {
+        aStartHeadShooting(mHeadReanimID, "anim_shooting1");
+    }
+    aStartHeadShooting(mHeadReanimID2, "anim_shooting2");
+    if (aCanFireAbove || aCompensateEdge) {
+        aStartHeadShooting(mHeadReanimID3, "anim_shooting3");
+    }
+    mShootingCounter = 35;
+}
+
 void Plant::LaunchPeanut() {
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (aBodyReanim == nullptr) {
@@ -3892,26 +3922,29 @@ void Plant::UpdateShooting() {
         }
     } else if (mShootingCounter == 1) {
         if (mSeedType == SeedType::SEED_THREEPEATER) {
-            int rowAbove = mRow - 1;
-            int rowBelow = mRow + 1;
+            int aRowAbove = mRow - 1;
+            int aRowBelow = mRow + 1;
+            const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSClassicMode;
             Reanimation *aHeadReanim2 = mApp->ReanimationTryToGet(mHeadReanimID2);
             Reanimation *aHeadReanim3 = mApp->ReanimationTryToGet(mHeadReanimID3);
             Reanimation *aHeadReanim1 = mApp->ReanimationTryToGet(mHeadReanimID);
 
             if (aHeadReanim1->mLoopType == ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD) {
-                Fire(nullptr, rowBelow, PlantWeapon::WEAPON_PRIMARY, nullptr);
+                if (aCompensateEdge && !mBoard->RowCanHaveZombies(aRowBelow)) {
+                    Fire(nullptr, mRow, PlantWeapon::WEAPON_SECONDARY, nullptr);
+                } else {
+                    Fire(nullptr, aRowBelow, PlantWeapon::WEAPON_PRIMARY, nullptr);
+                }
             }
             if (aHeadReanim2->mLoopType == ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD) {
                 Fire(nullptr, mRow, PlantWeapon::WEAPON_PRIMARY, nullptr);
-                // 边路缺失的侧线豌豆补到本行，每次仍发射三颗
-                if (mApp->IsVSMode() && !Challenge::msVSClassicMode) {
-                    if (!mBoard->RowCanHaveZombies(rowAbove) || !mBoard->RowCanHaveZombies(rowBelow)) {
-                        Fire(nullptr, mRow, PlantWeapon::WEAPON_SECONDARY, nullptr);
-                    }
-                }
             }
             if (aHeadReanim3->mLoopType == ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD) {
-                Fire(nullptr, rowAbove, PlantWeapon::WEAPON_PRIMARY, nullptr);
+                if (aCompensateEdge && !mBoard->RowCanHaveZombies(aRowAbove)) {
+                    Fire(nullptr, mRow, PlantWeapon::WEAPON_SECONDARY, nullptr);
+                } else {
+                    Fire(nullptr, aRowAbove, PlantWeapon::WEAPON_PRIMARY, nullptr);
+                }
             }
         } else if (mSeedType == SeedType::SEED_SPLITPEA) {
             Reanimation *aHeadBackReanim = mApp->ReanimationTryToGet(mHeadReanimID2);

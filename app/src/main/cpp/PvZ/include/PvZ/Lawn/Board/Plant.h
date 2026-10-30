@@ -248,9 +248,7 @@ public:
     TodParticleSystem *AddAttachedParticle(int thePosX, int thePosY, int theRenderPosition, ParticleEffect theEffect) {
         return reinterpret_cast<TodParticleSystem *(*)(Plant *, int, int, int, ParticleEffect)>(Plant_AddAttachedParticleAddr)(this, thePosX, thePosY, theRenderPosition, theEffect);
     }
-    void LaunchThreepeater() {
-        reinterpret_cast<void (*)(Plant *)>(Plant_LaunchThreepeaterAddr)(this);
-    }
+    void LaunchThreepeater();
     void LaunchStarFruit() {
         reinterpret_cast<void (*)(Plant *)>(Plant_LaunchStarFruitAddr)(this);
     }
