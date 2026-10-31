@@ -100,6 +100,7 @@ public:
     };
 
     void GridItemDie();
+    void GridItemDie_Origin();
     void DrawGridItem(Sexy::Graphics *g);
     void DrawScaryPot(Sexy::Graphics *g);
     void Update();
@@ -141,8 +142,6 @@ inline bool transparentVase;
 
 
 inline void (*old_GridItem_GridItem)(GridItem *);
-
-inline void (*old_GridItem_GridItemDie)(GridItem *);
 
 inline void (*old_GridItem_Update)(GridItem *a1);
 

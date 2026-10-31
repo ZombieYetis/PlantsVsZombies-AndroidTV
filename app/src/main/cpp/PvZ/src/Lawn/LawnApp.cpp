@@ -244,6 +244,8 @@ void LawnApp::LoadAddonImages() {
     DefinitionLoadImage(&addonImages.IMAGE_RED_STINGER_SPLATS, "IMAGE_RED_STINGER_SPLATS", "addonFiles/particles/red_stinger_splats");
     DefinitionLoadImage(&addonImages.IMAGE_RED_STINGER_PARTICLES, "IMAGE_RED_STINGER_PARTICLES", "addonFiles/particles/red_stinger_particles");
     addonImages.IMAGE_RED_STINGER_PARTICLES->mNumCols = 6;
+    DefinitionLoadImage(&addonImages.IMAGE_ZOMBIE_SKELETON_PARTICLES, "IMAGE_ZOMBIE_SKELETON_PARTICLES", "addonFiles/particles/zombie_skeleton_particles");
+    addonImages.IMAGE_ZOMBIE_SKELETON_PARTICLES->mNumCols = 4;
     addonImages.IMAGE_REANIM_ZOMBLOBHEAD_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombiezomblobhead_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_DYING_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_dying_buttered");

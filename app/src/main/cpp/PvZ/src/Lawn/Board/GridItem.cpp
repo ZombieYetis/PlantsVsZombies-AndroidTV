@@ -47,6 +47,9 @@ void GridItem::_constructor() {
 }
 
 void GridItem::GridItemDie() {
+    if (mDead) {
+        return;
+    }
     if (mApp->mGameScene == SCENE_PLAYING) {
         if (IsRemoteClientOrViewer()) {
             return;
@@ -67,6 +70,10 @@ void GridItem::GridItemDie() {
         }
     }
 
+    GridItemDie_Origin();
+}
+
+void GridItem::GridItemDie_Origin() {
     mDead = true;
 
     bool processVsDie = mApp->IsVSMode();
@@ -121,6 +128,11 @@ void GridItem::GridItemDie() {
             auto &aRelatedPoleID = reinterpret_cast<GridItemID &>(aZombie->mRelatedZombieID);
             aRelatedPoleID = GridItemID::GRIDITEMID_NULL;
         }
+    }
+
+    if (IsSkeletonPile() && mGridItemState != GridItemState::GRIDITEM_STATE_NORMAL) {
+        const Rect aRect = GetItemRect();
+        mApp->AddTodParticle(aRect.mX + aRect.mWidth * 0.5f, aRect.mY + aRect.mHeight - 60.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_SKELETON_PILE_BREAK);
     }
 
     Reanimation *aGridItemReanim = mApp->ReanimationTryToGet(mGridItemReanimID);
@@ -412,6 +424,8 @@ void GridItem::RestoreSkeleton(Zombie *theZombie) {
     theZombie->mOnHighGround = mGoalY > 0.0f;
     theZombie->mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
     theZombie->StartWalkAnim(0);
+    // 重生完成后的骨堆仅清理对象，不播放被摧毁的碎裂特效。
+    mGridItemState = GridItemState::GRIDITEM_STATE_NORMAL;
 }
 
 void GridItem::UpdateSkeletonPile() {

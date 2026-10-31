@@ -2536,7 +2536,7 @@ void Board::processServerEvent(const BaseEvent *event) {
             uint16_t clientGridItemID = 0;
             if (homura::FindInMap(serverGridItemIDMap, serverGridItemID, clientGridItemID)) {
                 GridItem *aGridItem = mGridItems.DataArrayGet(clientGridItemID);
-                old_GridItem_GridItemDie(aGridItem);
+                aGridItem->GridItemDie_Origin();
                 serverGridItemIDMap.erase(serverGridItemID);
             }
         } break;
@@ -8626,7 +8626,7 @@ GridItem *Board::AddSkeletonPile(Zombie *theZombie, float thePosX, float thePosY
     aPile->mGridY = theZombie->mRow;
     aPile->mRenderOrder = theZombie->mRenderOrder;
     aPile->mVSGraveStoneHealth = 190;
-    aPile->mGridItemCounter = 700;
+    aPile->mGridItemCounter = 750;
     aPile->mZombieType = ZombieType::ZOMBIE_SKELETON;
     // 骨堆复用闲置字段保存阵营、波次、皮肤、缩放和高度。
     aPile->mSummonIndex = int(theZombie->mMindControlled);

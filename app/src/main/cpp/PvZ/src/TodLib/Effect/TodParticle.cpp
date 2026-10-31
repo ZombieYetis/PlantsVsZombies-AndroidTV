@@ -29,6 +29,7 @@ namespace {
 // 与 ParticleEffect 扩展区一一对应；文件名不包含最后的 .compiled。
 constexpr std::array<ParticleParams, EXTENDED_NUM_PARTICLES - NUM_PARTICLES> gExtendedParticleParamArray = {{
     {PARTICLE_RED_STINGER_SPLAT, "addonFiles/compiled/particles/RedStingerSplat.xml"},
+    {PARTICLE_SKELETON_PILE_BREAK, "addonFiles/compiled/particles/SkeletonPileBreak.xml"},
 }};
 
 static_assert(NUM_PARTICLES == 108);

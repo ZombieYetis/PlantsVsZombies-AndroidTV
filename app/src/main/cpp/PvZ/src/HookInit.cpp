@@ -294,7 +294,7 @@ void InitHookFunction() {
 
 
     homura::HookFunc(GridItem__constructorAddr, &GridItem::_constructor, &old_GridItem_GridItem);
-    homura::HookFunc(GridItem_GridItemDieAddr, &GridItem::GridItemDie, &old_GridItem_GridItemDie);
+    homura::HookFunc(GridItem_GridItemDieAddr, &GridItem::GridItemDie, nullptr);
     homura::HookFunc(GridItem_DrawGridItemAddr, &GridItem::DrawGridItem, &old_GridItem_DrawGridItem);
     homura::HookFunc(GridItem_UpdateAddr, &GridItem::Update, &old_GridItem_Update);
     homura::HookFunc(GridItem_UpdateScaryPotAddr, &GridItem::UpdateScaryPot, &old_GridItem_UpdateScaryPot);
