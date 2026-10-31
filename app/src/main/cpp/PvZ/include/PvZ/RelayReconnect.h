@@ -10,8 +10,26 @@ struct BaseEvent;
 
 namespace netplay::reconnect {
 // Wire values are shared with RelayReconnect.java. All multibyte fields are BE.
-enum Op : uint8_t { State = 1, Frozen, Sync, Loaded, Commit, Resume, Cancel, Ping, Pong };
-enum Phase : uint8_t { None, Freezing, Waiting, Attaching, Syncing, Resuming, Closing };
+enum Op : uint8_t {
+    OP_STATE = 1,
+    OP_FROZEN,
+    OP_SYNC,
+    OP_LOADED,
+    OP_COMMIT,
+    OP_RESUME,
+    OP_CANCEL,
+    OP_PING,
+    OP_PONG,
+};
+enum Phase : uint8_t {
+    PHASE_NONE,
+    PHASE_FREEZING,
+    PHASE_WAITING,
+    PHASE_ATTACHING,
+    PHASE_SYNCING,
+    PHASE_RESUMING,
+    PHASE_CLOSING,
+};
 constexpr uint16_t SnapshotVersion = 1;
 constexpr std::size_t MaxSnapshotSize = 64 * 1024 * 1024;
 bool IsFrozen() noexcept;

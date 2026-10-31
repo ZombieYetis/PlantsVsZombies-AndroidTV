@@ -21,7 +21,7 @@
 namespace netplay::reconnect {
 namespace {
     using Clock = std::chrono::steady_clock;
-    std::atomic<Phase> phase{None};
+    std::atomic<Phase> phase{PHASE_NONE};
     uint32_t epoch = 0, transfer = 0, expected = 0, expectedHash = 0, snapshotTick = 0;
     GameMode snapshotMode = GAMEMODE_MP_VS;
     std::vector<unsigned char> incoming, outgoing;
@@ -81,7 +81,7 @@ namespace {
         if (gIsServerModeSpectator) {
             message = TodStringTranslate("[RECONNECT_SPECTATOR_WAIT]");
         } else if (IsRemoteServer() && code >= 0) {
-            auto status = TodStringTranslate(phase == Waiting ? "[RECONNECT_WAITING]" : "[RECONNECT_SYNCING]");
+            auto status = TodStringTranslate(phase == PHASE_WAITING ? "[RECONNECT_WAITING]" : "[RECONNECT_SYNCING]");
             message = Sexy::StrFormat(TodStringTranslate("[RECONNECT_HOST_CODE_FMT]").c_str(), code, status.c_str());
         } else {
             message = TodStringTranslate(IsRemoteServer() ? "[RECONNECT_PREPARING]" : "[RECONNECT_CLIENT_SYNCING]");
@@ -96,15 +96,15 @@ namespace {
         shownPhase = phase.load();
     }
     void FailClient() {
-        Control(Loaded, 0);
-        phase = Resuming;
+        Control(OP_LOADED, 0);
+        phase = PHASE_RESUMING;
         receiving = false;
         incoming.clear();
     }
 } // namespace
 
 bool IsFrozen() noexcept {
-    return phase != None;
+    return phase != PHASE_NONE;
 }
 bool IsEvent(uint8_t type) noexcept {
     return type >= EVENT_RECONNECT_CONTROL && type <= EVENT_RECONNECT_SNAPSHOT_END;
@@ -118,7 +118,7 @@ uint32_t Hash(const std::vector<unsigned char> &data) {
 void PrepareClient(uint32_t newEpoch, uint32_t newTransfer) {
     epoch = newEpoch;
     transfer = newTransfer;
-    phase = Attaching;
+    phase = PHASE_ATTACHING;
     previousPause = false;
     progress = Clock::now();
     ClearTransfer();
@@ -127,7 +127,7 @@ void PrepareClient(uint32_t newEpoch, uint32_t newTransfer) {
 }
 void Reset(LawnApp *app) noexcept {
     HideDialog(app);
-    phase = None;
+    phase = PHASE_NONE;
     epoch = transfer = 0;
     code = -1;
     cancelRequested = false;
@@ -146,45 +146,45 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
         if (event->size != 16)
             return true;
         const auto op = Op(p[2]);
-        if (op == Pong) {
+        if (op == OP_PONG) {
             lastPong = Clock::now();
             return true;
         }
         const auto newEpoch = Read32(p + 4), newTransfer = Read32(p + 8);
-        if (op == State) {
-            if (p[3] < Freezing || p[3] > Closing)
+        if (op == OP_STATE) {
+            if (p[3] < PHASE_FREEZING || p[3] > PHASE_CLOSING)
                 return true;
             if (newEpoch < epoch)
                 return true;
-            if (phase == None && app->mBoard)
+            if (phase == PHASE_NONE && app->mBoard)
                 previousPause = app->mBoard->mPaused;
             epoch = newEpoch;
             transfer = newTransfer;
             phase = Phase(p[3]);
             ClearHeldInput();
-            if (phase == Freezing || phase == Waiting)
+            if (phase == PHASE_FREEZING || phase == PHASE_WAITING)
                 ClearTransfer();
             const auto value = Read32(p + 12);
-            if (IsRemoteServer() && phase == Waiting && value < 100) {
+            if (IsRemoteServer() && phase == PHASE_WAITING && value < 100) {
                 code = int(value);
                 shownPhase = -1;
             }
-            if (phase == Freezing && IsRemoteServer()) {
+            if (phase == PHASE_FREEZING && IsRemoteServer()) {
                 // Already queued events stay in order; the relay treats FROZEN as a barrier.
                 // Preserve any spectator snapshot and catchup already in flight.
                 // Its sender pauses with this board and continues after RESUME.
-                Control(Frozen, netplay::CanCaptureReconnectSnapshot(app) ? 1 : 0);
+                Control(OP_FROZEN, netplay::CanCaptureReconnectSnapshot(app) ? 1 : 0);
             }
-            if (phase == Closing)
+            if (phase == PHASE_CLOSING)
                 cancelRequested = true;
             progress = Clock::now();
             return true;
         }
-        if (newEpoch != epoch || (!gIsServerModeSpectator && op != Sync && newTransfer != transfer))
+        if (newEpoch != epoch || (!gIsServerModeSpectator && op != OP_SYNC && newTransfer != transfer))
             return true;
-        if (op == Sync && IsRemoteServer() && (phase == Waiting || phase == Attaching)) {
+        if (op == OP_SYNC && IsRemoteServer() && (phase == PHASE_WAITING || phase == PHASE_ATTACHING)) {
             transfer = newTransfer;
-            phase = Syncing;
+            phase = PHASE_SYNCING;
             ClearTransfer();
             // Snapshot the pre-dialog pause state, without modifying the live board permanently.
             bool paused = app->mBoard && app->mBoard->mPaused;
@@ -194,7 +194,7 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
             if (app->mBoard)
                 app->mBoard->mPaused = paused;
             if (!captured) {
-                Control(Loaded, 0);
+                Control(OP_LOADED, 0);
                 return true;
             }
             unsigned char begin[26]{EVENT_RECONNECT_SNAPSHOT_BEGIN, 26};
@@ -206,10 +206,10 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
             Write32(begin + 18, Hash(outgoing));
             Write32(begin + 22, app->mAppCounter);
             Send(begin, sizeof(begin));
-        } else if (op == Loaded && IsRemoteServer() && phase == Syncing && Read32(p + 12) == 1 && outgoing.empty()) {
-            phase = Resuming;
-            Control(Commit);
-        } else if (op == Resume && IsFrozen()) {
+        } else if (op == OP_LOADED && IsRemoteServer() && phase == PHASE_SYNCING && Read32(p + 12) == 1 && outgoing.empty()) {
+            phase = PHASE_RESUMING;
+            Control(OP_COMMIT);
+        } else if (op == OP_RESUME && IsFrozen()) {
             ClearTransfer();
             ClearHeldInput();
             code = -1;
@@ -223,7 +223,7 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
             if (app->mBoard)
                 app->mBoard->Pause(false);
             gPauseSyncFromRemote = wasPauseSyncFromRemote;
-            phase = None;
+            phase = PHASE_NONE;
             if (IsRemoteServer() && previousPause && app->mBoard && !app->mVSSetupMenu) {
                 // Reconnect controls are excluded from replays. Record one
                 // authoritative resume to balance the pre-disconnect pause.
@@ -246,7 +246,7 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
     if (IsRemoteServer() || gIsServerModeSpectator || !IsFrozen() || event->size < 10 || Read32(p + 2) != epoch || Read32(p + 6) != transfer)
         return true;
     if (event->type == EVENT_RECONNECT_SNAPSHOT_BEGIN) {
-        if (event->size != 26 || phase != Attaching || Read16(p + 10) != SnapshotVersion) {
+        if (event->size != 26 || phase != PHASE_ATTACHING || Read16(p + 10) != SnapshotVersion) {
             FailClient();
             return true;
         }
@@ -261,7 +261,7 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
         incoming.clear();
         incoming.reserve(expected);
         receiving = true;
-        phase = Syncing;
+        phase = PHASE_SYNCING;
     } else if (event->type == EVENT_RECONNECT_SNAPSHOT_CHUNK && receiving) {
         if (event->size < 16 || Read32(p + 10) != incoming.size() || Read16(p + 14) != event->size - 16 || event->size == 16 || incoming.size() + event->size - 16 > expected) {
             FailClient();
@@ -277,8 +277,8 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
         if (valid) {
             app->mAppCounter = snapshotTick;
         }
-        phase = Resuming;
-        Control(Loaded, valid ? 1 : 0);
+        phase = PHASE_RESUMING;
+        Control(OP_LOADED, valid ? 1 : 0);
     }
     progress = Clock::now();
     return true;
@@ -301,7 +301,7 @@ void Update(LawnApp *app) {
             lastPing = lastPong = now;
         }
         if (now - lastPing >= std::chrono::seconds(2)) {
-            Control(Ping);
+            Control(OP_PING);
             lastPing = now;
         }
         if (now - lastPong > std::chrono::seconds(25))
@@ -314,14 +314,14 @@ void Update(LawnApp *app) {
             dialog->GetVTable()->Update(dialog);
         if (cancelRequested) {
             if (IsRemoteServer()) {
-                Control(Cancel);
+                Control(OP_CANCEL);
                 FlushSendBuffer(socket);
             }
             app->DoBackToMain();
             return;
         }
     }
-    if (IsRemoteServer() && phase == Syncing && !outgoing.empty() && !HasPendingSendData()) {
+    if (IsRemoteServer() && phase == PHASE_SYNCING && !outgoing.empty() && !HasPendingSendData()) {
         const auto end = std::min(offset + 16 * 1024, outgoing.size());
         while (offset < end) {
             unsigned char data[240]{EVENT_RECONNECT_SNAPSHOT_CHUNK};
