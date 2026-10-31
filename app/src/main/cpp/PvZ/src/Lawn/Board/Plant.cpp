@@ -117,7 +117,7 @@ PlantDefinition gExtendedPlantDefs[]{
     {SeedType::SEED_SUN_BEAN, nullptr, ReanimationType::REANIM_SUN_BEAN, 0, 50, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "SUN_BEAN"},
     {SeedType::SEED_PEANUT, nullptr, ReanimationType::REANIM_PEANUT, 0, 150, 3000, PlantSubClass::SUBCLASS_SHOOTER, 200, "PEANUT"},
     {SeedType::SEED_ENDURIAN, nullptr, ReanimationType::REANIM_ENDURIAN, 0, 75, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "ENDURIAN"},
-    {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 1500, PlantSubClass::SUBCLASS_SHOOTER, 200, "RED_STINGER"},
+    {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 750, PlantSubClass::SUBCLASS_SHOOTER, 250, "RED_STINGER"},
     {SeedType::SEED_IMP_PEAR, nullptr, ReanimationType::REANIM_IMP_PEAR, 0, 100, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "IMP_PEAR"},
     {SeedType::SEED_AKEE, nullptr, ReanimationType::REANIM_AKEE, 0, 175, 750, PlantSubClass::SUBCLASS_SHOOTER, 300, "AKEE"},
 };
@@ -2932,7 +2932,6 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_MELONPULT: // 300 -> 200
             aCost = 200;
             break;
-        case SeedType::SEED_THREEPEATER:       // 200 -> 225
         case SeedType::SEED_ZOMBIE_GARGANTUAR: // 250 -> 225
             aCost = 225;
             break;
@@ -2978,9 +2977,8 @@ static int GetVSCostShuffle(SeedType theSeedType) {
             return 200;
         case SeedType::SEED_THREEPEATER:
         case SeedType::SEED_MELONPULT:
-            return 225;
         case SeedType::SEED_ZOMBIE_FLAG:
-            return 250;
+            return 225;
         default:
             return GetVSCost(theSeedType);
     }
@@ -2997,7 +2995,6 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_NORMAL:          // 7.5 -> 15
         case SeedType::SEED_ZOMBIE_JACK_IN_THE_BOX: // 30 -> 15
         case SeedType::SEED_ZOMBIE_SNORKEL:         // 7.5 -> 15
-        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_MOUND:
         case SeedType::SEED_ZOMBIE_SUPER_FAN_IMP:
         case SeedType::SEED_ZOMBIE_SUNDAY_EDITION:
@@ -3012,10 +3009,11 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_WALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_JALAPENO_HEAD:
         case SeedType::SEED_ZOMBIE_GATLINGPEA_HEAD:
+        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
         case SeedType::SEED_ZOMBIE_JACKSON:
-        case SeedType::SEED_ZOMBIE_GIGA_POLEVAULTER:
+        2 case SeedType::SEED_ZOMBIE_GIGA_POLEVAULTER:
         case SeedType::SEED_ZOMBIE_EXPLORER:
         case SeedType::SEED_ZOMBIE_ZOMBLOB:
         case SeedType::SEED_ZOMBIE_DOGWALKER:
