@@ -110,6 +110,7 @@ public:
     void InitFromBoard(Board *theBoard);
     bool SaveReplay();
     void ShowReplayButton();
+    void UpdateReplayButtonState();
     void KillReplayButton();
 
     void processClientEvent(const BaseEvent *event);

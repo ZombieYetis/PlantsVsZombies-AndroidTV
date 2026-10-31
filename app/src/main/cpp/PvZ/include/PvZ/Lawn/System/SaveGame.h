@@ -114,6 +114,12 @@ void UpdateSaveGameTransfer(LawnApp *app);
 void ResetSaveGameTransfer() noexcept;
 bool IsSynchronizingSaveGame() noexcept;
 bool IsApplyingOnlineSaveGame() noexcept;
+bool IsSerializingSpectatorSnapshot() noexcept;
+bool IsSendingSpectatorSnapshot() noexcept;
+bool HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event, bool fromHost);
+std::vector<std::byte> TakeSpectatorCatchupEvents();
+void UpdateSpectatorSnapshot(LawnApp *app);
+void ResetSpectatorSnapshot() noexcept;
 } // namespace netplay
 
 #endif // PVZ_LAWN_SYSTEM_SAVE_GAME_H

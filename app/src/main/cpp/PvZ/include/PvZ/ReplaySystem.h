@@ -63,6 +63,15 @@ struct PlaybackEvent {
 using EventList = std::vector<PlaybackEvent>;
 
 void ResetRecorder();
+bool IsRecordingComplete();
+enum class HistoryStatus { Local, Receiving, Queued, Ready, Saved, Failed };
+HistoryStatus GetHistoryStatus();
+uint32_t GetRecordingEpoch();
+void BindLiveHistory(uint32_t epoch);
+void RequestHistoryTransfer(uint32_t epoch);
+bool HandleHistoryEvent(const BaseEvent *event, bool fromHost);
+void UpdateHistoryTransfer();
+void ResetHistoryTransfer();
 void RecordPacket(ReplayPacketDir dir, const std::byte *data, std::size_t len, std::uint32_t tick);
 bool SaveCurrentMatchReplay(const ReplayMetaInfo &meta);
 std::vector<ReplayMetaInfo> ListReplayFiles();
@@ -84,6 +93,7 @@ int GetPlaybackDurationTicks();
 int GetPlaybackBoardTicks();
 const std::string &GetPlaybackFilePath();
 int GetPlaybackVsBackground();
+int GetPlaybackNetplayVersion();
 int GetPlaybackBoardStartTick();
 const std::vector<int> &GetPlaybackGridItemDieTicks();
 const std::vector<int> &GetPlaybackLawnMowerStartTicks();

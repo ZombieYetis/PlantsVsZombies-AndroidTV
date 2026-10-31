@@ -114,6 +114,8 @@ bool netplay::FlushSendBuffer(int socket) {
 void netplay::ClearSendBuffer() noexcept {
     sendBuffer.clear();
     ResetSaveGameTransfer();
+    ResetSpectatorSnapshot();
+    replay::ResetHistoryTransfer();
 }
 
 bool netplay::HasPendingSendData() noexcept {
@@ -258,6 +260,9 @@ static bool SendSettlementPayloadBlocking(const std::string &serverIp, int serve
 }
 
 bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
+    // TODO：测试完毕后改回来
+    return false;
+
     // 非对战模式不能构造或上传对战结算数据。
     if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
         return false;

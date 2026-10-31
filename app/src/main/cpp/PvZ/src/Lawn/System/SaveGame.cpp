@@ -23,19 +23,36 @@
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/Board/Challenge.h"
 #include "PvZ/Lawn/Board/CursorObject.h"
+#include "PvZ/Lawn/Board/CutScene.h"
 #include "PvZ/Lawn/Board/MessageWidget.h"
+#include "PvZ/Lawn/Board/OpeningEncounter.h"
 #include "PvZ/Lawn/Board/SeedBank.h"
 #include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
+#include "PvZ/Lawn/System/SpectatorWidgetSync.h"
+#include "PvZ/Lawn/Widget/GameButton.h"
+#include "PvZ/Lawn/Widget/NetplayLobbyWidget.h"
+#include "PvZ/Lawn/Widget/SeedChooserScreen.h"
+#include "PvZ/Lawn/Widget/VSResultsMenu.h"
+#include "PvZ/Lawn/Widget/VSSetupAddonWidget.h"
+#include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/ReplaySystem.h"
+#include "PvZ/SexyAppFramework/Widget/Checkbox.h"
+#include "PvZ/SexyAppFramework/Widget/ImageWidget.h"
+#include "PvZ/SexyAppFramework/Widget/WidgetManager.h"
+#include "PvZ/TodLib/Common/TodStringFile.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
 #include "PvZ/TodLib/Effect/TodParticle.h"
 
+#include <sys/socket.h>
 #include <cstring>
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 namespace {
 enum class OnlineLoadState { Idle, AwaitingHost, Sending, Receiving, AwaitingReady, AwaitingResume };
@@ -108,6 +125,568 @@ void AbortOnlineSave(LawnApp *app, bool notifyPeer) {
     LOG_ERROR("[NETPLAY] coop save transfer failed; returned to mode selection");
 }
 } // namespace
+
+namespace {
+// Separate from the co-op handshake: capturing/sending never pauses the players.
+bool gCapturingSpectatorSnapshot = false;
+bool gApplyingSpectatorSnapshot = false;
+bool gSpectatorSnapshotRequested = false;
+bool gReceivingSpectatorSnapshot = false;
+bool gSpectatorDraftProgressPending = false;
+std::vector<unsigned char> gSpectatorSnapshotOut, gSpectatorSnapshotIn;
+std::vector<std::byte> gSpectatorCatchup, gSpectatorCatchupReady;
+std::size_t gSpectatorSnapshotOffset = 0;
+uint32_t gSpectatorSnapshotSize = 0, gSpectatorSnapshotHash = 0;
+uint32_t gSpectatorHistoryEpoch = 0;
+auto gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
+constexpr std::size_t kMaxSpectatorCatchup = 16 * 1024 * 1024;
+constexpr uint16_t kSpectatorSnapshotVersion = 4;
+
+// UI objects contain local pointers, listeners and widget-manager links. Only
+// serialize explicit value fields; construct the actual widgets on the viewer.
+template <typename... T>
+void SyncSpectatorValues(SaveGameContext &context, T &...values) {
+    static_assert((std::is_trivially_copyable_v<T> && ...));
+    static_assert((!std::is_pointer_v<std::remove_all_extents_t<T>> && ...));
+    (context.SyncBytes(&values, sizeof(values)), ...);
+}
+
+struct SpectatorScene {
+    GameScenes scene = SCENE_PLAYING;
+    BackgroundType background = BACKGROUND_1_DAY;
+    bool setup = false, plantChooser = false, zombieChooser = false;
+    bool shuffle = false, classic = false, extraPackets = false, ban = false, timed = false;
+    uint32_t historyEpoch = 0;
+
+    void Sync(SaveGameContext &context) {
+        SyncSpectatorValues(context, scene, background, setup, plantChooser, zombieChooser, shuffle, classic, extraPackets, ban, timed, historyEpoch);
+    }
+};
+
+// Local identities only: restart a transfer if its board/UI is replaced, or
+// drafting finishes before delivery. A new BEGIN discards the obsolete backlog.
+Board *gSpectatorSourceBoard = nullptr;
+VSSetupMenu *gSpectatorSourceSetup = nullptr;
+SeedChooserScreen *gSpectatorSourcePlant = nullptr, *gSpectatorSourceZombie = nullptr;
+GameScenes gSpectatorSourceScene = SCENE_PLAYING;
+
+SpectatorScene GetSpectatorScene(LawnApp *app) {
+    SpectatorScene scene;
+    scene.scene = app->mGameScene;
+    scene.historyEpoch = replay::GetRecordingEpoch();
+    scene.background = app->mBoard->mBackground;
+    scene.setup = app->mVSSetupMenu != nullptr;
+    scene.plantChooser = app->mSeedChooserScreen != nullptr;
+    scene.zombieChooser = app->mZombieChooserScreen != nullptr;
+    scene.shuffle = Challenge::msVSShuffleMode;
+    scene.classic = Challenge::msVSClassicMode;
+    scene.timed = VSSetupAddonWidget::msTimedDraftMode;
+    if (scene.setup) {
+        scene.extraPackets = app->mVSSetupMenu->mAddonWidget->mExtraPacketMode;
+        scene.ban = app->mVSSetupMenu->mAddonWidget->mBanMode;
+    }
+    return scene;
+}
+
+void SyncSpectatorWidget(SaveGameContext &context, Sexy::Widget *widget) {
+    netplay::snapshot::SyncWidget(context, widget);
+}
+
+void SyncSpectatorChooser(SaveGameContext &context, SeedChooserScreen &chooser) {
+    SyncSpectatorWidget(context, &chooser);
+    SyncSpectatorValues(context,
+                        chooser.mShowHelpText,
+                        chooser.mChosenSeeds,
+                        chooser.mSeedChooserAge,
+                        chooser.mSeedsInFlight,
+                        chooser.mSeedsInBank,
+                        chooser.mSeedsIn1PBank,
+                        chooser.mSeedsIn2PBank,
+                        chooser.mCursorPositionX1,
+                        chooser.mCursorPositionX2,
+                        chooser.mCursorPositionY1,
+                        chooser.mCursorPositionY2,
+                        chooser.mChooseState,
+                        chooser.mViewLawnTime,
+                        chooser.mPlayerIndex,
+                        chooser.mSeedIndex1,
+                        chooser.mSeedIndex2,
+                        chooser.mCursorBobPhase,
+                        chooser.mDimCounter,
+                        chooser.mPageIndex,
+                        chooser.mNumBanPackets,
+                        chooser.mSeedsInBanned,
+                        chooser.mBannedSeed,
+                        chooser.mBanningPhase,
+                        chooser.mGlobalBpBansApplied,
+                        chooser.mChosenSeedsExtended,
+                        chooser.mTimedDraftTicksRemaining,
+                        chooser.mTimedDraftWasActive,
+                        chooser.mReanimSeedChooser);
+    SyncSpectatorWidget(context, chooser.mStartButton);
+    if (context.mReading && !context.mFailed) {
+        // Keep all app/board/bank/button pointers from the local constructor.
+        chooser.mToolTipSeed1 = chooser.mToolTipSeed2 = -1;
+        chooser.UpdateImitaterButton();
+        chooser.RebuildHelpbar();
+        chooser.MarkDirty();
+    }
+}
+
+void SyncSpectatorIntro(SaveGameContext &context, LawnApp *app) {
+    auto &cutscene = *app->mBoard->mCutScene;
+    SyncSpectatorWidget(context, app->mBoard);
+    SyncSpectatorValues(context,
+                        cutscene.mCutsceneTime,
+                        cutscene.mSodTime,
+                        cutscene.mGraveStoneTime,
+                        cutscene.mReadySetPlantTime,
+                        cutscene.mFogTime,
+                        cutscene.mBossTime,
+                        cutscene.mCrazyDaveTime,
+                        cutscene.mLawnMowerTime,
+                        cutscene.mCrazyDaveDialogStart,
+                        cutscene.mSeedChoosing,
+                        cutscene.mZombiesWonReanimID,
+                        cutscene.mPreloaded,
+                        cutscene.mPlacedZombies,
+                        cutscene.mPlacedLawnItems,
+                        cutscene.mCrazyDaveCountDown,
+                        cutscene.mCrazyDaveLastTalkIndex,
+                        cutscene.mUpsellHideBoard,
+                        cutscene.mPreUpdatingBoard,
+                        cutscene.mPlantsWonReanimID);
+    if (auto *menu = app->mVSSetupMenu) {
+        SyncSpectatorWidget(context, menu);
+        SyncSpectatorValues(context,
+                            menu->mInt70,
+                            menu->mInt71,
+                            menu->mInt72,
+                            menu->mState,
+                            menu->mControllerIndex,
+                            menu->mSides,
+                            menu->mSideLocked,
+                            menu->mSeedPickTurn,
+                            menu->mChooserAnimateUpdateCnt,
+                            menu->mSetupMode);
+        SyncSpectatorValues(context, is1PControllerMoving, is2PControllerMoving);
+        for (int id = VSSetupMenu::BACKGROUND_FRAME; id <= VSSetupMenu::RANDOM_BUTTON; ++id) {
+            auto *widget = menu->FindWidget(id);
+            // VSSetupSides.txt omits PLANT_SIDE and ZOMBIE_SIDE. Do not
+            // dereference these null results or skip their serialized fields.
+            SyncSpectatorWidget(context, widget);
+            if (id <= VSSetupMenu::CONTROLLER_1) {
+                netplay::snapshot::SyncOptionalValue(context, widget ? &static_cast<Sexy::ImageWidget *>(widget)->mAlpha : nullptr);
+            } else {
+                for (int color : {Sexy::ButtonWidget::COLOR_LABEL, Sexy::ButtonWidget::COLOR_LABEL_HILITE}) {
+                    auto *value = widget && widget->mColors->size() > static_cast<std::size_t>(color) ? &(*widget->mColors)[color] : nullptr;
+                    netplay::snapshot::SyncOptionalValue(context, value);
+                }
+            }
+        }
+        auto *addon = menu->mAddonWidget;
+        if (context.mReading) {
+            addon->UpdateGlobalBpButtonState();
+        }
+        SyncSpectatorValues(context, addon->mDrawString);
+        SyncSpectatorWidget(context, addon->mBackButton);
+        SyncSpectatorWidget(context, addon->mGlobalBpButton);
+        SyncSpectatorWidget(context, addon->mExtraPacketCheckbox);
+        SyncSpectatorWidget(context, addon->mBanModeCheckbox);
+        SyncSpectatorWidget(context, addon->mTimedDraftCheckbox);
+        // AI settings are local-only and are never usable by a spectator.
+        if (context.mReading) {
+            addon->SetDisable(addon->mAISettingsButton);
+        }
+    }
+    if (app->mSeedChooserScreen)
+        SyncSpectatorChooser(context, *app->mSeedChooserScreen);
+    if (app->mZombieChooserScreen)
+        SyncSpectatorChooser(context, *app->mZombieChooserScreen);
+}
+
+void SyncSpectatorExtras(SaveGameContext &context, Board *board) {
+    // Native SyncBoard only includes player 0. Use registered blocks, never pointers/vtables.
+    const auto syncObject = [&](SyncObject *object) {
+        for (auto &block : *object->mSyncBlocks) {
+            context.SyncBytes(block.mAddress, static_cast<int>(block.mSize));
+        }
+    };
+    syncObject(board->mSeedBank[1]);
+    syncObject(board->mGamepadControls[1]);
+    syncObject(board->mCursorObject[1]);
+    syncObject(board->mCursorPreview[1]);
+    context.SyncBytes(&Challenge::msVSShuffleMode, sizeof(Challenge::msVSShuffleMode));
+    context.SyncBytes(&Challenge::msVSClassicMode, sizeof(Challenge::msVSClassicMode));
+    SyncSpectatorValues(context, VSSetupMenu::msNextFirstPick, VSSetupMenu::msNextSidePickPlayerIndex, gGamepad1ToPlayerIndex);
+    SyncSpectatorValues(context, Challenge::gVSResourseDropMode, Challenge::gVSResourceDropCount, Challenge::gVSWinMode, Challenge::gVSSuddenDeathMode);
+    context.SyncBytes(gFreeForFristShuffle, sizeof(gFreeForFristShuffle));
+    context.SyncBytes(&VSSetupAddonWidget::msGlobalBpMode, sizeof(VSSetupAddonWidget::msGlobalBpMode));
+    context.SyncBytes(&VSSetupAddonWidget::msGlobalBpSeedsInitialized, sizeof(VSSetupAddonWidget::msGlobalBpSeedsInitialized));
+    context.SyncBytes(VSSetupAddonWidget::msGlobalBpWins, sizeof(VSSetupAddonWidget::msGlobalBpWins));
+    context.SyncBytes(VSSetupAddonWidget::msGlobalBpSeeds, sizeof(VSSetupAddonWidget::msGlobalBpSeeds));
+    context.SyncBytes(VSResultsMenu::msPlayerRecords, sizeof(VSResultsMenu::msPlayerRecords));
+    context.SyncBytes(&board->mJacksonDanceMode, sizeof(board->mJacksonDanceMode));
+    bool hasEncounter = gOpeningEncounter != nullptr;
+    context.SyncBytes(&hasEncounter, sizeof(hasEncounter));
+    if (context.mReading && !context.mFailed) {
+        delete gOpeningEncounter;
+        gOpeningEncounter = hasEncounter ? new OpeningEncounter() : nullptr;
+    }
+    if (hasEncounter && !context.mFailed) {
+        context.SyncBytes(&gOpeningEncounter->mType, sizeof(gOpeningEncounter->mType));
+        context.SyncInt(gOpeningEncounter->mCounter);
+        context.SyncBytes(&gOpeningEncounter->mDoEffect, sizeof(gOpeningEncounter->mDoEffect));
+    }
+    char hostName[sizeof(gServerHostName)]{};
+    if (!context.mReading) {
+        const char *localName = board->mApp->mPlayerInfo ? board->mApp->mPlayerInfo->mName : nullptr;
+        const char *name = gServerHostName[0] != '\0' ? gServerHostName : localName;
+        if (name)
+            std::strncpy(hostName, name, sizeof(hostName) - 1);
+    }
+    context.SyncBytes(hostName, sizeof(hostName));
+    if (context.mReading && !context.mFailed && hostName[0] != '\0') {
+        // JOIN_RESULT already supplied a host name. An empty cache from an
+        // older host must not overwrite it (or fall back to the viewer's name).
+        hostName[sizeof(hostName) - 1] = '\0';
+        std::memcpy(gServerHostName, hostName, sizeof(gServerHostName));
+    }
+    context.SyncBytes(gSecondPlayerName, sizeof(gSecondPlayerName));
+}
+
+void FailSpectatorSnapshot() {
+    LOG_ERROR("[NETPLAY] live spectator snapshot failed; closing viewer connection");
+    netplay::ResetSpectatorSnapshot();
+    // Only disconnect this viewer; never send an abort to the playing host/guest.
+    if (gIsServerModeSpectator && gTcpServerSocket >= 0) {
+        shutdown(gTcpServerSocket, SHUT_RDWR);
+    }
+}
+
+bool ApplySpectatorSnapshot(LawnApp *app) {
+    struct Applying {
+        Applying() {
+            gApplyingOnlineSaveGame = gApplyingSpectatorSnapshot = true;
+        }
+        ~Applying() {
+            gApplyingOnlineSaveGame = gApplyingSpectatorSnapshot = false;
+        }
+    } applying;
+    SaveGameContext context{};
+    context.mReading = true;
+    context.mBuffer.mData = std::move(gSpectatorSnapshotIn);
+    context.mBuffer.mDataBitSize = static_cast<int>(context.mBuffer.mData.size() * 8);
+    context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
+    SpectatorScene scene;
+    scene.Sync(context);
+    if (context.mFailed || !scene.historyEpoch || (scene.scene != SCENE_LEVEL_INTRO && scene.scene != SCENE_PLAYING)
+        || (scene.scene == SCENE_PLAYING && (scene.setup || scene.plantChooser || scene.zombieChooser)) || ((scene.plantChooser || scene.zombieChooser) && !scene.setup))
+        return false;
+
+    app->mGameMode = GameMode::GAMEMODE_MP_VS;
+    app->KillSeedChooserScreen();
+    app->KillZombieChooserScreen();
+    app->KillVSSetupScreen();
+    app->PostEnterLevel();
+    app->MakeNewBoard();
+    app->SetSecondPlayer(1);
+    app->mGameScene = scene.scene;
+    app->mBoard->mBackground = gVSBackground = scene.background;
+    Challenge::msVSShuffleMode = scene.shuffle;
+    Challenge::msVSClassicMode = scene.classic;
+    // Create the local widgets before restoring the effect arrays. The chooser
+    // constructor skips its local clock; restore the host's clock ID below.
+    if (scene.setup) {
+        app->ShowVSSetupScreen();
+        auto *addon = app->mVSSetupMenu->mAddonWidget;
+        addon->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtraPacket, scene.extraPackets, false);
+        addon->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BanMode, scene.ban, false);
+        addon->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft, scene.timed, false);
+    }
+    VSSetupAddonWidget::msTimedDraftMode = scene.timed;
+    if (scene.plantChooser)
+        app->ShowSeedChooserScreen();
+    if (scene.zombieChooser)
+        app->ShowZombieChooserScreen();
+    if (!LawnLoadGame(app->mBoard, &context))
+        return false;
+    app->mGameScene = scene.scene; // LawnLoadGame normally resumes straight into combat.
+    SyncSpectatorExtras(context, app->mBoard);
+    if (scene.scene == SCENE_LEVEL_INTRO)
+        SyncSpectatorIntro(context, app);
+    if (context.mFailed || context.mBuffer.mReadBitPos != context.mBuffer.mDataBitSize)
+        return false;
+    gServerHostName[sizeof(gServerHostName) - 1] = '\0';
+    gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
+    auto *board = app->mBoard;
+    const bool paused = board->mPaused;
+    if (scene.scene == SCENE_PLAYING) {
+        board->PostLoadGame();
+    } else {
+        // PostLoadGame enables graves and starts battle music. During the
+        // intro these must still be driven by the restored cutscene timeline.
+        board->LoadBackgroundImages();
+        board->ResetFPSStats();
+        app->mMusic->StopAllMusic();
+        app->mMusic->MakeSureMusicIsPlaying(MUSIC_TUNE_CHOOSE_YOUR_SEEDS);
+    }
+    board->mPaused = paused;
+    // LawnLoadGame already repaired native objects. Repair only the extra player-1
+    // blocks here, avoiding a second animation/sound restoration pass.
+    auto *bank = board->mSeedBank[1];
+    bank->mApp = app;
+    bank->mBoard = board;
+    for (auto &packet : bank->mSeedPackets) {
+        packet.mApp = app;
+        packet.mBoard = board;
+        packet.mSeedBank = bank;
+    }
+    board->mCursorObject[1]->mApp = app;
+    board->mCursorObject[1]->mBoard = board;
+    board->mCursorPreview[1]->mApp = app;
+    board->mCursorPreview[1]->mBoard = board;
+    for (int i = 0; i < 2; ++i) {
+        board->mGamepadControls[i]->mApp = app;
+        board->mGamepadControls[i]->mBoard = board;
+        board->mGamepadControls[i]->mGamepadIndex = app->PlayerToGamepadIndex(board->mGamepadControls[i]->mPlayerIndex);
+    }
+    board->MapLoadedNetplayIds();
+    gVSBackground = board->mBackground;
+    app->mBoardResult = BoardResult::BOARDRESULT_NONE;
+    app->mFirstTimeGameSelector = false;
+    app->mNeedLoadGame = false;
+    if (auto *lobby = NetplayLobbyWidget::GetInstance()) {
+        lobby->mServerJoinedRoomGaming = false;
+        lobby->mServerSpectateReservationActive = false;
+        lobby->RequestClose(NetplayLobbyWidget::NetplayLobbyWidget_Enter);
+    }
+    app->KillChallengeScreen();
+    replay::BindLiveHistory(scene.historyEpoch);
+    LOG_INFO("[NETPLAY] live spectator snapshot loaded; catchup={} bytes", gSpectatorCatchup.size());
+    return true;
+}
+} // namespace
+
+bool netplay::IsSerializingSpectatorSnapshot() noexcept {
+    return gCapturingSpectatorSnapshot || gApplyingSpectatorSnapshot;
+}
+bool netplay::IsSendingSpectatorSnapshot() noexcept {
+    return gSpectatorSnapshotRequested || !gSpectatorSnapshotOut.empty();
+}
+
+void netplay::ResetSpectatorSnapshot() noexcept {
+    gSpectatorSnapshotRequested = false;
+    gReceivingSpectatorSnapshot = false;
+    gSpectatorDraftProgressPending = false;
+    gSpectatorSourceBoard = nullptr;
+    gSpectatorSourceSetup = nullptr;
+    gSpectatorSourcePlant = gSpectatorSourceZombie = nullptr;
+    gSpectatorSnapshotOut.clear();
+    gSpectatorSnapshotIn.clear();
+    gSpectatorCatchup.clear();
+    gSpectatorCatchupReady.clear();
+    gSpectatorSnapshotOffset = 0;
+}
+
+std::vector<std::byte> netplay::TakeSpectatorCatchupEvents() {
+    return std::exchange(gSpectatorCatchupReady, {});
+}
+
+void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
+    if (gReceivingSpectatorSnapshot && std::chrono::steady_clock::now() - gSpectatorSnapshotProgress > std::chrono::seconds(60)) {
+        FailSpectatorSnapshot();
+        return;
+    }
+    if (!IsRemoteServer())
+        return;
+    // Client input can enqueue authoritative events earlier in this frame.
+    // Flush them before the snapshot boundary instead of indefinitely starving
+    // the transfer while either player continuously moves their cursor.
+    if ((gSpectatorSnapshotRequested || !gSpectatorSnapshotOut.empty()) && HasPendingSendData())
+        FlushSendBuffer(gTcpClientSocket);
+    if (HasPendingSendData())
+        return;
+    if (!gSpectatorSnapshotOut.empty()
+        && (app->mBoard != gSpectatorSourceBoard || app->mGameScene != gSpectatorSourceScene || app->mVSSetupMenu != gSpectatorSourceSetup || app->mSeedChooserScreen != gSpectatorSourcePlant
+            || app->mZombieChooserScreen != gSpectatorSourceZombie)) {
+        gSpectatorSnapshotOut.clear();
+        gSpectatorSnapshotRequested = true;
+    }
+    if (gSpectatorSnapshotOut.empty() && gSpectatorSnapshotRequested) {
+        if (app->mGameScene == SCENE_LEVEL_INTRO && app->mBoard
+            && (!app->mBoard->mZombieWavesReady || app->mBoard->mCutScene->mPreUpdatingBoard || (app->mVSSetupMenu && int(app->mVSSetupMenu->mState) < 0))) {
+            // Retry after level construction/preloading completes.
+            return;
+        }
+        gSpectatorSnapshotRequested = false;
+        if (app->mGameMode != GameMode::GAMEMODE_MP_VS || (app->mGameScene != SCENE_PLAYING && app->mGameScene != SCENE_LEVEL_INTRO) || !app->mBoard || app->mVSResultsMenu
+            || IsSynchronizingSaveGame()) {
+            BaseEvent abort{EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT};
+            PutEvent(abort);
+            return;
+        }
+        SaveGameContext context{};
+        auto scene = GetSpectatorScene(app);
+        gSpectatorHistoryEpoch = scene.historyEpoch;
+        scene.Sync(context);
+        SaveFileHeader header{SAVE_FILE_MAGIC_NUMBER, SAVE_FILE_VERSION, SAVE_FILE_DATE};
+        context.SyncBytes(&header, sizeof(header));
+        {
+            struct Capturing {
+                Capturing() {
+                    gCapturingSpectatorSnapshot = true;
+                }
+                ~Capturing() {
+                    gCapturingSpectatorSnapshot = false;
+                }
+            } capturing;
+            SyncBoard(&context, app->mBoard);
+            SyncSpectatorExtras(context, app->mBoard);
+            if (scene.scene == SCENE_LEVEL_INTRO)
+                SyncSpectatorIntro(context, app);
+        }
+        if (context.mFailed || context.mBuffer.mData.size() > kMaxOnlineSaveSize) {
+            BaseEvent abort{EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT};
+            PutEvent(abort);
+            return;
+        }
+        gSpectatorSnapshotOut = std::move(context.mBuffer.mData);
+        gSpectatorSnapshotOffset = 0;
+        gSpectatorSourceBoard = app->mBoard;
+        gSpectatorSourceSetup = app->mVSSetupMenu;
+        gSpectatorSourcePlant = app->mSeedChooserScreen;
+        gSpectatorSourceZombie = app->mZombieChooserScreen;
+        gSpectatorSourceScene = app->mGameScene;
+        U16UNI32UNI32_Event begin{};
+        begin.type = EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN;
+        begin.data1 = kSpectatorSnapshotVersion;
+        begin.data2.u32 = static_cast<uint32_t>(gSpectatorSnapshotOut.size());
+        begin.data3.u32 = SaveDataHash(gSpectatorSnapshotOut);
+        PutEvent(begin);
+        LOG_INFO("[NETPLAY] sending live spectator snapshot: {} bytes", gSpectatorSnapshotOut.size());
+    }
+    if (gSpectatorSnapshotOut.empty())
+        return;
+    const auto end = std::min(gSpectatorSnapshotOffset + 16 * 1024, gSpectatorSnapshotOut.size());
+    while (gSpectatorSnapshotOffset < end) {
+        U16U8x240_Event chunk{};
+        chunk.type = EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK;
+        chunk.count = static_cast<uint16_t>(std::min(sizeof(chunk.data), gSpectatorSnapshotOut.size() - gSpectatorSnapshotOffset));
+        std::memcpy(chunk.data, gSpectatorSnapshotOut.data() + gSpectatorSnapshotOffset, chunk.count);
+        PutEvent(chunk);
+        gSpectatorSnapshotOffset += chunk.count;
+    }
+    if (gSpectatorSnapshotOffset == gSpectatorSnapshotOut.size()) {
+        // Timers may have advanced while sending chunks. This final marker is
+        // applied AFTER the viewer replays any intervening picks/bans.
+        U16UNI32UNI32_Event done{};
+        done.type = EVENT_SERVER_SPECTATE_SNAPSHOT_END;
+        if (auto *chooser = app->mSeedChooserScreen) {
+            done.data1 |= uint16_t(chooser->mTimedDraftWasActive);
+            done.data2.i32 = chooser->mTimedDraftTicksRemaining;
+        }
+        if (auto *chooser = app->mZombieChooserScreen) {
+            done.data1 |= uint16_t(chooser->mTimedDraftWasActive) << 1;
+            done.data3.i32 = chooser->mTimedDraftTicksRemaining;
+        }
+        PutEvent(done);
+        gSpectatorSnapshotOut.clear();
+        replay::RequestHistoryTransfer(gSpectatorHistoryEpoch);
+    }
+}
+
+bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event, bool fromHost) {
+    if (event->type == EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST) {
+        if (!fromHost && event->size == sizeof(BaseEvent) && IsRemoteServer() && gIsServerModeNetplay && gServerModeTransport == ServerModeTransport::RELAY)
+            gSpectatorSnapshotRequested = true;
+        return true;
+    }
+    const bool snapshotEvent = event->type >= EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN && event->type <= EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT;
+    if (!fromHost || !gIsServerModeSpectator || gIsReplayMode)
+        return snapshotEvent;
+    if (gSpectatorDraftProgressPending && event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
+        gSpectatorDraftProgressPending = false;
+        if (event->size != sizeof(U16UNI32UNI32_Event)) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        const auto *done = static_cast<const U16UNI32UNI32_Event *>(event);
+        if (auto *chooser = app->mSeedChooserScreen) {
+            chooser->mTimedDraftTicksRemaining = done->data2.i32;
+            chooser->mTimedDraftWasActive = (done->data1 & 1) != 0;
+        }
+        if (auto *chooser = app->mZombieChooserScreen) {
+            chooser->mTimedDraftTicksRemaining = done->data3.i32;
+            chooser->mTimedDraftWasActive = (done->data1 & 2) != 0;
+        }
+        return true;
+    }
+    auto *lobby = NetplayLobbyWidget::GetInstance();
+    if (!gReceivingSpectatorSnapshot && (!lobby || !lobby->ServerIsWaitingReservedSpectate()))
+        return snapshotEvent;
+    if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN) {
+        if (event->size != sizeof(U16UNI32UNI32_Event)) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
+        if (begin->data1 != kSpectatorSnapshotVersion || begin->data2.u32 < sizeof(SaveFileHeader) || begin->data2.u32 > kMaxOnlineSaveSize) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        gSpectatorSnapshotIn.clear();
+        gSpectatorCatchup.clear();
+        gSpectatorSnapshotSize = begin->data2.u32;
+        gSpectatorSnapshotHash = begin->data3.u32;
+        gReceivingSpectatorSnapshot = true;
+        gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
+        return true;
+    }
+    if (!gReceivingSpectatorSnapshot) {
+        if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT && lobby)
+            lobby->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_WAIT_NEXT]");
+        return snapshotEvent;
+    }
+    if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK) {
+        if (event->size != sizeof(U16U8x240_Event)) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        const auto *chunk = static_cast<const U16U8x240_Event *>(event);
+        if (!chunk->count || chunk->count > sizeof(chunk->data) || gSpectatorSnapshotIn.size() + chunk->count > gSpectatorSnapshotSize) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        gSpectatorSnapshotIn.insert(gSpectatorSnapshotIn.end(), chunk->data, chunk->data + chunk->count);
+        gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
+    } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
+        if (event->size != sizeof(U16UNI32UNI32_Event) || gSpectatorSnapshotIn.size() != gSpectatorSnapshotSize || SaveDataHash(gSpectatorSnapshotIn) != gSpectatorSnapshotHash
+            || !ApplySpectatorSnapshot(app)) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        gReceivingSpectatorSnapshot = false;
+        gSpectatorCatchupReady = std::move(gSpectatorCatchup);
+        const auto *bytes = reinterpret_cast<const std::byte *>(event);
+        gSpectatorCatchupReady.insert(gSpectatorCatchupReady.end(), bytes, bytes + event->size);
+        gSpectatorDraftProgressPending = true;
+    } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT) {
+        gReceivingSpectatorSnapshot = false;
+        gSpectatorSnapshotIn.clear();
+        gSpectatorCatchup.clear(); // Lobby can still align with the next round.
+        if (lobby)
+            lobby->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_WAIT_NEXT]");
+    } else {
+        if (gSpectatorCatchup.size() + event->size > kMaxSpectatorCatchup) {
+            FailSpectatorSnapshot();
+            return true;
+        }
+        const auto *bytes = reinterpret_cast<const std::byte *>(event);
+        gSpectatorCatchup.insert(gSpectatorCatchup.end(), bytes, bytes + event->size);
+    }
+    return true;
+}
 
 bool netplay::IsApplyingOnlineSaveGame() noexcept {
     return gApplyingOnlineSaveGame;

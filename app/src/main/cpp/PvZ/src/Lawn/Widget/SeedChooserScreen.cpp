@@ -29,6 +29,7 @@
 #include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
+#include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/Lawn/Widget/AlmanacDialog.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
 #include "PvZ/Lawn/Widget/ImitaterDialog.h"
@@ -1497,7 +1498,9 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
     mBackToModeSelectButton = nullptr;
     mBackToModeSelectRequested = false;
     mReanimSeedChooser = ReanimationID::REANIMATIONID_NULL;
-    if (mApp->IsVSMode()) {
+    // The spectator snapshot restores the host's clock and its ID. Allocating
+    // a local clock here would leak its tracks when SyncBoard replaces it.
+    if (mApp->IsVSMode() && !netplay::IsSerializingSpectatorSnapshot()) {
         ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_APPLE_CLOCK, true);
         Reanimation *aClockReanim = mApp->AddReanimation(335.0f, 600.0f, 0, ReanimationType::REANIM_APPLE_CLOCK);
         aClockReanim->mAnimRate = 0.0f;
@@ -3880,6 +3883,8 @@ void SeedChooserScreen::ButtonDepress(int theId) {
     if (mApp->IsVSMode() && !IsLocalChooserInputAllowed(this)) {
         return;
     }
+    if (theId == SeedChooserScreen_Page && (mSeedsInFlight > 0 || mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN || !mMouseVisible))
+        return;
 
     if (mApp->IsCoopMode() && theId == SeedChooserScreen_BackToModeSelect) {
         if (IsRemoteClient()) {
@@ -3906,8 +3911,12 @@ void SeedChooserScreen::ButtonDepress(int theId) {
         if (IsRemoteClient()) {
             U8U8_Event event = {{EventType::EVENT_CLIENT_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(theId), uint8_t(mIsZombieChooser)};
             netplay::PutEvent(event);
+            return; // Apply the host acknowledgement once, including page toggles.
         } else if (IsRemoteServer()) {
-            U8U8_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(theId), uint8_t(mIsZombieChooser)};
+            uint8_t flags = uint8_t(mIsZombieChooser);
+            if (theId == SeedChooserScreen_Page)
+                flags |= uint8_t(mPageIndex == 0) << 1;
+            U8U8_Event event = {{EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, uint8_t(theId), flags};
             netplay::PutEvent(event);
         }
     }

@@ -26,6 +26,7 @@
 #include "PvZ/Lawn/Board/SeedBank.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/Widget/SeedChooserScreen.h"
+#include "PvZ/ReplaySystem.h"
 #include "PvZ/SexyAppFramework/Widget/Checkbox.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
 
@@ -748,14 +749,28 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
             gMetricsHostSendNameAllowed = eventState->data;
         } break;
         case EVENT_CLIENT_SEEDCHOOSER_BUTTON_DEPRESS: {
+            if (gIsServerModeSpectator || (gIsReplayMode && replay::GetPlaybackNetplayVersion() >= 3214)) {
+                break; // Only the ordered host acknowledgement changes the UI.
+            }
             auto *eventBtnDepress = static_cast<const U8U8_Event *>(event);
             SeedChooserScreen *seedChooser = eventBtnDepress->data2 != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
             if (seedChooser != nullptr) {
+                if (seedChooser->mSeedsInFlight > 0 || seedChooser->mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN || !seedChooser->mMouseVisible)
+                    break;
+                if (IsRemoteServer()) {
+                    uint8_t flags = eventBtnDepress->data2 & 1;
+                    if (eventBtnDepress->data1 == SeedChooserScreen::SeedChooserScreen_Page)
+                        flags |= uint8_t(seedChooser->mPageIndex == 0) << 1;
+                    U8U8_Event syncEvent = {{EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, eventBtnDepress->data1, flags};
+                    netplay::PutEvent(syncEvent);
+                }
                 seedChooser->ButtonDepress_Origin(eventBtnDepress->data1);
             }
         } break;
         case EVENT_CLIENT_SEEDCHOOSER_SELECT_SEED:
         case EVENT_CLIENT_SEEDCHOOSER_BAN_SEED: {
+            if (gIsServerModeSpectator || (gIsReplayMode && replay::GetPlaybackNetplayVersion() >= 3214))
+                break; // Even cursor/page updates follow the host's stream boundary.
             auto *event1 = static_cast<const U8x3_Event *>(event);
             auto seedType = SeedType(event1->data[0]);
             bool isZombieChooser = event1->data[1] != 0;
@@ -822,7 +837,6 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
                 netplay::PutEvent(syncEvent);
             }
 
-            // 回放只用主机广播推进选卡/禁卡；客户端请求仍更新光标，避免提前切换回合。
             if (moveOnly || gIsReplayMode) {
                 break;
             }
@@ -910,9 +924,15 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS: {
             auto *eventBtnDepress = static_cast<const U8U8_Event *>(event);
-            SeedChooserScreen *seedChooser = eventBtnDepress->data2 != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
+            SeedChooserScreen *seedChooser = (eventBtnDepress->data2 & 1) != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
             if (seedChooser != nullptr) {
-                seedChooser->ButtonDepress_Origin(eventBtnDepress->data1);
+                if (eventBtnDepress->data1 == SeedChooserScreen::SeedChooserScreen_Page && (!gIsReplayMode || replay::GetPlaybackNetplayVersion() >= 3214)) {
+                    // Absolute page, not a toggle: buffered picks may still be
+                    // animating locally when the host accepts the page change.
+                    seedChooser->SetPageIndex((eventBtnDepress->data2 >> 1) & 1);
+                } else {
+                    seedChooser->ButtonDepress_Origin(eventBtnDepress->data1);
+                }
             }
         } break;
         case EVENT_VSSETUPMENU_ENTER_STATE: {

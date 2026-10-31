@@ -83,7 +83,7 @@ public:
 using ButtonVector = std::vector<GameButton *>;
 
 class SeedChooserScreen : public Sexy::Widget, public Sexy::ButtonListener {
-private:
+public:
     enum {
         SeedChooserScreen_Start = 100,
         SeedChooserScreen_Random = 101,

@@ -531,7 +531,7 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
         replay::RecordPacket(ReplayPacketDir::InboundClient, clientRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
         // LOG_DEBUG("event.type = {}", int(event->type));
 
-        if (netplay::HandleSaveGameEvent(this, event, false)) {
+        if (replay::HandleHistoryEvent(event, false) || netplay::HandleSpectatorSnapshotEvent(this, event, false) || netplay::HandleSaveGameEvent(this, event, false)) {
             offset += event->size;
             continue;
         }
@@ -584,7 +584,8 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
 }
 
 void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
-    serverRecvBuffer.append_range(std::views::counted(buf, bufSize));
+    if (bufSize != 0)
+        serverRecvBuffer.append_range(std::views::counted(buf, bufSize));
     auto *waitDialog = NetplayLobbyWidget::GetInstance();
     size_t offset = 0;
 
@@ -600,6 +601,17 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
         replay::RecordPacket(ReplayPacketDir::InboundServer, serverRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
         // LOG_DEBUG("event.type = {}", int(event->type));
 
+        if (replay::HandleHistoryEvent(event, true)) {
+            offset += event->size;
+            continue;
+        }
+        if (netplay::HandleSpectatorSnapshotEvent(this, event, true)) {
+            auto catchup = netplay::TakeSpectatorCatchupEvents();
+            offset += event->size;
+            serverRecvBuffer.insert(serverRecvBuffer.begin() + offset, catchup.begin(), catchup.end());
+            waitDialog = NetplayLobbyWidget::GetInstance();
+            continue;
+        }
         if (netplay::HandleSaveGameEvent(this, event, true)) {
             offset += event->size;
             continue;
@@ -820,6 +832,10 @@ void LawnApp::UpdateFrames() {
     }
 
     if (gTcpConnected) {
+        // RELAY_GO can hand off complete events without leaving any further
+        // bytes in the socket (for example a paused match). Drain those too.
+        if (!serverRecvBuffer.empty())
+            HandleTcpServerMessage(nullptr, 0);
         if (gIsServerModeSpectator) {
             netplay::FlushSendBuffer(gTcpServerSocket);
         } else {
@@ -886,6 +902,7 @@ void LawnApp::UpdateFrames() {
     //    UpdatePlayTimeStats(); // 本来就是空函数，故注释
 
     netplay::UpdateSaveGameTransfer(this);
+    netplay::UpdateSpectatorSnapshot(this);
     int updateCount = 0;
 
     if (gSlowMo) {
@@ -960,6 +977,8 @@ void LawnApp::UpdateFrames() {
         delete mSaveGame;
         mSaveGame = nullptr;
     }
+
+    replay::UpdateHistoryTransfer();
 
     //    if (!mQueryCoinState.mPending)
     //        return;

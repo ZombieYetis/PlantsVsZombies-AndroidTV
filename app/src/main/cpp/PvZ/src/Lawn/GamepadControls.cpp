@@ -541,6 +541,9 @@ void GamepadControls::Draw(Sexy::Graphics *g) {
 }
 
 void GamepadControls::Update(float a2) {
+    if (netplay::IsSerializingSpectatorSnapshot()) {
+        return; // 原版 SyncBoard 在写快照时也调用 Update，不允许推进主机状态。
+    }
     LawnApp *anApp = mApp;
     int aGridX = mBoard->PixelToGridXKeepOnBoard(mCursorPositionX, mCursorPositionY);
     int aGridY = mBoard->PixelToGridYKeepOnBoard(mCursorPositionX, mCursorPositionY);

@@ -220,6 +220,12 @@ void VSSetupAddonWidget::CheckboxChecked(int theId, bool checked) {
     if ((theId < VSSetupAddonWidget_ExtraPacket || theId > VSSetupAddonWidget_AITemplateDeckDisabled) && theId != VSSetupAddonWidget_TimedDraft) {
         return;
     }
+    if (gIsServerModeSpectator || gIsReplayMode) {
+        // Checkboxes toggle before notifying the listener. Restore the host's
+        // value without saving local preferences or emitting a network event.
+        SetAddonMode(theId, GetAddonMode(theId), false);
+        return;
+    }
     // AI settings are intentionally local-only. They configure the local
     // builtin agents and must not change an online opponent's chooser.
     if (IsLocalAIOption(theId)) {

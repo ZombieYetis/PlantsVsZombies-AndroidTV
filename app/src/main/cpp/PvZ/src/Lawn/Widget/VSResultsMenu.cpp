@@ -352,6 +352,8 @@ void VSResultsMenu::Update() {
     ++mVSResultsCounter;
     old_VSResultsMenu_Update(this);
 
+    UpdateReplayButtonState();
+
     //    if (mBackButton != nullptr) {
     //        mBackButton->SetLabel(mIsOnlineSession && IsOnlineResultsSessionActive() ? "[DISCONNECT]" : "[BACK_TO_MODE_SELECT]");
     //    }
@@ -374,6 +376,29 @@ void VSResultsMenu::HandleOpponentDisconnected() {
         auto *quitVsButton = reinterpret_cast<GameButton *>(quitVsWidget);
         quitVsButton->SetLabel("[QUIT_VS]");
     }
+}
+
+void VSResultsMenu::UpdateReplayButtonState() {
+    if (!mSaveReplayButton || !mSaveReplayButton->mVisible || !mIsOnlineSession || mIsReplaySession)
+        return;
+    const auto status = replay::GetHistoryStatus();
+    if (status == replay::HistoryStatus::Local)
+        return;
+    if (status == replay::HistoryStatus::Saved) {
+        HideReplayButton(true);
+        gVSResultRequestState = kVSResultRequestStateReplaySaved;
+        return;
+    }
+    const char *label = "[SAVE_REPLAY]";
+    if (status == replay::HistoryStatus::Receiving)
+        label = "[LIVE_SPECTATE_REPLAY_SAVE_WHEN_READY]";
+    else if (status == replay::HistoryStatus::Queued)
+        label = "[LIVE_SPECTATE_REPLAY_SYNCING]";
+    else if (status == replay::HistoryStatus::Failed)
+        label = "[LIVE_SPECTATE_REPLAY_FAILED]";
+    if (*mSaveReplayButton->mLabel != TodStringTranslate(label))
+        mSaveReplayButton->SetLabel(label);
+    mSaveReplayButton->mDisabled = status == replay::HistoryStatus::Queued || status == replay::HistoryStatus::Failed;
 }
 
 void VSResultsMenu::HideReplayButton(bool forceHide) {
@@ -459,6 +484,7 @@ bool VSResultsMenu::SaveReplay() {
     }
 
     const bool saved = replay::SaveCurrentMatchReplay(meta);
+    UpdateReplayButtonState();
     LOG_INFO("[REPLAY] save requested, saved={}, file={}", saved, meta.fileName);
     if (saved) {
         HideReplayButton(true);
@@ -596,6 +622,7 @@ void VSResultsMenu::ShowReplayButton() {
     mSaveReplayButton->mLabelJustify = BUTTON_LABEL_WRAP_CENTER;
     mSaveReplayButton->GameButton::Resize(660, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT);
     AddWidget(mSaveReplayButton);
+    UpdateReplayButtonState();
 }
 
 void VSResultsMenu::KillReplayButton() {

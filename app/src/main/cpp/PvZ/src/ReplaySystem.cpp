@@ -21,7 +21,9 @@
 #include "Homura/Logger.h"
 #include "PvZ/GlobalVariable.h"
 #include "PvZ/Lawn/LawnApp.h"
+#include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/ReplayHistory.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -30,19 +32,42 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <deque>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <map>
+#include <memory>
+#include <optional>
 #include <string_view>
 
 namespace {
 constexpr std::array<char, 6> kReplayMagic = {'P', 'V', 'R', 'P', '1', '\0'};
 constexpr const char *kReplayDir = "replays";
 
-struct ReplayPacketRecord {
-    ReplayPacketDir dir;
-    std::uint32_t tick;
-    std::vector<std::byte> data;
+using ReplayPacketRecord = replay::history::Record;
+
+struct HistorySource : replay::history::Log {
+    uint32_t epoch = 0;
+    std::size_t offset = 0;
+    std::size_t checkpoint = std::size_t(-1);
+    bool sealed = false, queued = false, begun = false, restart = false;
 };
+struct HistorySaveResult {
+    bool saved;
+    std::vector<ReplayPacketRecord> records;
+};
+struct HistoryReceiver : replay::history::Receiver {
+    bool begun = false, saved = false;
+    std::optional<ReplayMetaInfo> pendingSave;
+    std::future<HistorySaveResult> saveTask;
+};
+std::shared_ptr<HistorySource> gHistorySource;
+std::deque<std::shared_ptr<HistorySource>> gHistoryQueue;
+std::map<uint32_t, HistoryReceiver> gHistoryReceivers;
+uint32_t gBoundHistoryEpoch = 0;
+uint32_t gNextHistoryEpoch = uint32_t(std::chrono::steady_clock::now().time_since_epoch().count());
+auto gLastHistorySend = std::chrono::steady_clock::time_point{};
 
 struct PlaybackState {
     bool active = false;
@@ -54,6 +79,7 @@ struct PlaybackState {
     int speedLevel = 0;
     bool halfSpeedPhase = false;
     int vsBackground = 0;
+    int netplayVersion = 0;
     int boardStartTick = -1;
     std::vector<int> gridItemDieTicks;
     std::vector<int> lawnMowerStartTicks;
@@ -65,6 +91,7 @@ std::vector<ReplayPacketRecord> gRecordedPackets;
 PlaybackState gPlaybackState;
 std::uint32_t gRecordStartTick = 0;
 bool gRecordStartTickReady = false;
+bool gRecordingComplete = true;
 
 std::string BuildMetaText(const ReplayMetaInfo &meta) {
     return "host=" + meta.hostName + "\n" + "guest=" + meta.guestName + "\n" + "winner=" + meta.winnerName + "\n" + "map=" + meta.mapName + "\n" + "vs_background=" + std::to_string(meta.vsBackground)
@@ -215,9 +242,28 @@ void BuildPlaybackProgressMarkerCache() {
 } // namespace
 
 void replay::ResetRecorder() {
+    // Finish requested old rounds even if the players start the next round
+    // before background delivery (or a queued auto-save) has completed.
+    if (gHistorySource)
+        gHistorySource->sealed = true;
+    gHistorySource.reset();
+    gBoundHistoryEpoch = 0;
+    std::erase_if(gHistoryReceivers, [](const auto &entry) { return !entry.second.saveTask.valid() && (!entry.second.pendingSave || entry.second.failed); });
     gRecordedPackets.clear();
     gRecordStartTick = 0;
     gRecordStartTickReady = false;
+    gRecordingComplete = true;
+}
+
+bool replay::IsRecordingComplete() {
+    if (gBoundHistoryEpoch) {
+        const auto it = gHistoryReceivers.find(gBoundHistoryEpoch);
+        return it != gHistoryReceivers.end() && it->second.complete && !it->second.failed;
+    }
+    return gRecordingComplete;
+}
+int replay::GetPlaybackNetplayVersion() {
+    return gPlaybackState.netplayVersion;
 }
 
 void replay::AdvancePlaybackTick() {
@@ -242,12 +288,24 @@ void replay::RecordPacket(ReplayPacketDir dir, const std::byte *data, std::size_
     if (data == nullptr || len == 0) {
         return;
     }
+    if (len >= sizeof(BaseEvent)) {
+        const auto type = static_cast<EventType>(std::to_integer<uint8_t>(data[0]));
+        if (type >= EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST && type <= EVENT_SERVER_REPLAY_HISTORY_ABORT)
+            return; // Other viewers' snapshots are not part of this match's event replay.
+    }
+    if (gBoundHistoryEpoch)
+        return; // Use only the host timeline, never duplicate local catch-up packets.
     if (!gRecordStartTickReady) {
         gRecordStartTick = tick;
         gRecordStartTickReady = true;
     }
 
     const std::uint32_t normalizedTick = tick - gRecordStartTick;
+    if (IsRemoteServer() && gLawnApp && gLawnApp->IsVSMode()) {
+        GetRecordingEpoch();
+        if (!gHistorySource->sealed)
+            gHistorySource->Append(dir, normalizedTick, data, len);
+    }
     if (!gRecordedPackets.empty()) {
         ReplayPacketRecord &last = gRecordedPackets.back();
         if (last.dir == dir && last.tick == normalizedTick) {
@@ -263,13 +321,12 @@ void replay::RecordPacket(ReplayPacketDir dir, const std::byte *data, std::size_
     gRecordedPackets.push_back(std::move(record));
 }
 
-bool replay::SaveCurrentMatchReplay(const ReplayMetaInfo &meta) {
+static bool SaveReplayPackets(const ReplayMetaInfo &meta, const std::vector<ReplayPacketRecord> &packetsToSave) {
     namespace fs = std::filesystem;
-    if (gRecordedPackets.empty()) {
+    if (packetsToSave.empty()) {
         LOG_WARN("[REPLAY] skip save: no packet recorded");
         return false;
     }
-    const std::vector<ReplayPacketRecord> &packetsToSave = gRecordedPackets;
     std::error_code ec;
     fs::create_directories(kReplayDir, ec);
     if (ec) {
@@ -281,7 +338,8 @@ bool replay::SaveCurrentMatchReplay(const ReplayMetaInfo &meta) {
     metaToWrite.durationTicks = static_cast<int>(packetsToSave.back().tick);
 
     const std::string outPath = std::string(kReplayDir) + "/" + metaToWrite.fileName;
-    std::ofstream out(outPath, std::ios::binary);
+    const std::string temporaryPath = outPath + ".tmp";
+    std::ofstream out(temporaryPath, std::ios::binary);
     if (!out.is_open()) {
         LOG_ERROR("[REPLAY] open failed path={}", outPath);
         return false;
@@ -302,8 +360,229 @@ bool replay::SaveCurrentMatchReplay(const ReplayMetaInfo &meta) {
         out.write(reinterpret_cast<const char *>(&len), sizeof(len));
         out.write(reinterpret_cast<const char *>(p.data.data()), static_cast<std::streamsize>(p.data.size()));
     }
+    out.flush();
+    if (!out.good()) {
+        LOG_ERROR("[REPLAY] write failed path={}", outPath);
+        out.close();
+        fs::remove(temporaryPath, ec);
+        return false;
+    }
     out.close();
+    fs::rename(temporaryPath, outPath, ec);
+    if (ec) {
+        LOG_ERROR("[REPLAY] publish failed path={}: {}", outPath, ec.message());
+        fs::remove(temporaryPath, ec);
+        return false;
+    }
     LOG_INFO("[REPLAY] saved path={} packets={}", outPath, packetsToSave.size());
+    return true;
+}
+
+bool replay::SaveCurrentMatchReplay(const ReplayMetaInfo &meta) {
+    if (gBoundHistoryEpoch) {
+        auto &receiver = gHistoryReceivers[gBoundHistoryEpoch];
+        if (receiver.failed || receiver.saveTask.valid())
+            return false;
+        if (!receiver.complete) {
+            receiver.pendingSave = meta;
+            return false;
+        }
+        receiver.saved = SaveReplayPackets(meta, receiver.records);
+        return receiver.saved;
+    }
+    return gRecordingComplete && SaveReplayPackets(meta, gRecordedPackets);
+}
+
+uint32_t replay::GetRecordingEpoch() {
+    if (!gHistorySource) {
+        gHistorySource = std::make_shared<HistorySource>();
+        if (++gNextHistoryEpoch == 0)
+            ++gNextHistoryEpoch;
+        gHistorySource->epoch = gNextHistoryEpoch;
+    }
+    return gHistorySource->epoch;
+}
+
+void replay::BindLiveHistory(uint32_t epoch) {
+    gBoundHistoryEpoch = epoch;
+    gRecordedPackets.clear();
+    gRecordingComplete = false;
+    if (epoch)
+        gHistoryReceivers.try_emplace(epoch);
+}
+
+replay::HistoryStatus replay::GetHistoryStatus() {
+    if (!gBoundHistoryEpoch)
+        return HistoryStatus::Local;
+    const auto it = gHistoryReceivers.find(gBoundHistoryEpoch);
+    if (it == gHistoryReceivers.end() || it->second.failed)
+        return HistoryStatus::Failed;
+    if (it->second.saved)
+        return HistoryStatus::Saved;
+    if (it->second.pendingSave || it->second.saveTask.valid())
+        return HistoryStatus::Queued;
+    return it->second.complete ? HistoryStatus::Ready : HistoryStatus::Receiving;
+}
+
+void replay::RequestHistoryTransfer(uint32_t epoch) {
+    if (!gHistorySource || gHistorySource->epoch != epoch)
+        return;
+    auto &source = *gHistorySource;
+    if (source.queued) {
+        // A new viewer may have missed BEGIN. Finish the current pass first so
+        // successive joins cannot continually starve the earlier viewers.
+        source.restart = true;
+        return;
+    }
+    source.queued = true;
+    source.begun = false;
+    source.offset = 0;
+    source.checkpoint = std::size_t(-1);
+    gHistoryQueue.push_back(gHistorySource);
+}
+
+void replay::ResetHistoryTransfer() {
+    gHistoryQueue.clear();
+    gHistorySource.reset();
+    for (auto &[epoch, receiver] : gHistoryReceivers) {
+        if (!receiver.complete)
+            receiver.failed = true;
+        receiver.pendingSave.reset();
+    }
+}
+
+void replay::UpdateHistoryTransfer() {
+    // File I/O for a deferred auto-save can finish during the following game.
+    // Poll without waiting; never write an entire old replay on the game thread.
+    for (auto &[epoch, receiver] : gHistoryReceivers) {
+        if (receiver.saveTask.valid() && receiver.saveTask.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            auto result = receiver.saveTask.get();
+            receiver.saved = result.saved;
+            receiver.records = std::move(result.records);
+        }
+    }
+    std::erase_if(gHistoryReceivers, [](const auto &entry) { return entry.first != gBoundHistoryEpoch && !entry.second.pendingSave && !entry.second.saveTask.valid(); });
+    if (!IsRemoteServer() || !gLawnApp)
+        return;
+    if (gHistorySource && gLawnApp->mVSResultsMenu)
+        gHistorySource->sealed = true;
+    if (gHistoryQueue.empty() || netplay::IsSendingSpectatorSnapshot())
+        return;
+    const auto now = std::chrono::steady_clock::now();
+    if (now - gLastHistorySend < std::chrono::milliseconds(32))
+        return;
+    // Flush current gameplay first. At most 2 KiB of low-priority history is
+    // added per frame, and none while the playing connection is backpressured.
+    if (netplay::HasPendingSendData())
+        netplay::FlushSendBuffer(gTcpClientSocket);
+    if (netplay::HasPendingSendData())
+        return;
+    gLastHistorySend = now;
+    auto source = gHistoryQueue.front();
+    if (source->failed) {
+        U16UNI32_Event abort{};
+        abort.type = EVENT_SERVER_REPLAY_HISTORY_ABORT;
+        abort.data2.u32 = source->epoch;
+        netplay::PutEvent(abort);
+        source->queued = false;
+        gHistoryQueue.pop_front();
+        return;
+    }
+    if (!source->begun) {
+        U16UNI32_Event begin{};
+        begin.type = EVENT_SERVER_REPLAY_HISTORY_BEGIN;
+        begin.data1 = 1;
+        begin.data2.u32 = source->epoch;
+        netplay::PutEvent(begin);
+        source->begun = true;
+    }
+    const auto end = std::min(source->offset + 2048, source->bytes.size());
+    while (source->offset < end) {
+        U16UNI32x2U8x232_Event chunk{};
+        chunk.type = EVENT_SERVER_REPLAY_HISTORY_CHUNK;
+        chunk.data2[0].u32 = source->epoch;
+        chunk.data2[1].u32 = uint32_t(source->offset);
+        chunk.data1 = uint16_t(std::min(sizeof(chunk.data3), end - source->offset));
+        std::memcpy(chunk.data3, source->bytes.data() + source->offset, chunk.data1);
+        netplay::PutEvent(chunk);
+        source->offset += chunk.data1;
+    }
+    if (source->offset != source->bytes.size())
+        return;
+    if (source->checkpoint != source->offset || source->sealed) {
+        U16UNI32x3_Event checkpoint{};
+        checkpoint.type = EVENT_SERVER_REPLAY_HISTORY_CHECKPOINT;
+        checkpoint.data2[0].u32 = source->epoch;
+        checkpoint.data2[1].u32 = uint32_t(source->offset);
+        checkpoint.data2[2].u32 = source->hash;
+        checkpoint.data1 = source->sealed;
+        netplay::PutEvent(checkpoint);
+        source->checkpoint = source->offset;
+    }
+    if (source->restart) {
+        source->restart = false;
+        source->offset = 0;
+        source->checkpoint = std::size_t(-1);
+        source->begun = false;
+    } else if (source->sealed) {
+        source->queued = false;
+        gHistoryQueue.pop_front();
+    }
+}
+
+bool replay::HandleHistoryEvent(const BaseEvent *event, bool fromHost) {
+    if (event->type < EVENT_SERVER_REPLAY_HISTORY_BEGIN || event->type > EVENT_SERVER_REPLAY_HISTORY_ABORT)
+        return false;
+    if (!fromHost || !gIsServerModeSpectator || gIsReplayMode)
+        return true;
+    // All history envelopes place the epoch at offset 4. Never let this
+    // transport feed recorded events back into the live board dispatcher.
+    if (event->size < sizeof(U16UNI32_Event))
+        return true;
+    uint32_t epoch;
+    std::memcpy(&epoch, reinterpret_cast<const std::byte *>(event) + 4, sizeof(epoch));
+    const auto it = gHistoryReceivers.find(epoch);
+    if (it == gHistoryReceivers.end())
+        return true;
+    auto &receiver = it->second;
+    if (receiver.failed || receiver.complete)
+        return true;
+    if (event->type == EVENT_SERVER_REPLAY_HISTORY_BEGIN) {
+        receiver.begun = event->size == sizeof(U16UNI32_Event) && static_cast<const U16UNI32_Event *>(event)->data1 == 1;
+        if (!receiver.begun)
+            receiver.failed = true;
+    } else if (event->type == EVENT_SERVER_REPLAY_HISTORY_ABORT) {
+        receiver.failed = true;
+    } else if (!receiver.begun) {
+        return true; // Joined in the middle of another viewer's pass; await BEGIN.
+    } else if (event->type == EVENT_SERVER_REPLAY_HISTORY_CHUNK) {
+        if (event->size != sizeof(U16UNI32x2U8x232_Event)) {
+            receiver.failed = true;
+        } else {
+            const auto *chunk = static_cast<const U16UNI32x2U8x232_Event *>(event);
+            if (chunk->data1 == 0 || chunk->data1 > sizeof(chunk->data3))
+                receiver.failed = true;
+            else
+                receiver.Receive(chunk->data2[1].u32, reinterpret_cast<const std::byte *>(chunk->data3), chunk->data1);
+        }
+    } else if (event->type == EVENT_SERVER_REPLAY_HISTORY_CHECKPOINT) {
+        if (event->size != sizeof(U16UNI32x3_Event)) {
+            receiver.failed = true;
+        } else {
+            const auto *checkpoint = static_cast<const U16UNI32x3_Event *>(event);
+            receiver.Checkpoint(checkpoint->data2[1].u32, checkpoint->data2[2].u32, checkpoint->data1 != 0);
+        }
+    }
+    if (receiver.failed) {
+        receiver.pendingSave.reset();
+        LOG_ERROR("[REPLAY] history transfer failed epoch={}; live spectating continues", epoch);
+    } else if (receiver.complete && receiver.pendingSave) {
+        receiver.saveTask = std::async(std::launch::async, [meta = *receiver.pendingSave, records = std::move(receiver.records)]() mutable {
+            const bool saved = SaveReplayPackets(meta, records);
+            return HistorySaveResult{saved, std::move(records)};
+        });
+        receiver.pendingSave.reset();
+    }
     return true;
 }
 
@@ -472,6 +751,7 @@ bool replay::BeginPlaybackFromFile(const std::string &path) {
     }
 
     gPlaybackState.active = true;
+    gPlaybackState.netplayVersion = replayVersion;
     gPlaybackState.paused = false;
     requestPause = false;
     gPlaybackState.playbackTick = 0;
