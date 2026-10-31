@@ -240,6 +240,10 @@ void LawnApp::LoadAddonImages() {
     addonImages.IMAGE_PROJECTILETELEPORTATION = GetImageByFileName("addonFiles/images/ProjectileTeleportation");
     addonImages.IMAGE_PROJECTILEACKEE = GetImageByFileName("addonFiles/images/ProjectileAckee");
     addonImages.IMAGE_PROJECTILEREDSTINGER = GetImageByFileName("addonFiles/images/ProjectileRedStinger");
+    // 与粒子定义共用原加载器缓存的图片，分列直接作用于粒子使用的对象。
+    DefinitionLoadImage(&addonImages.IMAGE_RED_STINGER_SPLATS, "IMAGE_RED_STINGER_SPLATS", "addonFiles/particles/red_stinger_splats");
+    DefinitionLoadImage(&addonImages.IMAGE_RED_STINGER_PARTICLES, "IMAGE_RED_STINGER_PARTICLES", "addonFiles/particles/red_stinger_particles");
+    addonImages.IMAGE_RED_STINGER_PARTICLES->mNumCols = 6;
     addonImages.IMAGE_REANIM_ZOMBLOBHEAD_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombiezomblobhead_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_DYING_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_dying_buttered");

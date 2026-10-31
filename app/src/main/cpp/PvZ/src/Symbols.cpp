@@ -1208,6 +1208,7 @@ bool LoadGameMain() {
     TestMenuWidget_TestMenuWidgetAddr = GetLibGameMain().GetSymbol("_ZN14TestMenuWidgetC2Ev");
     ReanimatorLoadDefinitionsAddr = GetLibGameMain().GetSymbol("_Z25ReanimatorLoadDefinitionsP17ReanimationParamsi");
     DefinitionGetCompiledFilePathFromXMLFilePathAddr = GetLibGameMain().GetSymbol("_Z44DefinitionGetCompiledFilePathFromXMLFilePathRKSs");
+    DefinitionLoadImageAddr = GetLibGameMain().GetSymbol("_Z19DefinitionLoadImagePPN4Sexy5ImageESsSs");
     MaskHelpWidget_MaskHelpWidgetAddr = GetLibGameMain().GetSymbol("_ZN14MaskHelpWidgetC2EP7LawnApp");
     MaskHelpWidget_UpdateAddr = GetLibGameMain().GetSymbol("_ZN14MaskHelpWidget6UpdateEv");
     MaskHelpWidget_DrawAddr = GetLibGameMain().GetSymbol("_ZN14MaskHelpWidget4DrawEPN4Sexy8GraphicsE");

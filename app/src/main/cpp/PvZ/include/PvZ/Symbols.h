@@ -1092,6 +1092,7 @@ inline void *TodDeleteResourcesAddr;
 inline void *Sexy_AudiereSoundManager_LoadSoundAddr;
 inline void *ReanimatorLoadDefinitionsAddr;
 inline void *DefinitionGetCompiledFilePathFromXMLFilePathAddr;
+inline void *DefinitionLoadImageAddr;
 inline void *TestMenuWidget_TestMenuWidgetAddr;
 inline void *MaskHelpWidget_MaskHelpWidgetAddr;
 inline void *MaskHelpWidget_UpdateAddr;

@@ -338,4 +338,9 @@ void ReanimatorLoadDefinitions(ReanimationParams *theReanimationParamArray, int 
 
 pvzstl::string DefinitionGetCompiledFilePathFromXMLFilePath(const pvzstl::string &defPathString);
 
+// 复用定义加载器的图片 ID 缓存；原接口的两个字符串参数按值传递。
+inline bool DefinitionLoadImage(Sexy::Image **theImage, pvzstl::string theImageId, pvzstl::string theImagePath) {
+    return reinterpret_cast<bool (*)(Sexy::Image **, pvzstl::string, pvzstl::string)>(DefinitionLoadImageAddr)(theImage, theImageId, theImagePath);
+}
+
 #endif // PVZ_SEXYAPPFRAMEWORK_EFFECT_REANIMATION_H
