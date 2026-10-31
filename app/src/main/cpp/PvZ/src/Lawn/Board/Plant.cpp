@@ -3013,7 +3013,7 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
         case SeedType::SEED_ZOMBIE_JACKSON:
-        2 case SeedType::SEED_ZOMBIE_GIGA_POLEVAULTER:
+        case SeedType::SEED_ZOMBIE_GIGA_POLEVAULTER:
         case SeedType::SEED_ZOMBIE_EXPLORER:
         case SeedType::SEED_ZOMBIE_ZOMBLOB:
         case SeedType::SEED_ZOMBIE_DOGWALKER:
