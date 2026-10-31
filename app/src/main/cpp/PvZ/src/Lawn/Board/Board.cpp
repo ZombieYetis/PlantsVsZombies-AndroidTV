@@ -608,6 +608,9 @@ void Board::ProcessDeleteQueue() {
 
 void Board::InitLevel() {
     old_Board_InitLevel(this);
+    if (mApp->IsVSMode() && StageIsNight()) {
+        mSunMoney1 = mDeathMoney = 150; // 夜晚对战基础阳光/脑光提高至150
+    }
     mNewWallNutAndSunFlowerAndChomperOnly = !(mApp->IsScaryPotterLevel() || mApp->IsIZombieLevel() || mApp->IsWhackAZombieLevel() || HasConveyorBeltSeedBank(0) || mApp->IsChallengeWithoutSeedBank());
     mNewPeaShooterCount = 0;
 }

@@ -132,7 +132,7 @@ public:
          SEED_ZOMBIE_ZOMBLOB,
          SEED_ZOMBIE_GIGA_GARGANTUAR},
     };
-    static inline VSSide msNextFirstPick;
+    static VSSide &msNextFirstPick;
     static inline int msNextSidePickPlayerIndex = 0;
 
     int mInt70;                   // 70

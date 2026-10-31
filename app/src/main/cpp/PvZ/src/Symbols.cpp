@@ -25,6 +25,7 @@
 #include "PvZ/Lawn/Board/Challenge.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/Widget/VSResultsMenu.h"
+#include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/MagicNumbers.h"
 
 [[nodiscard]] static homura::SharedObjLoader &GetLibGameMain() {
@@ -2306,6 +2307,7 @@ int &Challenge::gVSResourceDropCount = *GetLibGameMain().GetSymbol<int>("_ZN9Cha
 
 Sexy::Rect &LawnApp::FULLSCREEN_RECT = *GetLibGameMain().GetSymbol<Sexy::Rect>("_ZN7LawnApp15FULLSCREEN_RECTE");
 int (&VSResultsMenu::msPlayerRecords)[2][5] = *GetLibGameMain().GetSymbol<int[2][5]>("_ZN13VSResultsMenu15msPlayerRecordsE");
+VSSide &VSSetupMenu::msNextFirstPick = *GetLibGameMain().GetSymbol<VSSide>("_ZN11VSSetupMenu15msNextFirstPickE");
 
 DISABLE_WARNING_BEGIN("-Wextra-qualification") // warning: extra qualification on member 'xxx'
 EffectSystem *& ::gEffectSystem = *GetLibGameMain().GetSymbol<EffectSystem *>("gEffectSystem");

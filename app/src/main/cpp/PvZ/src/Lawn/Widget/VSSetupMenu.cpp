@@ -97,7 +97,8 @@ static VSSide ResolveRequestedSide(const VSSetupMenu *menu, int slot, VSSide req
 
 void VSSetupMenu::_constructor() {
     old_VSSetupMenu_Constructor(this);
-    msNextFirstPick = VSSide::VS_SIDE_ZOMBIE;
+    // 黑夜植物先选卡
+    msNextFirstPick = mApp->mBoard->StageIsNight() ? VSSide::VS_SIDE_PLANT : VSSide::VS_SIDE_ZOMBIE;
 
     // 拓展卡槽,禁选模式 etc.
     mAddonWidget = new VSSetupAddonWidget(this);
