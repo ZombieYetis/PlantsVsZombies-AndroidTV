@@ -18,6 +18,7 @@
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/SexyAppFramework/Graphics/Font.h"
 #include "PvZ/SexyAppFramework/Widget/ScrollWidget.h"
 #include "PvZ/TodLib/Common/TodCommon.h"
@@ -110,6 +111,8 @@ pvzstl::string BuildRoomTag(const ServerRoomItem &room, bool coop) {
     if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION) {
         return TodStringTranslate(room.protocolVersion < NETPLAY_VERSION ? "[SERVER_ROOM_VERSION_ERROR_LOWER]" : "[SERVER_ROOM_VERSION_ERROR_HIGHER]");
     }
+    if (room.reconnectPending)
+        return TodStringTranslate(room.reconnectBusy ? "[TAG_RECONNECT_BUSY]" : "[TAG_RECONNECT_WAIT]");
     if (room.full && room.spectateAllowed) {
         return TodStringTranslate(room.gaming && coop ? "[SPECTATE_QUEUE_AVAILABLE]" : "[SPECTATE_AVAILABLE]");
     }
@@ -1224,6 +1227,13 @@ void NetplayLobbyWidget::RefreshButtons() {
         this->mPrimaryActionButton->SetLabel("[ASK_START]");
         this->mPrimaryActionButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || this->mServerGameStarting);
     }
+    if (this->mUIMode == UIMode::MODE3_SERVER && mReconnectPending) {
+        // READY starts the raw-stream handoff. Do not send lobby actions while
+        // waiting for GO; the back button can still close the connection.
+        mJoinRoomButton->mDisabled = true;
+        mCreateRoomButton->mDisabled = true;
+        mPrimaryActionButton->mDisabled = true;
+    }
 }
 
 void NetplayLobbyWidget::ShowTextInput(const char *titleKey, const char *hintKey) {
@@ -1331,7 +1341,7 @@ bool NetplayLobbyWidget::ServerTryReadOneFrame(uint8_t &outType, uint8_t *outPay
     uint8_t type = this->mSrvRecvBuf[0];
     uint16_t len = (uint16_t(this->mSrvRecvBuf[1]) << 8) | uint16_t(this->mSrvRecvBuf[2]);
     const bool knownType = (type == 0x81 || type == 0x82 || type == 0x83 || type == 0x84 || type == 0x85 || type == 0x86 || type == 0x87 || type == 0x88 || type == 0x89 || type == 0x8A || type == 0x8B
-                            || type == 0x8C || type == 0x8D || type == 0x8E || type == 0x8F || type == 0x90 || type == 0xFF);
+                            || type == 0x8C || type == 0x8D || type == 0x8E || type == 0x8F || type == 0x90 || type == 0x91 || type == 0x92 || type == 0xFF);
     if (!knownType) {
         std::memmove(this->mSrvRecvBuf, this->mSrvRecvBuf + 1, this->mSrvRecvLen - 1);
         --this->mSrvRecvLen;
@@ -1372,6 +1382,8 @@ void NetplayLobbyWidget::ServerMoveBufferedRelayBytesToVsStream(bool asHost) {
     recvBuffer.insert(recvBuffer.end(), begin, begin + this->mSrvRecvLen);
     this->mSrvRecvLen = 0;
 }
+
+static bool SendAll(int sock, const void *data, size_t len);
 
 void NetplayLobbyWidget::ServerUpdateIO() {
     if (this->mServerSock < 0)
@@ -1528,6 +1540,8 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     it.guestProbeDone = (flags & 8) != 0;
                     it.spectateAllowed = (flags & 16) != 0;
                     it.forceRelay = (flags & 32) != 0;
+                    it.reconnectPending = (flags & 64) != 0;
+                    it.reconnectBusy = (flags & 128) != 0;
                     std::memset(it.name, 0, sizeof(it.name));
                     int cp = (int)displayRoomName.size();
                     if (cp > (int)sizeof(it.name) - 1)
@@ -1972,6 +1986,60 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                 return;
             }
 
+            case 0x91: { // RECONNECT_RESULT
+                if (!mReconnectPending || len != 13)
+                    break;
+                if (payload[0] != 0) {
+                    mReconnectPending = false;
+                    static const char *errors[] = {"",
+                                                   "[STATUS_RECONNECT_ROOM_ENDED]",
+                                                   "[STATUS_RECONNECT_UNAVAILABLE]",
+                                                   "[STATUS_RECONNECT_CODE_WRONG]",
+                                                   "[STATUS_RECONNECT_FAILED]",
+                                                   "[STATUS_RECONNECT_VERSION_MISMATCH]",
+                                                   "[STATUS_RECONNECT_RETRY_LATER]"};
+                    mServerStatusText = TodStringTranslate(payload[0] < std::size(errors) ? errors[payload[0]] : "[STATUS_RECONNECT_FAILED]");
+                    break;
+                }
+                if (homura::ReadBEI32(payload + 1) != mReconnectRoomId) {
+                    ServerDisconnect("reconnect room mismatch");
+                    break;
+                }
+                mReconnectEpoch = std::uint32_t(homura::ReadBEI32(payload + 5));
+                mReconnectTransfer = std::uint32_t(homura::ReadBEI32(payload + 9));
+                mServerJoinedRoomId = mReconnectRoomId;
+                mServerJoined = true;
+                mServerSpectating = mServerHosting = false;
+                uint8_t ready[9]{0x13};
+                homura::WriteBEI32(ready + 1, mReconnectEpoch);
+                homura::WriteBEI32(ready + 5, mReconnectTransfer);
+                if (!SendAll(mServerSock, ready, sizeof(ready))) {
+                    ServerDisconnect("reconnect ready failed");
+                    mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_FAILED]");
+                    break;
+                }
+                mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_JOINING]");
+                break;
+            }
+            case 0x92: { // RECONNECT_GO: only this new guest switches from framed to raw.
+                if (!mReconnectPending || len != 8 || mServerSock < 0 || std::uint32_t(homura::ReadBEI32(payload)) != mReconnectEpoch
+                    || std::uint32_t(homura::ReadBEI32(payload + 4)) != mReconnectTransfer)
+                    break;
+                ResetVsStreamBuffersForServerMode();
+                ServerMoveBufferedRelayBytesToVsStream(false);
+                gTcpServerSocket = mServerSock;
+                mServerSock = -1;
+                gTcpConnected = true;
+                gTcpConnecting = false;
+                gIsServerModeNetplay = true;
+                gServerModeTransport = ServerModeTransport::RELAY;
+                gIsServerModeSpectator = false;
+                mReconnectPending = false;
+                netplay::MetricsSetRoomId(mServerJoinedRoomId);
+                netplay::reconnect::PrepareClient(mReconnectEpoch, mReconnectTransfer);
+                // The snapshot loader closes the lobby, without starting a new Board here.
+                return;
+            }
             case 0xFF: { // ERROR
                 int ec = (len >= 1) ? (payload[0] & 0xFF) : -1;
                 this->mServerCreatePending = false;
@@ -2665,6 +2733,9 @@ void NetplayLobbyWidget::DrawServerRoomList(Sexy::Graphics *g) {
             tag = tag.empty() ? TodStringTranslate("[ROOM_STARTED]") : tag + ' ' + TodStringTranslate("[ROOM_STARTED]");
         }
 
+        if (r.reconnectPending)
+            tag = TodStringTranslate(r.reconnectBusy ? "[TAG_RECONNECT_BUSY]" : "[TAG_RECONNECT_WAIT]");
+
         if (versionLower) {
             tag = TodStringTranslate("[SERVER_ROOM_VERSION_ERROR_LOWER]");
         }
@@ -2759,6 +2830,8 @@ void NetplayLobbyWidget::ServerSelectRoomByMouse(int x, int y) {
 }
 
 void NetplayLobbyWidget::ServerSendJoinSelected() {
+    if (mReconnectPending)
+        return;
     if (this->mServerSock < 0)
         return;
     if (this->mServerRoomCount <= 0)
@@ -2777,6 +2850,16 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
     std::strncpy(this->mServerJoinedRoomName, room.name, sizeof(this->mServerJoinedRoomName) - 1);
     this->mServerJoinedRoomName[sizeof(this->mServerJoinedRoomName) - 1] = '\0';
     int roomId = room.roomId;
+    if (room.reconnectPending) {
+        if (room.reconnectBusy) {
+            mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_BUSY]");
+            return;
+        }
+        mReconnectRoomId = roomId;
+        mInputPurpose = InputPurpose::RECONNECT_CODE;
+        ShowTextInput("[INPUT_TITLE_RECONNECT_CODE]", "[HINT_RECONNECT_CODE]");
+        return;
+    }
 
     const char *playerName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
     int nameLen = (int)std::strlen(playerName);
@@ -2998,6 +3081,10 @@ bool NetplayLobbyWidget::ServerConnectFromInput() {
 void NetplayLobbyWidget::ServerDisconnect([[maybe_unused]] const char *why) {
     const bool hasActiveVsSocket = IsRemoteServer() || IsRemoteClient() || (gTcpServerSocket >= 0);
     CloseSocketFd(this->mServerSock);
+    mReconnectPending = false;
+    mReconnectStartedAt = 0;
+    mReconnectRoomId = 0;
+    mReconnectEpoch = mReconnectTransfer = 0;
     Mode3ResetTargetLatencyProbes(this);
     ServerResetP2PState(false);
 
@@ -3391,7 +3478,26 @@ void NetplayLobbyWidget::UpdateNetplay() {
         assert(!gInputString.empty());
 
         // MODE2：WIFI 手动加入指定 IP
-        if (this->mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && this->mUIMode == UIMode::MODE2_WIFI) {
+        if (mInputPurpose == InputPurpose::RECONNECT_CODE) {
+            const std::string input = std::move(gInputString);
+            gHasInputContent = false;
+            gHasInputContent.notify_one();
+            mInputPurpose = InputPurpose::NONE;
+            if (input.size() != 2 || input[0] < '0' || input[0] > '9' || input[1] < '0' || input[1] > '9') {
+                mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_CODE_INVALID]");
+            } else if (mServerConnected && mServerSock >= 0 && !mReconnectPending) {
+                uint8_t request[10]{0x12};
+                homura::WriteBEI32(request + 1, mReconnectRoomId);
+                homura::WriteBEI32(request + 5, NETPLAY_VERSION);
+                request[9] = uint8_t((input[0] - '0') * 10 + input[1] - '0');
+                mReconnectPending = true;
+                mReconnectStartedAt = Sexy::GetTickCount();
+                if (!SendAll(mServerSock, request, sizeof(request)))
+                    ServerDisconnect("reconnect join failed");
+                else
+                    mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_VERIFYING]");
+            }
+        } else if (this->mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && this->mUIMode == UIMode::MODE2_WIFI) {
             this->mUseManualTarget = true;
             ManualIpConnect(); // 内部会消费 gInputString
             this->mInputPurpose = InputPurpose::NONE;
@@ -3488,6 +3594,12 @@ void NetplayLobbyWidget::UpdateNetplay() {
     // 3) MODE3：服务器联机 IO（connect 完成检测 + 收包） + 自动 query
     // =========================================================
     if (this->mUIMode == UIMode::MODE3_SERVER) {
+        if (mReconnectEpoch != 0 && mServerSock < 0 && gTcpServerSocket < 0) {
+            // A failed snapshot/timeout closes the borrowed raw socket before
+            // the lobby itself closes. Release its stale joined-room state.
+            ServerDisconnect("reconnect borrowed socket closed");
+            mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_FAILED]");
+        }
         if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSock < 0 && gTcpServerSocket < 0) {
             ServerOnBorrowedSocketClosed("borrowed socket missing in update");
         }
@@ -3503,6 +3615,17 @@ void NetplayLobbyWidget::UpdateNetplay() {
         }
         // 网络 IO（你实现：包含 connect 完成检测、收包解析等）
         ServerUpdateIO();
+        if (netplay::reconnect::IsFrozen())
+            return;
+        if (mReconnectPending) {
+            // In particular, QUERY must not follow READY onto the raw stream.
+            if (std::uint32_t(Sexy::GetTickCount() - mReconnectStartedAt) >= 20000) {
+                ServerDisconnect("reconnect lobby handshake timed out");
+                mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_FAILED]");
+            }
+            RefreshButtons();
+            return;
+        }
         ServerUpdateP2PProbe();
         ServerUpdateP2P();
         Mode3UpdateTargetLatencyProbes(this);

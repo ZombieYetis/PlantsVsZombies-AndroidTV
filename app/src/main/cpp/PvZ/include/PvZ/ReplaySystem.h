@@ -63,6 +63,7 @@ struct PlaybackEvent {
 using EventList = std::vector<PlaybackEvent>;
 
 void ResetRecorder();
+void MarkRecordingIncomplete();
 bool IsRecordingComplete();
 enum class HistoryStatus { Local, Receiving, Queued, Ready, Saved, Failed };
 HistoryStatus GetHistoryStatus();

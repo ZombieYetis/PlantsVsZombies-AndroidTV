@@ -38,6 +38,7 @@
 #include "PvZ/Lawn/Widget/VSSetupAddonWidget.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/ReplaySystem.h"
 #include "PvZ/SexyAppFramework/Widget/Checkbox.h"
 #include "PvZ/SexyAppFramework/Widget/ImageWidget.h"
@@ -364,7 +365,7 @@ void FailSpectatorSnapshot() {
     }
 }
 
-bool ApplySpectatorSnapshot(LawnApp *app) {
+bool ApplyRuntimeSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMode mode, bool spectator) {
     struct Applying {
         Applying() {
             gApplyingOnlineSaveGame = gApplyingSpectatorSnapshot = true;
@@ -375,16 +376,16 @@ bool ApplySpectatorSnapshot(LawnApp *app) {
     } applying;
     SaveGameContext context{};
     context.mReading = true;
-    context.mBuffer.mData = std::move(gSpectatorSnapshotIn);
+    context.mBuffer.mData = std::move(data);
     context.mBuffer.mDataBitSize = static_cast<int>(context.mBuffer.mData.size() * 8);
     context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
     SpectatorScene scene;
     scene.Sync(context);
-    if (context.mFailed || !scene.historyEpoch || (scene.scene != SCENE_LEVEL_INTRO && scene.scene != SCENE_PLAYING)
-        || (scene.scene == SCENE_PLAYING && (scene.setup || scene.plantChooser || scene.zombieChooser)) || ((scene.plantChooser || scene.zombieChooser) && !scene.setup))
+    if (context.mFailed || (spectator && !scene.historyEpoch) || (scene.scene != SCENE_LEVEL_INTRO && scene.scene != SCENE_PLAYING)
+        || (scene.scene == SCENE_PLAYING && (scene.setup || scene.plantChooser || scene.zombieChooser)) || (mode == GAMEMODE_MP_VS && (scene.plantChooser || scene.zombieChooser) && !scene.setup))
         return false;
 
-    app->mGameMode = GameMode::GAMEMODE_MP_VS;
+    app->mGameMode = mode;
     app->KillSeedChooserScreen();
     app->KillZombieChooserScreen();
     app->KillVSSetupScreen();
@@ -409,7 +410,11 @@ bool ApplySpectatorSnapshot(LawnApp *app) {
         app->ShowSeedChooserScreen();
     if (scene.zombieChooser)
         app->ShowZombieChooserScreen();
-    if (!LawnLoadGame(app->mBoard, &context))
+    auto *music = app->mMusic;
+    // SyncBoard replaces the music fields, but not the audio player's state.
+    // Stop the local lobby tune before its ID is overwritten by the snapshot.
+    music->GetVTable()->StopAllMusic(music);
+    if (!LawnLoadGame_Original(app->mBoard, &context))
         return false;
     app->mGameScene = scene.scene; // LawnLoadGame normally resumes straight into combat.
     SyncSpectatorExtras(context, app->mBoard);
@@ -421,6 +426,10 @@ bool ApplySpectatorSnapshot(LawnApp *app) {
     gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
     auto *board = app->mBoard;
     const bool paused = board->mPaused;
+    const MusicTune restoredMusicTune = music->mCurMusicTune;
+    // A restored tune ID does not mean that tune is playing locally. Clear it
+    // through the active TV/Xbox implementation before restarting playback.
+    music->GetVTable()->StopAllMusic(music);
     if (scene.scene == SCENE_PLAYING) {
         board->PostLoadGame();
     } else {
@@ -428,9 +437,13 @@ bool ApplySpectatorSnapshot(LawnApp *app) {
         // intro these must still be driven by the restored cutscene timeline.
         board->LoadBackgroundImages();
         board->ResetFPSStats();
-        app->mMusic->StopAllMusic();
-        app->mMusic->MakeSureMusicIsPlaying(MUSIC_TUNE_CHOOSE_YOUR_SEEDS);
     }
+    // PostLoadGame chooses a default battle tune; the snapshot also covers
+    // special-mode music and intro transitions, including intentional silence.
+    if (restoredMusicTune == MUSIC_TUNE_NONE)
+        music->GetVTable()->StopAllMusic(music);
+    else
+        music->GetVTable()->MakeSureMusicIsPlaying(music, restoredMusicTune);
     board->mPaused = paused;
     // LawnLoadGame already repaired native objects. Repair only the extra player-1
     // blocks here, avoiding a second animation/sound restoration pass.
@@ -462,11 +475,54 @@ bool ApplySpectatorSnapshot(LawnApp *app) {
         lobby->RequestClose(NetplayLobbyWidget::NetplayLobbyWidget_Enter);
     }
     app->KillChallengeScreen();
-    replay::BindLiveHistory(scene.historyEpoch);
+    if (spectator)
+        replay::BindLiveHistory(scene.historyEpoch);
     LOG_INFO("[NETPLAY] live spectator snapshot loaded; catchup={} bytes", gSpectatorCatchup.size());
     return true;
 }
 } // namespace
+
+namespace netplay {
+bool CanCaptureReconnectSnapshot(LawnApp *app) {
+    if (!app->mBoard || IsSynchronizingSaveGame() || app->mVSResultsMenu)
+        return false;
+    if (app->mGameMode != GAMEMODE_MP_VS && !app->IsCoopMode())
+        return false;
+    if (app->mGameScene == SCENE_PLAYING)
+        return true;
+    return app->mGameScene == SCENE_LEVEL_INTRO && app->mBoard->mZombieWavesReady && !app->mBoard->mCutScene->mPreUpdatingBoard && (!app->mVSSetupMenu || int(app->mVSSetupMenu->mState) >= 0);
+}
+bool CaptureReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data) {
+    if (!CanCaptureReconnectSnapshot(app))
+        return false;
+    SaveGameContext context{};
+    auto scene = GetSpectatorScene(app);
+    scene.Sync(context);
+    SaveFileHeader header{SAVE_FILE_MAGIC_NUMBER, SAVE_FILE_VERSION, SAVE_FILE_DATE};
+    context.SyncBytes(&header, sizeof(header));
+    struct Capturing {
+        Capturing() {
+            gCapturingSpectatorSnapshot = true;
+        }
+        ~Capturing() {
+            gCapturingSpectatorSnapshot = false;
+        }
+    } capturing;
+    SyncBoard(&context, app->mBoard);
+    SyncSpectatorExtras(context, app->mBoard);
+    if (scene.scene == SCENE_LEVEL_INTRO)
+        SyncSpectatorIntro(context, app);
+    if (context.mFailed || context.mBuffer.mData.size() > reconnect::MaxSnapshotSize)
+        return false;
+    data = std::move(context.mBuffer.mData);
+    return true;
+}
+bool ApplyReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMode mode) {
+    if (mode != GAMEMODE_MP_VS && !(mode >= GAMEMODE_TWO_PLAYER_COOP_DAY && mode <= GAMEMODE_TWO_PLAYER_COOP_ENDLESS) && mode != GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD)
+        return false;
+    return ApplyRuntimeSnapshot(app, data, mode, false);
+}
+} // namespace netplay
 
 bool netplay::IsSerializingSpectatorSnapshot() noexcept {
     return gCapturingSpectatorSnapshot || gApplyingSpectatorSnapshot;
@@ -494,6 +550,13 @@ std::vector<std::byte> netplay::TakeSpectatorCatchupEvents() {
 }
 
 void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
+    if (reconnect::IsFrozen()) {
+        // A room may wait indefinitely for its guest. This is not a stalled
+        // spectator transfer; retain both the snapshot and its catchup backlog.
+        if (gReceivingSpectatorSnapshot)
+            gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
+        return;
+    }
     if (gReceivingSpectatorSnapshot && std::chrono::steady_clock::now() - gSpectatorSnapshotProgress > std::chrono::seconds(60)) {
         FailSpectatorSnapshot();
         return;
@@ -662,7 +725,7 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
     } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
         if (event->size != sizeof(U16UNI32UNI32_Event) || gSpectatorSnapshotIn.size() != gSpectatorSnapshotSize || SaveDataHash(gSpectatorSnapshotIn) != gSpectatorSnapshotHash
-            || !ApplySpectatorSnapshot(app)) {
+            || !ApplyRuntimeSnapshot(app, gSpectatorSnapshotIn, GAMEMODE_MP_VS, true)) {
             FailSpectatorSnapshot();
             return true;
         }

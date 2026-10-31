@@ -23,6 +23,7 @@
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/ReplayHistory.h"
 
 #include <cstdlib>
@@ -255,6 +256,10 @@ void replay::ResetRecorder() {
     gRecordingComplete = true;
 }
 
+void replay::MarkRecordingIncomplete() {
+    gRecordingComplete = false;
+}
+
 bool replay::IsRecordingComplete() {
     if (gBoundHistoryEpoch) {
         const auto it = gHistoryReceivers.find(gBoundHistoryEpoch);
@@ -290,7 +295,7 @@ void replay::RecordPacket(ReplayPacketDir dir, const std::byte *data, std::size_
     }
     if (len >= sizeof(BaseEvent)) {
         const auto type = static_cast<EventType>(std::to_integer<uint8_t>(data[0]));
-        if (type >= EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST && type <= EVENT_SERVER_REPLAY_HISTORY_ABORT)
+        if (type >= EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST && type <= EVENT_RECONNECT_SNAPSHOT_END)
             return; // Other viewers' snapshots are not part of this match's event replay.
     }
     if (gBoundHistoryEpoch)
@@ -462,7 +467,7 @@ void replay::UpdateHistoryTransfer() {
         }
     }
     std::erase_if(gHistoryReceivers, [](const auto &entry) { return entry.first != gBoundHistoryEpoch && !entry.second.pendingSave && !entry.second.saveTask.valid(); });
-    if (!IsRemoteServer() || !gLawnApp)
+    if (!IsRemoteServer() || !gLawnApp || netplay::reconnect::IsFrozen())
         return;
     if (gHistorySource && gLawnApp->mVSResultsMenu)
         gHistorySource->sealed = true;

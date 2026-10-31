@@ -23,6 +23,7 @@
 #include "PvZ/Lawn/Board/Challenge.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/SaveGame.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/ReplaySystem.h"
 
 #include <arpa/inet.h>
@@ -76,6 +77,12 @@ static std::string UrlEncode(std::string_view s) {
 void netplay::detail::PutEventData(const std::byte *data, std::size_t n) {
     if (IsApplyingOnlineSaveGame()) {
         return; // Loading a snapshot must not emit gameplay side effects.
+    }
+    if (reconnect::IsFrozen() && n >= sizeof(BaseEvent)) {
+        const auto type = std::to_integer<uint8_t>(data[0]);
+        // Spectators keep their existing heartbeat while the world is paused.
+        if (type < EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST && !(gIsServerModeSpectator && type == EVENT_PING))
+            return;
     }
     sendBuffer.append_range(std::views::counted(data, n));
     const std::uint32_t replayTick = static_cast<std::uint32_t>(gLawnApp->mAppCounter);
@@ -260,9 +267,6 @@ static bool SendSettlementPayloadBlocking(const std::string &serverIp, int serve
 }
 
 bool netplay::MetricsSendSettlement(bool plantWin, int mainCounter) {
-    // TODO：测试完毕后改回来
-    return false;
-
     // 非对战模式不能构造或上传对战结算数据。
     if (gLawnApp == nullptr || !gLawnApp->IsVSMode()) {
         return false;

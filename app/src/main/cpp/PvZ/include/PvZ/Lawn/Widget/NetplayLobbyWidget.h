@@ -30,6 +30,7 @@ enum class InputPurpose {
     LAN_JOIN_MANUAL,
     HOST_SET_PORT,
     SERVER_CONNECT_ADDR,
+    RECONNECT_CODE,
 };
 
 struct ServerRoomItem {
@@ -42,6 +43,8 @@ struct ServerRoomItem {
     bool guestProbeDone;
     bool spectateAllowed;
     bool forceRelay;
+    bool reconnectPending;
+    bool reconnectBusy;
 };
 
 class GameButton;
@@ -93,6 +96,10 @@ public:
     int mServerTargetProbeStartTick[5];
     int mServerTargetNextRefreshTick;
     int mServerSock;
+    int mReconnectRoomId = 0;
+    bool mReconnectPending = false;
+    std::uint32_t mReconnectStartedAt = 0;
+    std::uint32_t mReconnectEpoch = 0, mReconnectTransfer = 0;
     bool mServerConnecting;
     bool mServerHosting;
     bool mServerJoined;

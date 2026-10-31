@@ -360,7 +360,8 @@ enum Dialogs {
     DIALOG_PURCHASE_LIMIT = 83,
     DIALOG_BUY_SUNMONEY = 84,
 
-    NUM_DIALOGS
+    NUM_DIALOGS,
+    DIALOG_RECONNECT = 1000 // Keep native NUM_DIALOGS and existing dialog IDs unchanged.
 };
 enum DebugTextMode {
     DEBUG_TEXT_NONE = 0,

@@ -31,6 +31,7 @@
 #include "PvZ/Lawn/System/SaveGame.h"
 #include "PvZ/Lawn/Widget/VSSetupAddonWidget.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
 #include "PvZ/SexyAppFramework/Misc/Gamepad.h"
 #include "PvZ/Symbols.h"
@@ -1176,7 +1177,7 @@ void GamepadControls::DrawPreview(Sexy::Graphics *g) {
 }
 
 void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerIndex, unsigned int unk) {
-    if (netplay::IsSynchronizingSaveGame()) {
+    if (netplay::IsSynchronizingSaveGame() || netplay::reconnect::IsFrozen()) {
         return;
     }
 

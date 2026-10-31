@@ -35,6 +35,7 @@
 #include "PvZ/Lawn/Widget/TitleScreen.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/PatchList.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/Symbols.h"
 
 #include <jni.h>
@@ -522,6 +523,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_android_support_CkHomuraMenu_GetCu
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_transmension_mobile_EnhanceActivity_native1PButtonDown(JNIEnv *env, jclass clazz, jint code) {
+    if (netplay::reconnect::IsFrozen())
+        return;
     Board *aBoard = (gLawnApp)->mBoard;
     if (aBoard) {
         gButtonDownP1 = true;
@@ -530,6 +533,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_transmension_mobile_EnhanceActivity_n
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_transmension_mobile_EnhanceActivity_native2PButtonDown(JNIEnv *env, jclass clazz, jint code) {
+    if (netplay::reconnect::IsFrozen())
+        return;
     Board *aBoard = (gLawnApp)->mBoard;
     if (aBoard) {
         gButtonDownP2 = true;
@@ -556,6 +561,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_transmension_mobile_EnhanceActivity_n
 }
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_transmension_mobile_EnhanceActivity_nativeIsInGame(JNIEnv *env, jclass clazz) {
+    if (netplay::reconnect::IsFrozen())
+        return false; // Let keyboard input reach the reconnect dialog.
     LawnApp *anApp = gLawnApp;
     Board *aBoard = anApp->mBoard;
     auto *aFocusWidget = anApp->mWidgetManager->mFocusWidget;
@@ -575,6 +582,8 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_transmension_mobile_EnhanceActivi
 
 
 extern "C" JNIEXPORT void JNICALL Java_com_transmension_mobile_EnhanceActivity_nativeSendButtonEvent(JNIEnv *env, jclass clazz, jboolean isButtonDown, jint buttonCode) {
+    if (netplay::reconnect::IsFrozen())
+        return;
     bool aIsPlayer2 = buttonCode >= 256;
     bool aGamepad1Is2P = gGamepad1ToPlayerIndex == 1;
     Sexy::GamepadButton aButtonCode = Sexy::GamepadButton(aIsPlayer2 ? buttonCode - 256 : buttonCode);

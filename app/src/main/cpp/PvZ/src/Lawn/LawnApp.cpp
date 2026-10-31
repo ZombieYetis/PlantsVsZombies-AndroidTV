@@ -39,6 +39,7 @@
 #include "PvZ/Lawn/Widget/VSResultsMenu.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/NetPlay.h"
+#include "PvZ/RelayReconnect.h"
 #include "PvZ/ReplaySystem.h"
 #include "PvZ/STL/string.h"
 #include "PvZ/SexyAppFramework/Buffer.h"
@@ -403,6 +404,7 @@ void LawnApp::ClearSecondPlayer() {
     if (netplay::IsApplyingOnlineSaveGame()) {
         return;
     }
+    netplay::reconnect::Reset(this);
     netplay::ClearSendBuffer();
     gIsServerModeNetplay = false;
     gIsConnectedToServer = false;
@@ -531,6 +533,10 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
         replay::RecordPacket(ReplayPacketDir::InboundClient, clientRecvPtr, event->size, static_cast<std::uint32_t>(mAppCounter));
         // LOG_DEBUG("event.type = {}", int(event->type));
 
+        if (netplay::reconnect::HandleEvent(this, event) || (netplay::reconnect::IsFrozen() && event->type < EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST)) {
+            offset += event->size;
+            continue;
+        }
         if (replay::HandleHistoryEvent(event, false) || netplay::HandleSpectatorSnapshotEvent(this, event, false) || netplay::HandleSaveGameEvent(this, event, false)) {
             offset += event->size;
             continue;
@@ -602,6 +608,11 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
         // LOG_DEBUG("event.type = {}", int(event->type));
 
         if (replay::HandleHistoryEvent(event, true)) {
+            offset += event->size;
+            continue;
+        }
+        if (netplay::reconnect::HandleEvent(this, event) || (netplay::reconnect::IsFrozen() && event->type < EVENT_RELAY_SPECTATE_SNAPSHOT_REQUEST)) {
+            waitDialog = NetplayLobbyWidget::GetInstance();
             offset += event->size;
             continue;
         }
@@ -792,6 +803,7 @@ void LawnApp::UpdateFrames() {
                 clientRecvBuffer.clear();
                 serverRecvBuffer.clear();
                 netplay::ClearSendBuffer();
+                netplay::reconnect::Reset(this);
                 ResetNetDelayState();
                 if (mVSResultsMenu != nullptr) {
                     mVSResultsMenu->HandleOpponentDisconnected();
@@ -823,6 +835,7 @@ void LawnApp::UpdateFrames() {
                     clientRecvBuffer.clear();
                     serverRecvBuffer.clear();
                     netplay::ClearSendBuffer();
+                    netplay::reconnect::Reset(this);
                     ResetNetDelayState();
                     LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CONNECTION_ERROR]", "[RECREATE_ROOM]", "[DIALOG_BUTTON_OK]", "", 3);
                     break;
@@ -858,6 +871,7 @@ void LawnApp::UpdateFrames() {
                 clientRecvBuffer.clear();
                 serverRecvBuffer.clear();
                 netplay::ClearSendBuffer();
+                netplay::reconnect::Reset(this);
                 ResetNetDelayState();
                 if (mVSResultsMenu != nullptr) {
                     mVSResultsMenu->HandleOpponentDisconnected();
@@ -882,6 +896,7 @@ void LawnApp::UpdateFrames() {
                     clientRecvBuffer.clear();
                     serverRecvBuffer.clear();
                     netplay::ClearSendBuffer();
+                    netplay::reconnect::Reset(this);
                     ResetNetDelayState();
                     LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CONNECTION_ERROR]", "[REENTER_ROOM]", "[DIALOG_BUTTON_OK]", "", 3);
                     break;
@@ -901,6 +916,7 @@ void LawnApp::UpdateFrames() {
     //    UpdateSessionState(); // 连接渡维服务器用
     //    UpdatePlayTimeStats(); // 本来就是空函数，故注释
 
+    netplay::reconnect::Update(this);
     netplay::UpdateSaveGameTransfer(this);
     netplay::UpdateSpectatorSnapshot(this);
     int updateCount = 0;
@@ -926,7 +942,7 @@ void LawnApp::UpdateFrames() {
         updateCount = 0;
     }
 
-    if (netplay::IsSynchronizingSaveGame() && !replayActive) {
+    if ((netplay::IsSynchronizingSaveGame() || netplay::reconnect::IsFrozen()) && !replayActive) {
         updateCount = 0; // 继续处理 TCP 数据，但暂不推进两端正在同步的 Board。
     }
 

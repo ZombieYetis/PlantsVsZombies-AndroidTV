@@ -108,6 +108,9 @@ void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameConte
 
 namespace netplay {
 // State is external to LawnApp/Board to preserve the native object layouts.
+bool CanCaptureReconnectSnapshot(LawnApp *app);
+bool CaptureReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data);
+bool ApplyReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMode mode);
 bool StartCoopEndlessLoad(LawnApp *app);
 bool HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fromHost);
 void UpdateSaveGameTransfer(LawnApp *app);
