@@ -5068,6 +5068,9 @@ void Zombie::PlayDeathAnim(unsigned int theDamageFlags) {
     if (mInPool && aBodyReanim->TrackExists("anim_waterdeath")) {
         aDeathTrackName = "anim_waterdeath";
         ReanimIgnoreClipRect("Zombie_duckytube", false);
+    } else if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER) {
+        aDeathAnimRate = 18.0f;
+        aDeathTrackName = mHasObject ? "anim_death" : "anim_death2";
     } else if (mWalnutDeath && aBodyReanim->TrackExists("anim_superlongdeath")) {
         aDeathAnimRate = 14.0f;
         aDeathTrackName = "anim_walnutdeath";
@@ -8575,13 +8578,6 @@ void Zombie::AttachShield() {
     }
 
     aBodyReanim->AssignRenderGroupToTrack(aTrackName, RENDER_GROUP_SHIELD);
-}
-
-void Zombie::PlayZombieReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate) {
-    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && !mHasObject && strcmp(theTrackName, "anim_death") == 0) {
-        theTrackName = "anim_death2";
-    }
-    old_Zombie_PlayZombieReanim(this, theTrackName, theLoopType, theBlendTime, theAnimRate);
 }
 
 void Zombie::StartWalkAnim(int theBlendTime) {

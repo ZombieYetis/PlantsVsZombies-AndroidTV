@@ -517,7 +517,9 @@ public:
     int TakeFlyingDamage(int theDamage, unsigned int theDamageFlags);
     int TakeShieldDamage(int theDamage, unsigned int theDamageFlags);
     void AttachShield();
-    void PlayZombieReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate);
+    void PlayZombieReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate) {
+        reinterpret_cast<void (*)(Zombie *, const char *, ReanimLoopType, int, float)>(Zombie_PlayZombieReanimAddr)(this, theTrackName, theLoopType, theBlendTime, theAnimRate);
+    }
     void EnableDanceMode(bool theEnableDance) {
         reinterpret_cast<void (*)(Zombie *, bool)>(Zombie_EnableDanceModeAddr)(this, theEnableDance);
     }
@@ -663,7 +665,6 @@ inline void (*old_Zombie_DropArm)(Zombie *, unsigned int);
 
 inline int (*old_Zombie_TakeHelmDamage)(Zombie *, int theDamage, unsigned int theDamageFlags);
 
-inline void (*old_Zombie_PlayZombieReanim)(Zombie *, const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate);
 
 inline void (*old_Zombie_ReanimShowPrefix)(Zombie *, const char *, int);
 
