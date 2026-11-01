@@ -1,4 +1,5 @@
 #include "PvZ/RelayReconnect.h"
+#include "Homura/Logger.h"
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/SaveGame.h"
@@ -304,8 +305,10 @@ void Update(LawnApp *app) {
             Control(OP_PING);
             lastPing = now;
         }
-        if (now - lastPong > std::chrono::seconds(25))
+        if (now - lastPong > std::chrono::seconds(25)) {
+            LOG_ERROR("[NETPLAY] relay heartbeat timeout: socket={}, no pong for {} ms", socket, std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPong).count());
             shutdown(socket, SHUT_RDWR);
+        }
     }
     if (IsFrozen()) {
         ShowDialog(app);
@@ -344,7 +347,9 @@ void Update(LawnApp *app) {
         }
         progress = now;
     }
-    if (!IsRemoteServer() && !gIsServerModeSpectator && IsFrozen() && now - progress > std::chrono::seconds(70))
+    if (!IsRemoteServer() && !gIsServerModeSpectator && IsFrozen() && now - progress > std::chrono::seconds(70)) {
+        LOG_ERROR("[NETPLAY] reconnect transfer timeout: socket={}, epoch={}, transfer={}, phase={}", socket, epoch, transfer, int(phase.load()));
         shutdown(socket, SHUT_RDWR);
+    }
 }
 } // namespace netplay::reconnect

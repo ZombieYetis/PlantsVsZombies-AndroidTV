@@ -954,7 +954,10 @@ void replay::TickPlayback() {
         // route all packets through server-path dispatcher so EVENT_CLIENT_*
         // can follow the same spectator branch handling as live spectate.
         if (pkt.dir == ReplayPacketDir::InboundClient || pkt.dir == ReplayPacketDir::InboundServer || pkt.dir == ReplayPacketDir::Outbound) {
-            gLawnApp->HandleTcpServerMessage(pkt.data.data(), pkt.data.size());
+            if (!gLawnApp->HandleTcpServerMessage(pkt.data.data(), pkt.data.size())) {
+                StopPlayback();
+                return;
+            }
         }
         ++gPlaybackState.nextIndex;
     }

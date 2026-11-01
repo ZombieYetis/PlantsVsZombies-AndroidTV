@@ -667,8 +667,9 @@ public:
     void ClearSecondPlayer();
     bool Is3DAccelerated() const;
     void Set3DAccelerated(bool isAccelerated);
-    void HandleTcpClientMessage(const std::byte *buf, size_t bufSize);
-    void HandleTcpServerMessage(const std::byte *buf, size_t bufSize);
+    // False means the stream was rejected; stop reading and clean up the connection.
+    [[nodiscard]] bool HandleTcpClientMessage(const std::byte *buf, size_t bufSize);
+    [[nodiscard]] bool HandleTcpServerMessage(const std::byte *buf, size_t bufSize);
     void UpdateFrames();
     void FinishLoadGame();
     void ShowSeedChooserScreen();

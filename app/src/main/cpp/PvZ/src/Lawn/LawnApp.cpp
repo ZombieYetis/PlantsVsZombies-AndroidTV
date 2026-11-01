@@ -127,6 +127,49 @@ void SendPeriodicNetPing() {
     netplay::PutEvent(eventPing);
 }
 
+bool RejectNetplayEvent(LawnApp *app, bool fromClient, const char *reason, std::vector<std::byte> &buffer, std::size_t offset) {
+    const auto *data = buffer.data() + offset;
+    const auto available = buffer.size() - offset;
+    const auto previewSize = std::min<std::size_t>(available, 64);
+    constexpr char digits[] = "0123456789ABCDEF";
+    std::string preview;
+    preview.reserve(previewSize * 3);
+    for (std::size_t i = 0; i < previewSize; ++i) {
+        const auto value = std::to_integer<uint8_t>(data[i]);
+        if (i != 0)
+            preview.push_back(' ');
+        preview.push_back(digits[value >> 4]);
+        preview.push_back(digits[value & 15]);
+    }
+    const int socket = fromClient ? gTcpClientSocket : gTcpServerSocket;
+    const char *role = gIsReplayMode ? "replay" : fromClient ? "host" : gIsServerModeSpectator ? "spectator" : "guest";
+    const char *transport = !gIsServerModeNetplay ? "lan" : gServerModeTransport == ServerModeTransport::RELAY ? "relay" : gServerModeTransport == ServerModeTransport::P2P ? "p2p" : "none";
+    LOG_ERROR("[NETPLAY] protocol error: reason={}, source={}, role={}, socket={}, transport={}, frozen={}, scene={}, mode={}, tick={}, base_version={}, protocol={}, type={}, size={}, offset={}, "
+              "buffered={}, prefix({})={}",
+              reason,
+              fromClient ? "client" : "server",
+              role,
+              socket,
+              transport,
+              netplay::reconnect::IsFrozen(),
+              int(app->mGameScene),
+              int(app->mGameMode),
+              app->mAppCounter,
+              PVZ_VERSION,
+              NETPLAY_VERSION,
+              std::to_integer<unsigned>(data[0]),
+              netplay::ParseEventSize(data),
+              offset,
+              buffer.size(),
+              previewSize,
+              preview);
+    buffer.clear();
+    if (!gIsReplayMode && socket >= 0)
+        shutdown(socket, SHUT_RDWR);
+    // The caller must stop dispatching this stream and run its normal cleanup.
+    return false;
+}
+
 } // namespace
 
 // 此处写明具体每个贴图对应哪个文件.
@@ -517,13 +560,18 @@ int LawnApp::GamepadToPlayerIndex(unsigned int thePlayerIndex) const {
 }
 
 
-void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
-    clientRecvBuffer.append_range(std::views::counted(buf, bufSize));
+bool LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
+    if (bufSize != 0)
+        clientRecvBuffer.append_range(std::views::counted(buf, bufSize));
     size_t offset = 0;
 
     while (clientRecvBuffer.size() >= offset + sizeof(BaseEvent)) {
         const auto *clientRecvPtr = &clientRecvBuffer[offset];
-        if (clientRecvBuffer.size() < offset + netplay::ParseEventSize(clientRecvPtr)) {
+        const auto eventSize = netplay::ParseEventSize(clientRecvPtr);
+        if (eventSize < sizeof(BaseEvent)) {
+            return RejectNetplayEvent(this, true, "invalid event size", clientRecvBuffer, offset);
+        }
+        if (clientRecvBuffer.size() < offset + eventSize) {
             break;
         }
         alignas(std::max_align_t) std::byte alignedBuf[std::numeric_limits<decltype(BaseEvent::size)>::max()];
@@ -580,16 +628,17 @@ void LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
                 dialog->ProcessClientEvent(event);
             }
         } else {
-            throw std::runtime_error{std::format("Unknown-type event (type = {}, size = {})", int(event->type), event->size)};
+            return RejectNetplayEvent(this, true, "unknown event type", clientRecvBuffer, offset);
         }
         offset += event->size;
     }
     if (offset > 0) {
         clientRecvBuffer.erase(clientRecvBuffer.begin(), clientRecvBuffer.begin() + offset);
     }
+    return true;
 }
 
-void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
+bool LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
     if (bufSize != 0)
         serverRecvBuffer.append_range(std::views::counted(buf, bufSize));
     auto *waitDialog = NetplayLobbyWidget::GetInstance();
@@ -597,7 +646,11 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
 
     while (serverRecvBuffer.size() >= offset + sizeof(BaseEvent)) {
         const auto *serverRecvPtr = &serverRecvBuffer[offset];
-        if (serverRecvBuffer.size() < offset + netplay::ParseEventSize(serverRecvPtr)) {
+        const auto eventSize = netplay::ParseEventSize(serverRecvPtr);
+        if (eventSize < sizeof(BaseEvent)) {
+            return RejectNetplayEvent(this, false, "invalid event size", serverRecvBuffer, offset);
+        }
+        if (serverRecvBuffer.size() < offset + eventSize) {
             break;
         }
         alignas(std::max_align_t) std::byte alignedBuf[std::numeric_limits<decltype(BaseEvent::size)>::max()];
@@ -716,13 +769,14 @@ void LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
                 mVSResultsMenu->processServerEvent(event);
             }
         } else {
-            throw std::runtime_error{std::format("Unknown-type event (type = {}, size = {})", int(event->type), event->size)};
+            return RejectNetplayEvent(this, false, "unknown event type", serverRecvBuffer, offset);
         }
         offset += event->size;
     }
     if (offset > 0) {
         serverRecvBuffer.erase(serverRecvBuffer.begin(), serverRecvBuffer.begin() + offset);
     }
+    return true;
 }
 
 void LawnApp::FinishLoadGame() {
@@ -791,11 +845,11 @@ void LawnApp::UpdateFrames() {
 
         while (true) {
             ssize_t n = recv(gTcpClientSocket, buf, std::size(buf), MSG_DONTWAIT);
-            if (n > 0) {
-                HandleTcpClientMessage(buf, n);
-            } else if (n == 0) {
-                // 对端关闭连接（收到FIN）
-                LOG_DEBUG("[TCP] 对方关闭连接");
+            if (n > 0 && !HandleTcpClientMessage(buf, n))
+                n = 0; // Reject the whole stream, including bytes still queued in the socket.
+            if (n == 0) {
+                // 收到 FIN 或拒绝协议数据，统一清理连接。
+                LOG_DEBUG("[TCP] closing client connection");
                 if (gTcpClientSocket >= 0) {
                     close(gTcpClientSocket);
                     gTcpClientSocket = -1;
@@ -815,7 +869,7 @@ void LawnApp::UpdateFrames() {
                     LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CONNECTION_CLOSED]", "[RECREATE_ROOM]", "[DIALOG_BUTTON_OK]", "", 3);
                 }
                 break;
-            } else {
+            } else if (n < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     // 没有更多数据可读，正常退出
                     break;
@@ -847,21 +901,17 @@ void LawnApp::UpdateFrames() {
     if (gTcpConnected) {
         // RELAY_GO can hand off complete events without leaving any further
         // bytes in the socket (for example a paused match). Drain those too.
-        if (!serverRecvBuffer.empty())
-            HandleTcpServerMessage(nullptr, 0);
-        if (gIsServerModeSpectator) {
+        const bool protocolError = !serverRecvBuffer.empty() && !HandleTcpServerMessage(nullptr, 0);
+        if (!protocolError)
             netplay::FlushSendBuffer(gTcpServerSocket);
-        } else {
-            netplay::FlushSendBuffer(gTcpServerSocket);
-        }
 
         while (true) {
-            ssize_t n = recv(gTcpServerSocket, buf, std::size(buf), MSG_DONTWAIT);
-            if (n > 0) {
-                HandleTcpServerMessage(buf, n);
-            } else if (n == 0) {
-                // 对端关闭连接（收到FIN）
-                LOG_DEBUG("[TCP] 对方关闭连接");
+            ssize_t n = protocolError ? 0 : recv(gTcpServerSocket, buf, std::size(buf), MSG_DONTWAIT);
+            if (n > 0 && !HandleTcpServerMessage(buf, n))
+                n = 0;
+            if (n == 0) {
+                // 收到 FIN 或拒绝协议数据，统一清理连接。
+                LOG_DEBUG("[TCP] closing server connection");
                 close(gTcpServerSocket);
                 gTcpServerSocket = -1;
                 gTcpConnecting = false;
@@ -879,7 +929,7 @@ void LawnApp::UpdateFrames() {
                     LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CONNECTION_CLOSED]", "[REENTER_ROOM]", "[DIALOG_BUTTON_OK]", "", 3);
                 }
                 break;
-            } else {
+            } else if (n < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     // 没有更多数据可读，正常退出
                     break;
