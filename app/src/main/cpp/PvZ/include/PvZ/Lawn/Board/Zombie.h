@@ -481,6 +481,7 @@ public:
     void BossDestroyFireball();
     int GetDancerFrame();
     void RiseFromGrave(int theCol, int theRow);
+    int GetEatDamage() const;
     void EatPlant(Plant *thePlant);
     void EatZombie(Zombie *theZombie);
     void DetachShield();

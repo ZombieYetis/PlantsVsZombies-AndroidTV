@@ -6062,6 +6062,27 @@ void Zombie::StopEating() {
     UpdateAnimSpeed();
 }
 
+int Zombie::GetEatDamage() const {
+    float aDamageMultiplier = 1;
+    if (mZombieType == ZombieType::ZOMBIE_SUNDAY_EDITION) {
+        if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD) {
+            aDamageMultiplier = 4;
+        } else {
+            aDamageMultiplier = 2;
+        }
+    }
+    if (mZombieType == ZombieType::ZOMBIE_DOG) {
+        aDamageMultiplier = 2;
+    }
+    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && mHasObject) {
+        aDamageMultiplier = 2;
+    }
+    if (mZombieType == ZombieType::ZOMBIE_PIGEON) {
+        aDamageMultiplier = 0.5;
+    }
+    return int(DAMAGE_PER_EAT * aDamageMultiplier);
+}
+
 void Zombie::EatPlant(Plant *thePlant) {
     if (thePlant->mSeedType == SeedType::SEED_RED_STINGER && thePlant->mState == PlantState::STATE_RED_STINGER_DYING) {
         return;
@@ -6170,21 +6191,7 @@ void Zombie::EatPlant(Plant *thePlant) {
         thePlant->mPlantHealth -= DAMAGE_PER_EAT;
     }
 
-    int aDamageMultiplier = 1;
-    if (mZombieType == ZombieType::ZOMBIE_SUNDAY_EDITION) {
-        if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD) {
-            aDamageMultiplier = 4;
-        } else {
-            aDamageMultiplier = 2;
-        }
-    }
-    if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        aDamageMultiplier = 2;
-    }
-    if (mZombieType == ZombieType::ZOMBIE_GRAVEDIGGER && mHasObject) {
-        aDamageMultiplier = 2;
-    }
-    thePlant->mPlantHealth -= DAMAGE_PER_EAT * aDamageMultiplier;
+    thePlant->mPlantHealth -= GetEatDamage();
     thePlant->mRecentlyEatenCountdown = 50;
 
     if (thePlant->mPlantHealth <= 0) {
@@ -6225,17 +6232,7 @@ void Zombie::EatPlant(Plant *thePlant) {
 }
 
 void Zombie::EatZombie(Zombie *theZombie) {
-    theZombie->TakeDamage(DAMAGE_PER_EAT, 9U);
-    if (mZombieType == ZombieType::ZOMBIE_SUNDAY_EDITION) {
-        if (mZombiePhase == ZombiePhase::PHASE_NEWSPAPER_MAD) {
-            theZombie->TakeDamage(DAMAGE_PER_EAT * 3, 9U);
-        } else {
-            theZombie->TakeDamage(DAMAGE_PER_EAT, 9U);
-        }
-    }
-    if (mZombieType == ZombieType::ZOMBIE_DOG) {
-        theZombie->TakeDamage(DAMAGE_PER_EAT, 9U);
-    }
+    theZombie->TakeDamage(GetEatDamage(), 9U);
     StartEating();
     if (theZombie->mBodyHealth <= 0) {
         mApp->PlaySample(SOUND_GULP);
