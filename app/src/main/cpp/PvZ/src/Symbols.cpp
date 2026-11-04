@@ -979,6 +979,7 @@ bool LoadGameMain() {
     AlmanacDialog_GetZombieTypeAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog13GetZombieTypeEi");
     AlmanacDialog_GetZombiePositionAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog17GetZombiePositionE10ZombieTypeRiS1_");
     AlmanacDialog_ZombieIsShownAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog13ZombieIsShownE10ZombieType");
+    AlmanacPlayerDefeatedZombieAddr = GetLibGameMain().GetSymbol("_Z27AlmanacPlayerDefeatedZombie10ZombieType");
     AlmanacDialog_ZombieHasSilhouetteAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog19ZombieHasSilhouetteE10ZombieType");
     AlmanacDialog_UpdateAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog6UpdateEv");
     AlmanacDialog_SetupLayoutPlantsAddr = GetLibGameMain().GetSymbol("_ZN13AlmanacDialog17SetupLayoutPlantsEPN4Sexy8GraphicsE");

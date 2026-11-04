@@ -2774,6 +2774,7 @@ static int GetVSCostClassic(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_PAIL:
         case SeedType::SEED_ZOMBIE_SCREEN_DOOR:
         case SeedType::SEED_ZOMBIE_JACK_IN_THE_BOX:
+        case SeedType::SEED_ZOMBIE_PIGEON_FEEDER:
             return 100;
         case SeedType::SEED_TORCHWOOD:
         case SeedType::SEED_ZOMBIE_BUNGEE:
@@ -2903,6 +2904,7 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_TELEPORTATION:
         case SeedType::SEED_ZOMBIE_CROSSING_GUARD:
         case SeedType::SEED_ZOMBIE_SCIENTIST:
+        case SeedType::SEED_ZOMBIE_PIGEON_FEEDER:
             aCost = 100;
             break;
         case SeedType::SEED_SNOWPEA: // 150 -> 125
@@ -3022,6 +3024,7 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_SCIENTIST:
         case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
         case SeedType::SEED_ZOMBIE_SKELETON:
+        case SeedType::SEED_ZOMBIE_PIGEON_FEEDER:
             return 3000;
         case SeedType::SEED_ZOMBIE_GIGA_GARGANTUAR:
         case SeedType::SEED_ZOMBIE_SUPER_NOVA_GARGANTUAR:
@@ -4496,7 +4499,8 @@ void Plant::UpdateChomper() {
             Zombie *aZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
             bool doBite = false;
             if (aZombie) {
-                if (aZombie->IsGargantuar() || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mZombieType == ZombieType::ZOMBIE_ZOMBLOB_SMALL) {
+                if (aZombie->IsGargantuar() || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mZombieType == ZombieType::ZOMBIE_ZOMBLOB_SMALL
+                    || aZombie->mZombieType == ZombieType::ZOMBIE_PIGEON) {
                     doBite = true;
                 }
             }

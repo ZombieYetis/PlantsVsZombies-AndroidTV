@@ -290,6 +290,12 @@ void LawnApp::LoadAddonImages() {
     addonImages.IMAGE_RED_STINGER_PARTICLES->mNumCols = 6;
     DefinitionLoadImage(&addonImages.IMAGE_ZOMBIE_SKELETON_PARTICLES, "IMAGE_ZOMBIE_SKELETON_PARTICLES", "addonFiles/particles/zombie_skeleton_particles");
     addonImages.IMAGE_ZOMBIE_SKELETON_PARTICLES->mNumCols = 4;
+    DefinitionLoadImage(&addonImages.IMAGE_ZOMBIE_PIGEON_FEEDER_BREADCRUMBS, "IMAGE_ZOMBIE_PIGEON_FEEDER_BREADCRUMBS", "addonFiles/particles/zombie_pigeon_feeder_breadcrumbs");
+    addonImages.IMAGE_ZOMBIE_PIGEON_FEEDER_BREADCRUMBS->mNumCols = 6;
+    addonImages.IMAGE_ZOMBIE_PIGEON_FEEDER_HEAD = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombiePigeonFeederHead");
+    addonImages.IMAGE_ZOMBIE_PIGEON_FEEDER_ARM = GetImageByFileName("addonFiles/particles/ExtendedZombies/ZombiePigeonFeederArm");
+    addonImages.IMAGE_REANIM_ZOMBIE_PIGEON_FEEDER_OUTERARM_UPPER2 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_pigeon_feeder_outerarm_upper2");
+    addonImages.IMAGE_REANIM_ZOMBIE_PIGEON_FEEDER_BREAD2 = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_pigeon_feeder_bread2");
     addonImages.IMAGE_REANIM_ZOMBLOBHEAD_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombiezomblobhead_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_buttered");
     addonImages.IMAGE_REANIM_ZOMBIE_ZOMBLOB_BODY_DYING_BUTTERED = GetImageByFileName("addonFiles/reanim/ExtendedZombies/zombie_zomblob_body_dying_buttered");

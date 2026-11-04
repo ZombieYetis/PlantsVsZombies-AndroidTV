@@ -130,6 +130,8 @@ static ReanimationParams gExtendedReanimationParamArray[] = {
     {ReanimationType::REANIM_ZOMBIE_GRAVEDIGGER, "addonFiles/compiled/reanim/Zombie_gravedigger.reanim", 0},
     {ReanimationType::REANIM_ZOMBIE_SKELETON, "addonFiles/compiled/reanim/Zombie_skeleton.reanim", 0},
     {ReanimationType::REANIM_ZOMBIE_SKELETON_COLORFUL, "addonFiles/compiled/reanim/Zombie_skeleton_colorful.reanim", 0},
+    {ReanimationType::REANIM_ZOMBIE_PIGEON_FEEDER, "addonFiles/compiled/reanim/Zombie_pigeon_feeder.reanim", 0},
+    {ReanimationType::REANIM_ZOMBIE_PIGEON, "addonFiles/compiled/reanim/Zombie_pigeon.reanim", 0},
     {ReanimationType::REANIM_ICEBERG_LETTUCE, "addonFiles/compiled/reanim/IcebergLettuce.reanim", 0},
     {ReanimationType::REANIM_CELERY_STALKER, "addonFiles/compiled/reanim/CeleryStalker.reanim", 0},
     {ReanimationType::REANIM_SPORE_SHROOM, "addonFiles/compiled/reanim/SporeShroom.reanim", 0},

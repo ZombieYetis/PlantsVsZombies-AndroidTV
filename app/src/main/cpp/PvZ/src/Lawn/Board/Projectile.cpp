@@ -494,12 +494,17 @@ Zombie *Projectile::FindCollisionTarget() {
         return nullptr;
 
     Rect aProjectileRect = GetProjectileRect();
+    const bool aIsAntiAirSpike = mProjectileType == ProjectileType::PROJECTILE_SPIKE && TestBit(mDamageRangeFlags, int(DamageRangeFlags::DAMAGES_FLYING));
     Zombie *aBestZombie = nullptr;
     int aMinX = 0;
 
     Zombie *aZombie = nullptr;
     while (mBoard->IterateZombies(aZombie)) {
         if ((aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mRow == mRow) && aZombie->EffectedByDamage((unsigned int)mDamageRangeFlags)) {
+            if (aZombie->mZombieType == ZombieType::ZOMBIE_PIGEON && aZombie->IsFlying() && mMotionType != ProjectileMotion::MOTION_LOBBED && mMotionType != ProjectileMotion::MOTION_HOMING
+                && !aIsAntiAirSpike) {
+                continue;
+            }
             if (aZombie->mZombiePhase == ZombiePhase::PHASE_SNORKEL_WALKING_IN_POOL && mPosZ >= 45.0f) {
                 continue;
             }
@@ -1129,7 +1134,7 @@ void Projectile::PlayImpactSound(Zombie *theZombie) {
 }
 
 void Projectile::DoImpact(Zombie *theZombie) {
-    bool aIsPiercingSpike = theZombie != nullptr && IsPiercingSpike(this) && !theZombie->IsFlying();
+    bool aIsPiercingSpike = theZombie != nullptr && IsPiercingSpike(this);
     if (aIsPiercingSpike && HasHitZombie(this, theZombie)) {
         return;
     }
@@ -1205,22 +1210,23 @@ void Projectile::DoImpact(Zombie *theZombie) {
     } else if (theZombie) {
         unsigned int aDamageFlags = GetDamageFlags(theZombie);
         if (mApp->IsVSMode() && mProjectileType == ProjectileType::PROJECTILE_SPIKE) {
-            if (theZombie->IsFlying()) {
-                theZombie->TakeDamage(theZombie->mFlyingHealth, aDamageFlags);
-                Die();
-                return;
-            }
-
-            if (Challenge::msVSClassicMode) {
-                theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
+            if (!aIsPiercingSpike) {
+                const int aDamage = theZombie->IsFlying() && theZombie->mZombieType != ZombieType::ZOMBIE_PIGEON ? theZombie->mFlyingHealth : GetProjectileDef().mDamage;
+                theZombie->TakeDamage(aDamage, aDamageFlags);
                 Die();
                 return;
             }
 
             int aHitIndex = mPierceHitCount;
             int aDamage = SPIKE_PIERCE_DAMAGE[aHitIndex];
-            if (theZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR || theZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER || theZombie->mShieldType == ShieldType::SHIELDTYPE_TRASHCAN
-                || theZombie->mZombieType == ZombieType::ZOMBIE_ZAMBONI) {
+            if (theZombie->IsFlying()) {
+                // 对空尖刺同样消耗一次穿透；气球直接扎破，鸽子按穿透次数递减伤害。
+                if (theZombie->mZombieType != ZombieType::ZOMBIE_PIGEON) {
+                    aDamage = theZombie->mFlyingHealth;
+                }
+                ++mPierceHitCount;
+            } else if (theZombie->mShieldType == ShieldType::SHIELDTYPE_DOOR || theZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER || theZombie->mShieldType == ShieldType::SHIELDTYPE_TRASHCAN
+                       || theZombie->mZombieType == ZombieType::ZOMBIE_ZAMBONI) {
                 aDamage = 0;
                 for (int i = aHitIndex; i < MAX_PIERCE_HIT_COUNT; ++i) {
                     aDamage += SPIKE_PIERCE_DAMAGE[i];
@@ -1517,6 +1523,9 @@ Zombie *Projectile::FindCollisionMindControlledTarget() {
     Rect aProjectileRect = GetProjectileRect();
     while (mBoard->IterateZombies(aZombie)) {
         if (!aZombie->mDead && aZombie->mRow == mRow && aZombie->mMindControlled) {
+            if (aZombie->mZombieType == ZombieType::ZOMBIE_PIGEON && aZombie->IsFlying() && mMotionType != ProjectileMotion::MOTION_LOBBED) {
+                continue;
+            }
             Rect aZombieRect = aZombie->GetZombieRect();
             if (GetRectOverlap(aProjectileRect, aZombieRect) >= 0 && (aBestZombie == nullptr || aZombie->mX > aMinX)) {
                 aBestZombie = aZombie;

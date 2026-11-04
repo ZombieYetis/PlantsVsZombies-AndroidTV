@@ -311,6 +311,7 @@ void InitHookFunction() {
 
 
     homura::HookFunc(AlmanacDialog_AddedToManagerAddr, &AlmanacDialog::AddedToManager, &old_AlmanacDialog_AddedToManager);
+    homura::HookFunc(AlmanacPlayerDefeatedZombieAddr, &AlmanacPlayerDefeatedZombie, nullptr);
     homura::HookFunc(AlmanacDialog_RemovedFromManagerAddr, &AlmanacDialog::RemovedFromManager, &old_AlmanacDialog_RemovedFromManager);
     homura::HookFunc(AlmanacDialog_AlmanacDialogAddr, &AlmanacDialog::_constructor, &old_AlmanacDialog_AlmanacDialog);
     homura::HookFunc(AlmanacDialog_SetPageAddr, &AlmanacDialog::SetPage, &old_AlmanacDialog_SetPage);

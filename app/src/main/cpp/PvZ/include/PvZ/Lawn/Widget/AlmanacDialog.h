@@ -131,6 +131,8 @@ protected:
     void _destructor();
 };
 
+void AlmanacPlayerDefeatedZombie(ZombieType theZombieType);
+
 
 inline void (*old_AlmanacDialog_AlmanacDialog)(AlmanacDialog *almanacDialog, LawnApp *lawnApp);
 

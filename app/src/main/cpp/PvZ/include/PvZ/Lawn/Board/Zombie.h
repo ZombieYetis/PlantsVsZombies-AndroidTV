@@ -452,6 +452,11 @@ public:
     void UnbindRealatedZombie();
     void LaunchTrafficCone(Zombie *theTarget);
     void UpdateZombieGraveDigger();
+    void UpdatePigeonFeeder();
+    void SummonPigeons();
+    void PlaceSummonedPigeon(float theX, bool theMindControlled, bool thePlayArrivalSound);
+    void UpdatePigeon();
+    void SetPigeonPhase(ZombiePhase thePhase);
     void SetSkeletonVariant(bool theColorful);
     GridItem *FindGraveDiggerTarget();
     bool IsValidGraveDiggerTarget(GridItem *theTarget) const;

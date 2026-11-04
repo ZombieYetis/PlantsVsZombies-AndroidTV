@@ -3578,6 +3578,22 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
             }
         } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_PIGEON_STATE: {
+            const auto *aState = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
+                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
+                aZombie->mPosX = aState->data4.f32;
+                aZombie->SetPigeonPhase(ZombiePhase(aState->data2));
+            }
+        } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_PIGEON_SUMMON: {
+            const auto *aSummon = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aSummon->data1, aZombieID)) {
+                mZombies.DataArrayGet(aZombieID)->PlaceSummonedPigeon(aSummon->data4.f32, aSummon->data2 != 0, aSummon->data3 != 0);
+            }
+        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE: {
             const auto *aState = static_cast<const U16U16_Event *>(event);
             uint16_t aZombieID = 0;

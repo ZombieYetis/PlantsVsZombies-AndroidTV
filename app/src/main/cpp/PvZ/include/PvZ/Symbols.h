@@ -959,6 +959,7 @@ inline void *Sexy_Dialog_ButtonDepressAddr;
 
 
 inline void *AlmanacDialog_AddedToManagerAddr;
+inline void *AlmanacPlayerDefeatedZombieAddr;
 inline void *AlmanacDialog_RemovedFromManagerAddr;
 inline void *AlmanacDialog_AlmanacDialogAddr;
 inline void *AlmanacDialog_SetPageAddr;

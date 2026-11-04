@@ -30,6 +30,7 @@ namespace {
 constexpr std::array<ParticleParams, EXTENDED_NUM_PARTICLES - NUM_PARTICLES> gExtendedParticleParamArray = {{
     {PARTICLE_RED_STINGER_SPLAT, "addonFiles/compiled/particles/RedStingerSplat.xml"},
     {PARTICLE_SKELETON_PILE_BREAK, "addonFiles/compiled/particles/SkeletonPileBreak.xml"},
+    {PARTICLE_PIGEON_FEEDER_BREADCRUMBS, "addonFiles/compiled/particles/PigeonFeederBreadcrumbs.xml"},
 }};
 
 static_assert(NUM_PARTICLES == 108);

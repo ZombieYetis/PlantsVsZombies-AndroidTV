@@ -38,6 +38,13 @@
 
 using namespace Sexy;
 
+void AlmanacPlayerDefeatedZombie(ZombieType theZombieType) {
+    // 原版记录数组只有 34 项，扩展僵尸写入会破坏相邻的全局数据。
+    if (theZombieType >= ZombieType::ZOMBIE_NORMAL && theZombieType < ZombieType::NUM_ZOMBIE_TYPES) {
+        gZombieDefeated[theZombieType] = true;
+    }
+}
+
 namespace {
 
 GameButton *gAlmanacBackButton;
