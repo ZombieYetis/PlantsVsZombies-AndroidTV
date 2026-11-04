@@ -2280,7 +2280,7 @@ extern FoleyParams (&gLawnFoleyParamArray)[FoleyType::NUM_FOLEY];
 extern FoleyParams *&gFoleyParamArray;
 extern int &gFoleyParamArraySize;
 extern LawnApp *&gLawnApp;
-extern bool (&gZombieDefeated)[NUM_ZOMBIE_TYPES];
+extern bool (&gZombieDefeated)[ZombieType::NUM_ZOMBIE_TYPES];
 extern TodStringListFormat (&gLawnStringFormats)[14];
 extern ReanimationParams (&gLawnReanimationArray)[ReanimationType::NUM_REANIMS];
 extern ReanimatorDefinition *&gReanimatorDefArray;
