@@ -74,6 +74,8 @@ public:
 
     void AddedToManager(WidgetManager *theWidgetManager);
     void RemovedFromManager(WidgetManager *theWidgetManager);
+    void SetLinesFont(Font *font);
+    void SetHeaderFont(Font *font);
 
 protected:
     Dialog() = default;
@@ -85,6 +87,8 @@ protected:
 inline void (*old_Sexy_Dialog_AddedToManager)(Sexy::Dialog *, Sexy::WidgetManager *);
 
 inline void (*old_Sexy_Dialog_RemovedFromManager)(Sexy::Dialog *, Sexy::WidgetManager *);
+inline void (*old_Sexy_Dialog_SetLinesFont)(Sexy::Dialog *, Sexy::Font *);
+inline void (*old_Sexy_Dialog_SetHeaderFont)(Sexy::Dialog *, Sexy::Font *);
 
 inline void CenterDialog(Sexy::Dialog *theDialog, int theWidth, int theHeight) {
     reinterpret_cast<void (*)(Sexy::Dialog *, int, int)>(CenterDialogAddr)(theDialog, theWidth, theHeight);

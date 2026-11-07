@@ -586,6 +586,8 @@ void InitHookFunction() {
 
     homura::HookFunc(Sexy_Dialog_AddedToManagerWidgetManagerAddr, &Sexy::Dialog::AddedToManager, &old_Sexy_Dialog_AddedToManager);
     homura::HookFunc(Sexy_Dialog_RemovedFromManagerAddr, &Sexy::Dialog::RemovedFromManager, &old_Sexy_Dialog_RemovedFromManager);
+    homura::HookFunc(Sexy_Dialog_SetLinesFontAddr, &Sexy::Dialog::SetLinesFont, &old_Sexy_Dialog_SetLinesFont);
+    homura::HookFunc(Sexy_Dialog_SetHeaderFontAddr, &Sexy::Dialog::SetHeaderFont, &old_Sexy_Dialog_SetHeaderFont);
 
 
     homura::HookFunc(SeedBank_DrawAddr, &SeedBank::Draw, &old_SeedBank_Draw);
@@ -763,6 +765,7 @@ void InitHookFunction() {
     homura::HookFunc(DefinitionGetCompiledFilePathFromXMLFilePathAddr, &DefinitionGetCompiledFilePathFromXMLFilePath, &old_DefinitionGetCompiledFilePathFromXMLFilePath);
     homura::HookFunc(SaveGameContext_SyncReanimationDefAddr, &SaveGameContext::SyncReanimationDef, nullptr);
     homura::HookFunc(SaveGameContext_SyncParticleDefAddr, &SaveGameContext::SyncParticleDef, nullptr);
+    netplay::RegisterSnapshotDiagnostics();
     homura::HookFunc(SyncReanimationAddr, &SyncReanimation, nullptr);
     homura::HookFunc(PoolEffect_PoolEffectDrawAddr, &PoolEffect::PoolEffectDraw, nullptr);
     homura::HookFunc(Sexy_MemoryImage_ClearRectAddr, &Sexy::MemoryImage::ClearRect, nullptr);

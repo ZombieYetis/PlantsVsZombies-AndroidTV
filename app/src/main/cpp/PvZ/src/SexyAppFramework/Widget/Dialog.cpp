@@ -18,8 +18,26 @@
  */
 
 #include "PvZ/SexyAppFramework/Widget/Dialog.h"
+#include "PvZ/GlobalVariable.h"
+#include "PvZ/SexyAppFramework/Graphics/Font.h"
+
+#include <cstring>
 
 using namespace Sexy;
+
+void Dialog::SetLinesFont(Font *font) {
+    // Choose before the native dialog measures/wraps its text. The native
+    // setter duplicates the font and also updates TextLayout's font.
+    if (addonFonts.JN_BOBO_HEI20 && std::strstr(mDialogLines->c_str(), "局"))
+        font = addonFonts.JN_BOBO_HEI20;
+    old_Sexy_Dialog_SetLinesFont(this, font);
+}
+
+void Dialog::SetHeaderFont(Font *font) {
+    if (addonFonts.JN_BOBO_HEI24 && std::strstr(mDialogHeader->c_str(), "局"))
+        font = addonFonts.JN_BOBO_HEI24;
+    old_Sexy_Dialog_SetHeaderFont(this, font);
+}
 
 void Dialog::AddedToManager(WidgetManager *theWidgetManager) {
     old_Sexy_Dialog_AddedToManager(this, theWidgetManager);

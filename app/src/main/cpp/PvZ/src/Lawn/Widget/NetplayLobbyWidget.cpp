@@ -645,7 +645,12 @@ void NetplayLobbyWidget::Draw(Graphics *g) {
             status = TodStringTranslate(gScannedServerCount > 0 ? "[AVAILABLE_ROOMS]" : "[SCANNING_ROOMS]");
         }
         const bool roomExited = status == TodStringTranslate("[STATUS_ROOM_EXITED]");
-        TodDrawString(g, status, kRightPanelX + kRightPanelWidth / 2, roomExited ? kRoomExitedStatusY : kLobbyStatusY, FONT_HOUSEOFTERROR16, Color(235, 220, 185), DS_ALIGN_CENTER);
+        Font *statusFont = addonFonts.JN_BOBO_HEI20 && std::strstr(status.c_str(), "局") ? static_cast<Font *>(addonFonts.JN_BOBO_HEI20) : FONT_HOUSEOFTERROR16;
+        if (statusFont == addonFonts.JN_BOBO_HEI20 && statusFont->GetVTable()->StringWidth(statusFont, status) > kRightPanelWidth - 40) {
+            TodDrawStringWrapped(g, status, Rect(kRightPanelX + 20, kLobbyStatusY - 20, kRightPanelWidth - 40, 60), statusFont, Color(235, 220, 185), DS_ALIGN_CENTER, false);
+        } else {
+            TodDrawString(g, status, kRightPanelX + kRightPanelWidth / 2, roomExited ? kRoomExitedStatusY : kLobbyStatusY, statusFont, Color(235, 220, 185), DS_ALIGN_CENTER);
+        }
     }
 }
 

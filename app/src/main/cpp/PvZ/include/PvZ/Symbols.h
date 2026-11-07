@@ -954,6 +954,8 @@ inline void *VSResultsMenu_ClearPlayerRecordsAddr;
 
 inline void *Sexy_Dialog_AddedToManagerWidgetManagerAddr;
 inline void *Sexy_Dialog_RemovedFromManagerAddr;
+inline void *Sexy_Dialog_SetLinesFontAddr;
+inline void *Sexy_Dialog_SetHeaderFontAddr;
 inline void *Sexy_Dialog_WaitForResultAddr;
 inline void *Sexy_Dialog_ButtonDepressAddr;
 

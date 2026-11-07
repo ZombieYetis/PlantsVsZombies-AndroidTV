@@ -335,6 +335,7 @@ inline void (*old_ReanimatorLoadDefinitions)(ReanimationParams *theReanimationPa
 inline pvzstl::string (*old_DefinitionGetCompiledFilePathFromXMLFilePath)(const pvzstl::string &defPathString);
 
 void ReanimatorLoadDefinitions(ReanimationParams *theReanimationParamArray, int theReanimationParamArraySize);
+const char *GetReanimationFileName(ReanimationType type);
 
 pvzstl::string DefinitionGetCompiledFilePathFromXMLFilePath(const pvzstl::string &defPathString);
 

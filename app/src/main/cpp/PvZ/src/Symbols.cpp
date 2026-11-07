@@ -955,6 +955,8 @@ bool LoadGameMain() {
 
     Sexy_Dialog_AddedToManagerWidgetManagerAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog14AddedToManagerEPNS_13WidgetManagerE");
     Sexy_Dialog_RemovedFromManagerAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog18RemovedFromManagerEPNS_13WidgetManagerE");
+    Sexy_Dialog_SetLinesFontAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog12SetLinesFontEPNS_4FontE");
+    Sexy_Dialog_SetHeaderFontAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog13SetHeaderFontEPNS_4FontE");
     Sexy_Dialog_WaitForResultAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog13WaitForResultEb");
     Sexy_Dialog_ButtonDepressAddr = GetLibGameMain().GetSymbol("_ZN4Sexy6Dialog13ButtonDepressEi");
 

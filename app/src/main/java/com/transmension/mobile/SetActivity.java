@@ -1409,27 +1409,16 @@ public class SetActivity extends Activity {
 
         if (requestCode == REQUEST_CODE_EXPORT_LOG && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
 
-            String[] cmd = {"logcat", "-d", "-s", "pvztv"};
-
-            try (InputStream in = Runtime.getRuntime().exec(cmd).getInputStream();
-
-                 OutputStream out = getContentResolver().openOutputStream(data.getData())
-            ) {
-                if (out == null) {
-                    throw new IOException();
+            Uri destination = data.getData();
+            // Reading a blocked/denied logcat must not block the settings UI.
+            new Thread(() -> {
+                try (OutputStream out = getContentResolver().openOutputStream(destination)) {
+                    if (out == null) throw new IOException();
+                    LogDiagnostics.export(getApplicationContext(), out);
+                } catch (Exception e) {
+                    runOnUiThread(() -> Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show());
                 }
-
-                byte[] buffer = new byte[8192];
-                int length;
-
-                while ((length = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, length);
-                }
-
-                out.flush();
-            } catch (Exception e) {
-                Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
+            }, "pvztv-log-export").start();
         }
 
         if (requestCode == REQUEST_CODE_IMPORT_LEVEL_CONFIG && resultCode == Activity.RESULT_OK) {

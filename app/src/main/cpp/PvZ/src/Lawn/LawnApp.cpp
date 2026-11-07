@@ -676,6 +676,8 @@ bool LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
             continue;
         }
         if (netplay::HandleSpectatorSnapshotEvent(this, event, true)) {
+            if (netplay::HasSpectatorSnapshotFailure())
+                return false; // discard the rest of this stream before gameplay dispatch
             auto catchup = netplay::TakeSpectatorCatchupEvents();
             offset += event->size;
             serverRecvBuffer.insert(serverRecvBuffer.begin() + offset, catchup.begin(), catchup.end());
@@ -915,6 +917,8 @@ void LawnApp::UpdateFrames() {
             ssize_t n = protocolError ? 0 : recv(gTcpServerSocket, buf, std::size(buf), MSG_DONTWAIT);
             if (n > 0 && !HandleTcpServerMessage(buf, n))
                 n = 0;
+            if (netplay::RecoverSpectatorSnapshotFailure(this))
+                return;
             if (n == 0) {
                 // 收到 FIN 或拒绝协议数据，统一清理连接。
                 LOG_DEBUG("[TCP] closing server connection");
@@ -975,6 +979,8 @@ void LawnApp::UpdateFrames() {
     netplay::reconnect::Update(this);
     netplay::UpdateSaveGameTransfer(this);
     netplay::UpdateSpectatorSnapshot(this);
+    if (netplay::RecoverSpectatorSnapshotFailure(this))
+        return;
     int updateCount = 0;
 
     if (gSlowMo) {

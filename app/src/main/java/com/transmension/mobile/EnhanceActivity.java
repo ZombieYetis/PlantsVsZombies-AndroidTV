@@ -151,6 +151,40 @@ public class EnhanceActivity extends MainActivity {
 
     private static native void nativeOnReplayExportFinished(boolean success, String message);
 
+    // Called by the native snapshot diagnostics on the game thread, before returning to the lobby.
+    public boolean saveSnapshotFailure(String report) {
+        return LogDiagnostics.saveSnapshotFailure(this, report);
+    }
+
+    // JNI: read the APK baseline, independently of installed resource packs.
+    public byte[] readOriginalAnimationLayout(String filename) {
+        String path = filename.replace('\\', '/');
+        if (path.startsWith("/") || path.contains("..")) return null;
+        if (!path.startsWith("compiled/") && !path.startsWith("addonFiles/")) path = "compiled/" + path;
+        path = "files/" + path + ".compiled";
+        try {
+            // Native resource lookup is case-insensitive; AssetManager is not.
+            int slash = path.lastIndexOf('/');
+            String directory = path.substring(0, slash);
+            String basename = path.substring(slash + 1);
+            String[] files = getAssets().list(directory);
+            if (files != null) {
+                for (String file : files) {
+                    if (file.equalsIgnoreCase(basename)) {
+                        path = directory + "/" + file;
+                        break;
+                    }
+                }
+            }
+            try (InputStream input = getAssets().open(path)) {
+                return AnimationLayoutReader.read(input);
+            }
+        } catch (IOException | RuntimeException error) {
+            Log.e("pvztv", "[SNAPSHOT] cannot read bundled animation layout: " + path, error);
+            return null;
+        }
+    }
+
 
     private <T> T callOnUiThreadBlocking(Callable<T> operation, T failureValue) {
         if (Looper.myLooper() == Looper.getMainLooper()) {

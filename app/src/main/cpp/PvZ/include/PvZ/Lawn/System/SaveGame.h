@@ -107,6 +107,9 @@ inline void GetSavedGameName(const pvzstl::string &name, GameMode theGameMode, i
 void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameContext &theContext);
 
 namespace netplay {
+void RegisterSnapshotDiagnostics();
+bool HasSpectatorSnapshotFailure() noexcept;
+bool RecoverSpectatorSnapshotFailure(LawnApp *app);
 // State is external to LawnApp/Board to preserve the native object layouts.
 bool CanCaptureReconnectSnapshot(LawnApp *app);
 bool CaptureReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data);

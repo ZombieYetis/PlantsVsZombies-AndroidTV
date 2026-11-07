@@ -150,6 +150,16 @@ static ReanimationParams gExtendedReanimationParamArray[] = {
     {ReanimationType::REANIM_APPLE_CLOCK, "addonFiles/compiled/reanim/apple_clock.reanim", 0},
 };
 
+const char *GetReanimationFileName(ReanimationType type) {
+    for (const auto &params : gLawnReanimationArray)
+        if (params.mReanimationType == type)
+            return params.mReanimFileName;
+    for (const auto &params : gExtendedReanimationParamArray)
+        if (params.mReanimationType == type)
+            return params.mReanimFileName;
+    return nullptr;
+}
+
 void ReanimatorLoadDefinitions(ReanimationParams *theReanimationParamArray, int theReanimationParamArraySize) {
     if (theReanimationParamArraySize == 0) {
         old_ReanimatorLoadDefinitions(theReanimationParamArray, theReanimationParamArraySize);

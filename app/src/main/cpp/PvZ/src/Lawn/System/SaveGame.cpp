@@ -18,7 +18,10 @@
  */
 
 #include "PvZ/Lawn/System/SaveGame.h"
+#include "Homura/HookUtils.h"
 #include "Homura/Logger.h"
+#include "PvZ/Android/Native/BridgeApp.h"
+#include "PvZ/Android/Native/NativeApp.h"
 #include "PvZ/GlobalVariable.h"
 #include "PvZ/Lawn/Board/Board.h"
 #include "PvZ/Lawn/Board/Challenge.h"
@@ -30,7 +33,10 @@
 #include "PvZ/Lawn/GamepadControls.h"
 #include "PvZ/Lawn/LawnApp.h"
 #include "PvZ/Lawn/System/Music.h"
+#include "PvZ/Lawn/System/SnapshotAnimationWire.h"
+#include "PvZ/Lawn/System/SnapshotReanimation.h"
 #include "PvZ/Lawn/System/SpectatorWidgetSync.h"
+#include "PvZ/Lawn/Widget/ChallengeScreen.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
 #include "PvZ/Lawn/Widget/NetplayLobbyWidget.h"
 #include "PvZ/Lawn/Widget/SeedChooserScreen.h"
@@ -44,9 +50,11 @@
 #include "PvZ/SexyAppFramework/Widget/ImageWidget.h"
 #include "PvZ/SexyAppFramework/Widget/WidgetManager.h"
 #include "PvZ/TodLib/Common/TodStringFile.h"
+#include "PvZ/TodLib/Effect/EffectSystem.h"
 #include "PvZ/TodLib/Effect/Reanimator.h"
 #include "PvZ/TodLib/Effect/TodParticle.h"
 
+#include <dlfcn.h>
 #include <sys/socket.h>
 #include <cstring>
 #include <algorithm>
@@ -56,6 +64,214 @@
 #include <utility>
 
 namespace {
+const char *gSpectatorSnapshotFailure = nullptr;
+const char *gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_LOAD_FAILED]";
+// Diagnostic state is external: never change native layouts or the save format.
+struct SnapshotReadBlock {
+    const char *operation = "none";
+    const char *stage = "none";
+    unsigned index = 0;
+    int bitOffset = 0;
+    int expected = 0;
+    int actual = -1;
+    int available = 0;
+    uint32_t word = 0;
+    bool hasWord = false;
+    uintptr_t caller = 0;
+    int reanimationType = -1;
+    int trackCount = -1;
+};
+
+struct SnapshotReadDiagnostics {
+    SaveGameContext *context;
+    bool allowTrackRemap = false;
+    const netplay::snapshot::AnimationLayouts *sourceLayouts = nullptr;
+    netplay::snapshot::AnimationLayouts localLayouts;
+    netplay::snapshot::CosmeticSnapshotState cosmetics;
+    const char *stage = "scene";
+    bool reported = false;
+    unsigned blocks = 0;
+    const SnapshotReadBlock *bytesBlock = nullptr;
+    SnapshotReadBlock last;
+    int reanimationType = -1;
+    int trackCount = -1;
+};
+thread_local SnapshotReadDiagnostics *gSnapshotReadDiagnostics = nullptr;
+
+struct SnapshotReadScope {
+    SnapshotReadDiagnostics state;
+    SnapshotReadDiagnostics *previous;
+    explicit SnapshotReadScope(SaveGameContext &context, bool spectator, const netplay::snapshot::AnimationLayouts *layouts)
+        : state{.context = &context, .allowTrackRemap = spectator, .sourceLayouts = layouts}
+        , previous(gSnapshotReadDiagnostics) {
+        gSnapshotReadDiagnostics = &state;
+    }
+    ~SnapshotReadScope() {
+        gSnapshotReadDiagnostics = previous;
+    }
+};
+
+struct SnapshotReadStage {
+    SnapshotReadDiagnostics *diagnostics;
+    const char *previous;
+    int previousReanimationType;
+    int previousTrackCount;
+    SnapshotReadStage(SaveGameContext &context, const char *stage)
+        : diagnostics(gSnapshotReadDiagnostics && gSnapshotReadDiagnostics->context == &context ? gSnapshotReadDiagnostics : nullptr)
+        , previous(diagnostics ? diagnostics->stage : nullptr)
+        , previousReanimationType(diagnostics ? diagnostics->reanimationType : -1)
+        , previousTrackCount(diagnostics ? diagnostics->trackCount : -1) {
+        if (diagnostics) {
+            diagnostics->stage = stage;
+            diagnostics->reanimationType = diagnostics->trackCount = -1;
+        }
+    }
+    ~SnapshotReadStage() {
+        if (diagnostics) {
+            diagnostics->stage = previous;
+            diagnostics->reanimationType = previousReanimationType;
+            diagnostics->trackCount = previousTrackCount;
+        }
+    }
+};
+
+SnapshotReadBlock DescribeSnapshotRead(SnapshotReadDiagnostics &diagnostics, const char *operation, int expected, bool lengthPrefixed, void *caller) {
+    const auto &buffer = diagnostics.context->mBuffer;
+    SnapshotReadBlock block;
+    block.operation = operation;
+    block.stage = diagnostics.stage;
+    block.index = ++diagnostics.blocks;
+    block.bitOffset = buffer.mReadBitPos;
+    block.expected = expected;
+    block.caller = reinterpret_cast<uintptr_t>(caller) & ~uintptr_t{1};
+    block.reanimationType = diagnostics.reanimationType;
+    block.trackCount = diagnostics.trackCount;
+    const auto validBits = std::min<int64_t>(buffer.mDataBitSize, static_cast<int64_t>(buffer.mData.size()) * 8);
+    const auto remainingBits = std::max<int64_t>(0, validBits - std::max(0, block.bitOffset));
+    block.available = static_cast<int>(remainingBits / 8);
+    // Peek without moving the cursor or calling the native reader. Also handle
+    // non-byte-aligned positions, so diagnostics cannot introduce an over-read.
+    block.hasWord = block.bitOffset >= 0 && remainingBits >= 32;
+    if (block.hasWord) {
+        for (unsigned bit = 0; bit < 32; ++bit) {
+            const auto pos = static_cast<size_t>(block.bitOffset) + bit;
+            block.word |= uint32_t((buffer.mData[pos / 8] >> (pos % 8)) & 1) << bit;
+        }
+    }
+    block.actual = lengthPrefixed ? (block.hasWord ? static_cast<int32_t>(block.word) : -1) : std::min(expected, block.available);
+    if (lengthPrefixed)
+        block.available = std::max(0, block.available - 4);
+    return block;
+}
+
+void PersistSnapshotReadFailure(const std::string &report) {
+    auto *bridge = Native::BridgeApp::getSingleton();
+    if (!bridge || !bridge->mNativeApp)
+        return;
+    auto *env = bridge->getJNIEnv();
+    auto activity = bridge->mNativeApp->getActivity();
+    // Do not disturb an exception belonging to the caller.
+    if (!env || !activity || env->ExceptionCheck())
+        return;
+    if (env->PushLocalFrame(3) < 0) {
+        env->ExceptionClear();
+        LOG_ERROR("[SNAPSHOT_LOCAL] cannot allocate JNI references");
+        return;
+    }
+    jboolean saved = JNI_FALSE;
+    do {
+        auto activityClass = env->GetObjectClass(activity);
+        if (!activityClass || env->ExceptionCheck())
+            break;
+        auto method = env->GetMethodID(activityClass, "saveSnapshotFailure", "(Ljava/lang/String;)Z");
+        if (!method || env->ExceptionCheck())
+            break;
+        auto text = env->NewStringUTF(report.c_str());
+        if (!text || env->ExceptionCheck())
+            break;
+        saved = env->CallBooleanMethod(activity, method, text);
+    } while (false);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        saved = JNI_FALSE;
+    }
+    env->PopLocalFrame(nullptr);
+    if (!saved)
+        LOG_ERROR("[SNAPSHOT_LOCAL] could not persist first failure");
+}
+
+void ReportSnapshotReadFailure(SaveGameContext *context, const char *reason) {
+    auto *diagnostics = gSnapshotReadDiagnostics;
+    if (!diagnostics || diagnostics->context != context || diagnostics->reported)
+        return;
+    diagnostics->reported = true;
+    const auto &block = diagnostics->last;
+    if (std::strcmp(reason, "block_length_mismatch") == 0 && std::strcmp(block.stage, "reanimation") == 0)
+        gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_RESOURCE_MISMATCH]";
+    const auto detail = std::format("[SNAPSHOT] first_failure reason={} stage={} block={} op={} offset_bytes={} offset_bits={} expected_bytes={} actual_bytes={} available_bytes={} prefix_present={} "
+                                    "wire_word=0x{:08X} read_after_bits={} total_bits={} reanim_type={} tracks={}",
+                                    reason,
+                                    block.stage,
+                                    block.index,
+                                    block.operation,
+                                    block.bitOffset / 8,
+                                    block.bitOffset,
+                                    block.expected,
+                                    block.actual,
+                                    block.available,
+                                    block.hasWord,
+                                    block.word,
+                                    context->mBuffer.mReadBitPos,
+                                    context->mBuffer.mDataBitSize,
+                                    block.reanimationType,
+                                    block.trackCount);
+    Dl_info module{};
+    dladdr(reinterpret_cast<void *>(block.caller), &module);
+    const auto caller = std::format("[SNAPSHOT] first_failure caller=0x{:X} module={} module_offset=0x{:X} symbol={}",
+                                    block.caller,
+                                    module.dli_fname ? module.dli_fname : "?",
+                                    module.dli_fbase ? block.caller - reinterpret_cast<uintptr_t>(module.dli_fbase) : 0,
+                                    module.dli_sname ? module.dli_sname : "?");
+    // Persist independently of logcat filtering; only the first failure per load reaches here.
+    PersistSnapshotReadFailure(std::format("[SNAPSHOT] base_version={} netplay_version={}\n{}\n{}", PVZ_VERSION, NETPLAY_VERSION, detail, caller));
+    LOG_ERROR("{}", detail);
+    LOG_ERROR("{}", caller);
+}
+
+// Preserve the native return register as well as all reader side effects.
+int (*gOriginalSnapshotSyncInt)(SaveGameContext *, int &);
+int (*gOriginalSnapshotSyncBytes)(SaveGameContext *, void *, int);
+
+[[gnu::noinline]] int DiagnoseSnapshotSyncInt(SaveGameContext *context, int &value) {
+    auto *diagnostics = gSnapshotReadDiagnostics;
+    if (diagnostics && diagnostics->context == context && context->mReading && context->mFailed && !diagnostics->bytesBlock)
+        ReportSnapshotReadFailure(context, "native_validation_after_previous_block");
+    if (!diagnostics || diagnostics->context != context || !context->mReading || context->mFailed || diagnostics->reported || diagnostics->bytesBlock)
+        return gOriginalSnapshotSyncInt(context, value);
+    diagnostics->last = DescribeSnapshotRead(*diagnostics, "SyncInt", sizeof(value), false, __builtin_return_address(0));
+    const int result = gOriginalSnapshotSyncInt(context, value);
+    if (context->mFailed)
+        ReportSnapshotReadFailure(context, "integer_read");
+    return result;
+}
+
+[[gnu::noinline]] int DiagnoseSnapshotSyncBytes(SaveGameContext *context, void *destination, int size) {
+    auto *diagnostics = gSnapshotReadDiagnostics;
+    if (diagnostics && diagnostics->context == context && context->mReading && context->mFailed)
+        ReportSnapshotReadFailure(context, "native_validation_after_previous_block");
+    if (!diagnostics || diagnostics->context != context || !context->mReading || context->mFailed || diagnostics->reported)
+        return gOriginalSnapshotSyncBytes(context, destination, size);
+    diagnostics->last = DescribeSnapshotRead(*diagnostics, "SyncBytes", size, true, __builtin_return_address(0));
+    // SyncBytes internally calls SyncInt for its length prefix. Report that as
+    // part of this block rather than losing the payload's expected length.
+    diagnostics->bytesBlock = &diagnostics->last;
+    const int result = gOriginalSnapshotSyncBytes(context, destination, size);
+    diagnostics->bytesBlock = nullptr;
+    if (context->mFailed)
+        ReportSnapshotReadFailure(context, !diagnostics->last.hasWord ? "length_prefix_truncated" : diagnostics->last.actual != size ? "block_length_mismatch" : "block_payload_truncated");
+    return result;
+}
+
 enum class OnlineLoadState { Idle, AwaitingHost, Sending, Receiving, AwaitingReady, AwaitingResume };
 OnlineLoadState gOnlineLoadState = OnlineLoadState::Idle;
 bool gApplyingOnlineSaveGame = false;
@@ -135,6 +351,13 @@ bool gSpectatorSnapshotRequested = false;
 bool gReceivingSpectatorSnapshot = false;
 bool gSpectatorDraftProgressPending = false;
 std::vector<unsigned char> gSpectatorSnapshotOut, gSpectatorSnapshotIn;
+std::vector<unsigned char> gSpectatorLayoutsOut;
+std::size_t gSpectatorLayoutsOffset = 0;
+uint32_t gSpectatorLayoutsHash = 0;
+netplay::snapshot::LayoutTailReceiver gSpectatorLayoutReceiver;
+netplay::snapshot::AnimationLayouts gSpectatorLayoutsIn;
+thread_local netplay::snapshot::AnimationLayouts *gSnapshotLayoutCapture = nullptr;
+thread_local bool *gSnapshotLayoutCaptureValid = nullptr;
 std::vector<std::byte> gSpectatorCatchup, gSpectatorCatchupReady;
 std::size_t gSpectatorSnapshotOffset = 0;
 uint32_t gSpectatorSnapshotSize = 0, gSpectatorSnapshotHash = 0;
@@ -194,6 +417,7 @@ void SyncSpectatorWidget(SaveGameContext &context, Sexy::Widget *widget) {
 }
 
 void SyncSpectatorChooser(SaveGameContext &context, SeedChooserScreen &chooser) {
+    SnapshotReadStage diagnosticStage(context, chooser.mIsZombieChooser ? "zombie_chooser" : "plant_chooser");
     SyncSpectatorWidget(context, &chooser);
     SyncSpectatorValues(context,
                         chooser.mShowHelpText,
@@ -235,6 +459,7 @@ void SyncSpectatorChooser(SaveGameContext &context, SeedChooserScreen &chooser) 
 }
 
 void SyncSpectatorIntro(SaveGameContext &context, LawnApp *app) {
+    SnapshotReadStage diagnosticStage(context, "intro");
     auto &cutscene = *app->mBoard->mCutScene;
     SyncSpectatorWidget(context, app->mBoard);
     SyncSpectatorValues(context,
@@ -258,6 +483,7 @@ void SyncSpectatorIntro(SaveGameContext &context, LawnApp *app) {
                         cutscene.mPreUpdatingBoard,
                         cutscene.mPlantsWonReanimID);
     if (auto *menu = app->mVSSetupMenu) {
+        SnapshotReadStage menuDiagnosticStage(context, "vs_setup");
         SyncSpectatorWidget(context, menu);
         SyncSpectatorValues(context,
                             menu->mInt70,
@@ -307,16 +533,18 @@ void SyncSpectatorIntro(SaveGameContext &context, LawnApp *app) {
 }
 
 void SyncSpectatorExtras(SaveGameContext &context, Board *board) {
+    SnapshotReadStage diagnosticStage(context, "extras");
     // Native SyncBoard only includes player 0. Use registered blocks, never pointers/vtables.
-    const auto syncObject = [&](SyncObject *object) {
+    const auto syncObject = [&](SyncObject *object, const char *name) {
+        SnapshotReadStage objectDiagnosticStage(context, name);
         for (auto &block : *object->mSyncBlocks) {
             context.SyncBytes(block.mAddress, static_cast<int>(block.mSize));
         }
     };
-    syncObject(board->mSeedBank[1]);
-    syncObject(board->mGamepadControls[1]);
-    syncObject(board->mCursorObject[1]);
-    syncObject(board->mCursorPreview[1]);
+    syncObject(board->mSeedBank[1], "player1.seed_bank");
+    syncObject(board->mGamepadControls[1], "player1.gamepad");
+    syncObject(board->mCursorObject[1], "player1.cursor");
+    syncObject(board->mCursorPreview[1], "player1.cursor_preview");
     context.SyncBytes(&Challenge::msVSShuffleMode, sizeof(Challenge::msVSShuffleMode));
     context.SyncBytes(&Challenge::msVSClassicMode, sizeof(Challenge::msVSClassicMode));
     SyncSpectatorValues(context, VSSetupMenu::msNextFirstPick, VSSetupMenu::msNextSidePickPlayerIndex, gGamepad1ToPlayerIndex);
@@ -356,8 +584,20 @@ void SyncSpectatorExtras(SaveGameContext &context, Board *board) {
     context.SyncBytes(gSecondPlayerName, sizeof(gSecondPlayerName));
 }
 
-void FailSpectatorSnapshot() {
-    LOG_ERROR("[NETPLAY] live spectator snapshot failed; closing viewer connection");
+void FailSpectatorSnapshot(const char *reason) {
+    LOG_ERROR("[NETPLAY] live spectator snapshot failed; closing viewer connection reason={} received_bytes={} expected_bytes={} expected_hash=0x{:08X} catchup_bytes={}",
+              reason,
+              gSpectatorSnapshotIn.size(),
+              gSpectatorSnapshotSize,
+              gSpectatorSnapshotHash,
+              gSpectatorCatchup.size());
+    // Defer widget/socket cleanup until the packet dispatcher has unwound.
+    // The update loop consumes this before showing a dialog or drawing Board.
+    if (!gSpectatorSnapshotFailure) {
+        gSpectatorSnapshotFailure = std::strcmp(reason, "apply_runtime_snapshot") == 0 ? gSnapshotReadFailureMessage
+            : std::strcmp(reason, "receive_timeout") == 0                              ? "[SPECTATE_SNAPSHOT_TIMEOUT]"
+                                                                                       : "[SPECTATE_SNAPSHOT_TRANSFER_FAILED]";
+    }
     netplay::ResetSpectatorSnapshot();
     // Only disconnect this viewer; never send an abort to the playing host/guest.
     if (gIsServerModeSpectator && gTcpServerSocket >= 0) {
@@ -379,11 +619,29 @@ bool ApplyRuntimeSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMo
     context.mBuffer.mData = std::move(data);
     context.mBuffer.mDataBitSize = static_cast<int>(context.mBuffer.mData.size() * 8);
     context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
+    SnapshotReadScope diagnostics(context, spectator, spectator && gSpectatorLayoutReceiver.present ? &gSpectatorLayoutsIn : nullptr);
+    gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_LOAD_FAILED]";
+    LOG_INFO("[SNAPSHOT] apply base_version={} netplay_version={} bytes={} mode={} spectator={} board_before={}",
+             PVZ_VERSION,
+             NETPLAY_VERSION,
+             context.mBuffer.mData.size(),
+             static_cast<int>(mode),
+             spectator,
+             static_cast<void *>(app->mBoard));
     SpectatorScene scene;
     scene.Sync(context);
     if (context.mFailed || (spectator && !scene.historyEpoch) || (scene.scene != SCENE_LEVEL_INTRO && scene.scene != SCENE_PLAYING)
-        || (scene.scene == SCENE_PLAYING && (scene.setup || scene.plantChooser || scene.zombieChooser)) || (mode == GAMEMODE_MP_VS && (scene.plantChooser || scene.zombieChooser) && !scene.setup))
+        || (scene.scene == SCENE_PLAYING && (scene.setup || scene.plantChooser || scene.zombieChooser)) || (mode == GAMEMODE_MP_VS && (scene.plantChooser || scene.zombieChooser) && !scene.setup)) {
+        ReportSnapshotReadFailure(&context, "scene_validation");
+        LOG_ERROR("[SNAPSHOT] scene={} background={} epoch={} setup={} plant_chooser={} zombie_chooser={}",
+                  static_cast<int>(scene.scene),
+                  static_cast<int>(scene.background),
+                  scene.historyEpoch,
+                  scene.setup,
+                  scene.plantChooser,
+                  scene.zombieChooser);
         return false;
+    }
 
     app->mGameMode = mode;
     app->KillSeedChooserScreen();
@@ -414,14 +672,24 @@ bool ApplyRuntimeSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMo
     // SyncBoard replaces the music fields, but not the audio player's state.
     // Stop the local lobby tune before its ID is overwritten by the snapshot.
     music->GetVTable()->StopAllMusic(music);
-    if (!LawnLoadGame_Original(app->mBoard, &context))
+    if (!LawnLoadGame_Original(app->mBoard, &context)) {
+        LOG_ERROR("[SNAPSHOT] apply failed stage=board board={} plant_chooser={} zombie_chooser={} read_bits={} failed={}",
+                  static_cast<void *>(app->mBoard),
+                  static_cast<void *>(app->mSeedChooserScreen),
+                  static_cast<void *>(app->mZombieChooserScreen),
+                  context.mBuffer.mReadBitPos,
+                  context.mFailed);
         return false;
+    }
     app->mGameScene = scene.scene; // LawnLoadGame normally resumes straight into combat.
     SyncSpectatorExtras(context, app->mBoard);
     if (scene.scene == SCENE_LEVEL_INTRO)
         SyncSpectatorIntro(context, app);
-    if (context.mFailed || context.mBuffer.mReadBitPos != context.mBuffer.mDataBitSize)
+    if (context.mFailed || context.mBuffer.mReadBitPos != context.mBuffer.mDataBitSize) {
+        ReportSnapshotReadFailure(&context, context.mFailed ? "extras_or_intro" : "unconsumed_snapshot_bytes");
+        LOG_ERROR("[SNAPSHOT] apply failed stage=end expected_bits={} consumed_bits={} board={}", context.mBuffer.mDataBitSize, context.mBuffer.mReadBitPos, static_cast<void *>(app->mBoard));
         return false;
+    }
     gServerHostName[sizeof(gServerHostName) - 1] = '\0';
     gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
     auto *board = app->mBoard;
@@ -527,6 +795,56 @@ bool ApplyReconnectSnapshot(LawnApp *app, std::vector<unsigned char> &data, Game
 bool netplay::IsSerializingSpectatorSnapshot() noexcept {
     return gCapturingSpectatorSnapshot || gApplyingSpectatorSnapshot;
 }
+
+void netplay::RegisterSnapshotDiagnostics() {
+    homura::HookFunc(SaveGameContext_SyncIntAddr, &DiagnoseSnapshotSyncInt, &gOriginalSnapshotSyncInt);
+    homura::HookFunc(SaveGameContext_SyncBytesAddr, &DiagnoseSnapshotSyncBytes, &gOriginalSnapshotSyncBytes);
+}
+
+bool netplay::HasSpectatorSnapshotFailure() noexcept {
+    return gSpectatorSnapshotFailure != nullptr;
+}
+
+bool netplay::RecoverSpectatorSnapshotFailure(LawnApp *app) {
+    if (!gSpectatorSnapshotFailure)
+        return false;
+    const char *message = std::exchange(gSpectatorSnapshotFailure, nullptr);
+
+    // Disconnect only this viewer. Never enqueue a gameplay/abort event.
+    auto *oldLobby = NetplayLobbyWidget::GetInstance();
+    if (oldLobby && gTcpServerSocket >= 0 && oldLobby->mServerSock == gTcpServerSocket)
+        oldLobby->mServerSock = -1; // ClearSecondPlayer owns this borrowed fd.
+    app->ClearSecondPlayer();
+    if (oldLobby)
+        oldLobby->ServerDisconnect("spectator snapshot failed");
+    ResetSpectatorSnapshot();
+
+    // Loading failed before FixBoardAfterLoad. Do not run gameplay repair or
+    // resume the partially loaded board. Destruction must not follow animation
+    // attachment IDs from the failed snapshot, and delayed chooser deletion
+    // must not act on an animation in the next scene.
+    for (auto *chooser : {app->mSeedChooserScreen, app->mZombieChooserScreen}) {
+        if (chooser)
+            chooser->mReanimSeedChooser = REANIMATIONID_NULL;
+    }
+    Reanimation *animation = nullptr;
+    while (app->mEffectSystem->mReanimationHolder->mReanimations.IterateNext(animation))
+        animation->mDead = true;
+    app->KillBoard(); // removes Board/widgets before the modal dialog pumps frames
+    app->mNeedLoadGame = false;
+    app->mBoardResult = BOARDRESULT_NONE;
+    app->KillChallengeScreen();
+    app->ShowChallengeScreen(CHALLENGE_PAGE_VS);
+    auto *screen = app->mChallengeScreen;
+    auto *lobby = new NetplayLobbyWidget(app, false);
+    screen->mNetplayLobbyWidget = lobby;
+    screen->AddWidget(lobby);
+    lobby->SetMode(UIMode::MODE3_SERVER);
+    lobby->mServerStatusText = TodStringTranslate(message);
+    app->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[SPECTATE_SNAPSHOT_FAILED_TITLE]", message, "[DIALOG_BUTTON_OK]", "", 3);
+    return true;
+}
+
 bool netplay::IsSendingSpectatorSnapshot() noexcept {
     return gSpectatorSnapshotRequested || !gSpectatorSnapshotOut.empty();
 }
@@ -540,6 +858,10 @@ void netplay::ResetSpectatorSnapshot() noexcept {
     gSpectatorSourcePlant = gSpectatorSourceZombie = nullptr;
     gSpectatorSnapshotOut.clear();
     gSpectatorSnapshotIn.clear();
+    gSpectatorLayoutsOut.clear();
+    gSpectatorLayoutsOffset = 0;
+    gSpectatorLayoutReceiver = {};
+    gSpectatorLayoutsIn.clear();
     gSpectatorCatchup.clear();
     gSpectatorCatchupReady.clear();
     gSpectatorSnapshotOffset = 0;
@@ -558,7 +880,7 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         return;
     }
     if (gReceivingSpectatorSnapshot && std::chrono::steady_clock::now() - gSpectatorSnapshotProgress > std::chrono::seconds(60)) {
-        FailSpectatorSnapshot();
+        FailSpectatorSnapshot("receive_timeout");
         return;
     }
     if (!IsRemoteServer())
@@ -595,15 +917,21 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         scene.Sync(context);
         SaveFileHeader header{SAVE_FILE_MAGIC_NUMBER, SAVE_FILE_VERSION, SAVE_FILE_DATE};
         context.SyncBytes(&header, sizeof(header));
+        netplay::snapshot::AnimationLayouts layouts;
+        bool layoutsValid = true;
         {
             struct Capturing {
-                Capturing() {
+                Capturing(netplay::snapshot::AnimationLayouts &layouts, bool &valid) {
                     gCapturingSpectatorSnapshot = true;
+                    gSnapshotLayoutCapture = &layouts;
+                    gSnapshotLayoutCaptureValid = &valid;
                 }
                 ~Capturing() {
                     gCapturingSpectatorSnapshot = false;
+                    gSnapshotLayoutCapture = nullptr;
+                    gSnapshotLayoutCaptureValid = nullptr;
                 }
-            } capturing;
+            } capturing(layouts, layoutsValid);
             SyncBoard(&context, app->mBoard);
             SyncSpectatorExtras(context, app->mBoard);
             if (scene.scene == SCENE_LEVEL_INTRO)
@@ -626,17 +954,27 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         begin.data1 = kSpectatorSnapshotVersion;
         begin.data2.u32 = static_cast<uint32_t>(gSpectatorSnapshotOut.size());
         begin.data3.u32 = SaveDataHash(gSpectatorSnapshotOut);
+        gSpectatorLayoutsOut.clear();
+        gSpectatorLayoutsOffset = 0;
+        if (!layoutsValid || !netplay::snapshot::EncodeLayouts(layouts, begin.data3.u32, gSpectatorLayoutsOut)
+            || (gSpectatorLayoutsOut.size() + netplay::snapshot::kLayoutTailCapacity - 1) / netplay::snapshot::kLayoutTailCapacity > gSpectatorSnapshotOut.size()) {
+            // Metadata is optional. Never prevent the existing 3215 transfer
+            // just because a local definition cannot be described safely.
+            gSpectatorLayoutsOut.clear();
+            LOG_ERROR("[SNAPSHOT] animation_layout_capture_unavailable; sending legacy snapshot");
+        }
+        gSpectatorLayoutsHash = netplay::snapshot::LayoutHash(gSpectatorLayoutsOut);
         PutEvent(begin);
         LOG_INFO("[NETPLAY] sending live spectator snapshot: {} bytes", gSpectatorSnapshotOut.size());
     }
     if (gSpectatorSnapshotOut.empty())
         return;
-    const auto end = std::min(gSpectatorSnapshotOffset + 16 * 1024, gSpectatorSnapshotOut.size());
-    while (gSpectatorSnapshotOffset < end) {
+    // Bound actual network bytes per frame, including optional layout tails.
+    for (size_t sent = 0; gSpectatorSnapshotOffset < gSpectatorSnapshotOut.size() && sent + sizeof(U16U8x240_Event) <= 16 * 1024; sent += sizeof(U16U8x240_Event)) {
         U16U8x240_Event chunk{};
         chunk.type = EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK;
-        chunk.count = static_cast<uint16_t>(std::min(sizeof(chunk.data), gSpectatorSnapshotOut.size() - gSpectatorSnapshotOffset));
-        std::memcpy(chunk.data, gSpectatorSnapshotOut.data() + gSpectatorSnapshotOffset, chunk.count);
+        chunk.count =
+            netplay::snapshot::FillSnapshotChunk(chunk.data, std::span(gSpectatorSnapshotOut).subspan(gSpectatorSnapshotOffset), gSpectatorLayoutsOut, gSpectatorLayoutsHash, gSpectatorLayoutsOffset);
         PutEvent(chunk);
         gSpectatorSnapshotOffset += chunk.count;
     }
@@ -655,6 +993,7 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         }
         PutEvent(done);
         gSpectatorSnapshotOut.clear();
+        gSpectatorLayoutsOut.clear();
         replay::RequestHistoryTransfer(gSpectatorHistoryEpoch);
     }
 }
@@ -671,7 +1010,8 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
     if (gSpectatorDraftProgressPending && event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
         gSpectatorDraftProgressPending = false;
         if (event->size != sizeof(U16UNI32UNI32_Event)) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] draft_end expected_bytes={} actual_bytes={}", sizeof(U16UNI32UNI32_Event), event->size);
+            FailSpectatorSnapshot("draft_end_size");
             return true;
         }
         const auto *done = static_cast<const U16UNI32UNI32_Event *>(event);
@@ -690,20 +1030,30 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
         return snapshotEvent;
     if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN) {
         if (event->size != sizeof(U16UNI32UNI32_Event)) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] begin expected_bytes={} actual_bytes={}", sizeof(U16UNI32UNI32_Event), event->size);
+            FailSpectatorSnapshot("begin_size");
             return true;
         }
         const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
         if (begin->data1 != kSpectatorSnapshotVersion || begin->data2.u32 < sizeof(SaveFileHeader) || begin->data2.u32 > kMaxOnlineSaveSize) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] begin expected_version={} actual_version={} bytes={} min_bytes={} max_bytes={}",
+                      kSpectatorSnapshotVersion,
+                      begin->data1,
+                      begin->data2.u32,
+                      sizeof(SaveFileHeader),
+                      kMaxOnlineSaveSize);
+            FailSpectatorSnapshot("begin_version_or_length");
             return true;
         }
         gSpectatorSnapshotIn.clear();
         gSpectatorCatchup.clear();
+        gSpectatorLayoutReceiver = {};
+        gSpectatorLayoutsIn.clear();
         gSpectatorSnapshotSize = begin->data2.u32;
         gSpectatorSnapshotHash = begin->data3.u32;
         gReceivingSpectatorSnapshot = true;
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
+        LOG_INFO("[SNAPSHOT] receive begin version={} expected_bytes={} expected_hash=0x{:08X}", begin->data1, gSpectatorSnapshotSize, gSpectatorSnapshotHash);
         return true;
     }
     if (!gReceivingSpectatorSnapshot) {
@@ -713,23 +1063,53 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
     }
     if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK) {
         if (event->size != sizeof(U16U8x240_Event)) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] chunk expected_bytes={} actual_bytes={}", sizeof(U16U8x240_Event), event->size);
+            FailSpectatorSnapshot("chunk_size");
             return true;
         }
         const auto *chunk = static_cast<const U16U8x240_Event *>(event);
         if (!chunk->count || chunk->count > sizeof(chunk->data) || gSpectatorSnapshotIn.size() + chunk->count > gSpectatorSnapshotSize) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] chunk offset_bytes={} payload_bytes={} max_payload_bytes={}", gSpectatorSnapshotIn.size(), chunk->count, sizeof(chunk->data));
+            FailSpectatorSnapshot("chunk_count_or_overflow");
+            return true;
+        }
+        if (!gSpectatorLayoutReceiver.Add(chunk->data, chunk->count)) {
+            FailSpectatorSnapshot("animation_layout_fragment");
             return true;
         }
         gSpectatorSnapshotIn.insert(gSpectatorSnapshotIn.end(), chunk->data, chunk->data + chunk->count);
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
     } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
-        if (event->size != sizeof(U16UNI32UNI32_Event) || gSpectatorSnapshotIn.size() != gSpectatorSnapshotSize || SaveDataHash(gSpectatorSnapshotIn) != gSpectatorSnapshotHash
-            || !ApplyRuntimeSnapshot(app, gSpectatorSnapshotIn, GAMEMODE_MP_VS, true)) {
-            FailSpectatorSnapshot();
+        // Same checks and short-circuit order; distinguish transport rejection
+        // from a failure after ApplyRuntimeSnapshot has started changing Board.
+        if (event->size != sizeof(U16UNI32UNI32_Event)) {
+            LOG_ERROR("[SNAPSHOT] end expected_bytes={} actual_bytes={}", sizeof(U16UNI32UNI32_Event), event->size);
+            FailSpectatorSnapshot("end_size");
+            return true;
+        }
+        if (gSpectatorSnapshotIn.size() != gSpectatorSnapshotSize) {
+            FailSpectatorSnapshot("payload_length");
+            return true;
+        }
+        const uint32_t actualHash = SaveDataHash(gSpectatorSnapshotIn);
+        if (actualHash != gSpectatorSnapshotHash) {
+            LOG_ERROR("[SNAPSHOT] hash expected=0x{:08X} actual=0x{:08X}", gSpectatorSnapshotHash, actualHash);
+            FailSpectatorSnapshot("payload_hash");
+            return true;
+        }
+        if (!gSpectatorLayoutReceiver.Complete()
+            || (gSpectatorLayoutReceiver.present
+                && !netplay::snapshot::DecodeLayouts(gSpectatorLayoutReceiver.bytes, gSpectatorSnapshotHash, ReanimationType::EXTENDED_NUM_REANIMS, gSpectatorLayoutsIn))) {
+            FailSpectatorSnapshot("animation_layout_payload");
+            return true;
+        }
+        if (!ApplyRuntimeSnapshot(app, gSpectatorSnapshotIn, GAMEMODE_MP_VS, true)) {
+            FailSpectatorSnapshot("apply_runtime_snapshot");
             return true;
         }
         gReceivingSpectatorSnapshot = false;
+        gSpectatorLayoutReceiver = {};
+        gSpectatorLayoutsIn.clear();
         gSpectatorCatchupReady = std::move(gSpectatorCatchup);
         const auto *bytes = reinterpret_cast<const std::byte *>(event);
         gSpectatorCatchupReady.insert(gSpectatorCatchupReady.end(), bytes, bytes + event->size);
@@ -737,12 +1117,15 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
     } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT) {
         gReceivingSpectatorSnapshot = false;
         gSpectatorSnapshotIn.clear();
+        gSpectatorLayoutReceiver = {};
+        gSpectatorLayoutsIn.clear();
         gSpectatorCatchup.clear(); // Lobby can still align with the next round.
         if (lobby)
             lobby->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_WAIT_NEXT]");
     } else {
         if (gSpectatorCatchup.size() + event->size > kMaxSpectatorCatchup) {
-            FailSpectatorSnapshot();
+            LOG_ERROR("[SNAPSHOT] catchup offset_bytes={} event_bytes={} max_bytes={}", gSpectatorCatchup.size(), event->size, kMaxSpectatorCatchup);
+            FailSpectatorSnapshot("catchup_overflow");
             return true;
         }
         const auto *bytes = reinterpret_cast<const std::byte *>(event);
@@ -1034,23 +1417,38 @@ bool LawnSaveGame(Board *theBoard, const pvzstl::string &theFilePath) {
 }
 
 bool LawnLoadGame_Original(Board *theBoard, SaveGameContext *theContext) {
-
+    SnapshotReadStage headerDiagnosticStage(*theContext, "save_header");
     SaveFileHeader aHeader{};
     theContext->SyncBytes(&aHeader, sizeof(aHeader));
 
     // 检查存档魔数和版本范围。
     if (aHeader.mMagicNumber != SAVE_FILE_MAGIC_NUMBER || aHeader.mBuildVersion > SAVE_FILE_VERSION) {
+        ReportSnapshotReadFailure(theContext, "save_header_magic_or_version");
+        if (gSnapshotReadDiagnostics && gSnapshotReadDiagnostics->context == theContext)
+            LOG_ERROR("[SNAPSHOT] save_header expected_magic=0x{:08X} actual_magic=0x{:08X} expected_version={} actual_version={}",
+                      SAVE_FILE_MAGIC_NUMBER,
+                      aHeader.mMagicNumber,
+                      SAVE_FILE_VERSION,
+                      aHeader.mBuildVersion);
         if (!netplay::IsApplyingOnlineSaveGame())
             gLawnApp->HandleCorruptedGameFile();
         return false;
     }
     // 魔数正确，但不是当前支持的版本。
     if (aHeader.mBuildVersion != SAVE_FILE_VERSION) {
+        ReportSnapshotReadFailure(theContext, "save_header_old_version");
+        if (gSnapshotReadDiagnostics && gSnapshotReadDiagnostics->context == theContext)
+            LOG_ERROR("[SNAPSHOT] save_header expected_version={} actual_version={}", SAVE_FILE_VERSION, aHeader.mBuildVersion);
         if (!netplay::IsApplyingOnlineSaveGame())
             gLawnApp->HandleOldGameFile();
         return false;
     }
-    SyncBoard(theContext, theBoard);
+    {
+        SnapshotReadStage boardDiagnosticStage(*theContext, "native.SyncBoard");
+        SyncBoard(theContext, theBoard);
+        if (theContext->mFailed)
+            ReportSnapshotReadFailure(theContext, "SyncBoard_validation");
+    }
     if (gLawnApp->IsAdventureMode()) {
         if (gLawnApp->mPlayerInfo->mLevel != theBoard->mLevel) {
             const int highestLevel = theBoard->mLevel > gLawnApp->mPlayerInfo->mLevel ? theBoard->mLevel : gLawnApp->mPlayerInfo->mLevel;
@@ -1063,6 +1461,8 @@ bool LawnLoadGame_Original(Board *theBoard, SaveGameContext *theContext) {
         return false;
     }
 
+    if (gSnapshotReadDiagnostics && gSnapshotReadDiagnostics->context == theContext && gSnapshotReadDiagnostics->allowTrackRemap)
+        netplay::snapshot::FinishSnapshotCosmetics(*theBoard, gSnapshotReadDiagnostics->cosmetics);
     FixBoardAfterLoad(theBoard);
     theBoard->mApp->mGameScene = GameScenes::SCENE_PLAYING;
     return true;
@@ -1235,6 +1635,7 @@ void SaveGameContext::SyncReanimationDef(ReanimatorDefinition *&theDefinition) {
             theDefinition = &gReanimatorDefArray[aReanimType];
         } else {
             mFailed = true;
+            ReportSnapshotReadFailure(this, "reanimation_definition_index");
         }
     } else {
         int aReanimType = ReanimationType::REANIM_NONE;
@@ -1262,6 +1663,7 @@ void SaveGameContext::SyncParticleDef(TodParticleDefinition *&theDefinition) {
             theDefinition = &gParticleDefArray[aParticleIndex];
         } else {
             mFailed = true;
+            ReportSnapshotReadFailure(this, "particle_definition_index");
         }
     } else {
         if (theDefinition != nullptr && gParticleDefArray != nullptr) {
@@ -1276,15 +1678,209 @@ void SaveGameContext::SyncParticleDef(TodParticleDefinition *&theDefinition) {
     }
 }
 
-void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameContext &theContext) {
-    theContext.SyncReanimationDef(theReanimation->mDefinition);
+namespace {
+const char *RestoreLocalReanimation(
+    Board &board, Reanimation &reanimation, SaveGameContext &context, int sourceTracks, const netplay::snapshot::AnimationLayout &localLayout, std::span<const uint32_t> discardedAttachments) {
+    using namespace netplay::snapshot;
+    AnimationPlayback playback{reanimation.mFrameStart, reanimation.mFrameCount, reanimation.mFrameBasePose, reanimation.mAnimRate, reanimation.mAnimTime, reanimation.mLastFrameTime};
+    const auto actions = LocalAnimationActions(board, reanimation);
+    if (!RebuildLocalPlayback(localLayout, playback, actions))
+        return "reanimation_local_playback_invalid";
+    std::vector<ReanimatorTrackInstance> source(sourceTracks);
+    if (!ReadDiscardedTracks(context, std::span(source)))
+        return "reanimation_local_tracks_truncated";
+    for (auto &track : source)
+        ClearDiscardedAttachment(track, discardedAttachments);
+    for (auto &track : std::span(reanimation.mTrackInstances, reanimation.mDefinition->mTrackCount)) {
+        // Match native constructor defaults; no foreign image/blend pointers or
+        // source track indices survive the local reconstruction.
+        std::memset(static_cast<void *>(&track), 0, sizeof(track));
+        track.mTrackColor = Sexy::Color(255, 255, 255, 255);
+        track.mTruncateDisappearingFrames = true;
+        track.mBlendTransform.mText = "";
+    }
+    if (!RestoreLocalAnimationAttachments(board, reanimation, source))
+        return "reanimation_local_attachments_unresolved";
+    RestoreLocalAnimationLayers(board, reanimation);
+    LOG_INFO("[SNAPSHOT] rebuilt_local_reanimation type={} source_tracks={} local_tracks={} source_clip={}:{} local_clip={}:{}",
+             static_cast<int>(reanimation.mReanimationType),
+             sourceTracks,
+             localLayout.tracks.size(),
+             reanimation.mFrameStart,
+             reanimation.mFrameCount,
+             playback.start,
+             playback.count);
+    reanimation.mFrameStart = playback.start;
+    reanimation.mFrameCount = playback.count;
+    reanimation.mFrameBasePose = playback.basePose;
+    reanimation.SetAnimRate(playback.rate);
+    // Keep mAnimTime, mLastFrameTime, mLoopType/mLoopCount, IDs and transforms.
+    // Restarting PlayReanim here would repeat completed actions in the viewer.
+    return nullptr;
+}
 
+bool RestoreDifferentReanimationTracks(Reanimation &reanimation,
+                                       SaveGameContext &context,
+                                       const netplay::snapshot::AnimationLayout &sourceLayout,
+                                       const netplay::snapshot::AnimationLayout &localLayout,
+                                       std::span<const uint32_t> discardedAttachments) {
+    using namespace netplay::snapshot;
+    AnimationPlayback playback{reanimation.mFrameStart, reanimation.mFrameCount, reanimation.mFrameBasePose, reanimation.mAnimRate, reanimation.mAnimTime, reanimation.mLastFrameTime};
+    if (!RemapPlayback(sourceLayout, localLayout, playback))
+        return false;
+
+    auto local = std::span(reanimation.mTrackInstances, reanimation.mDefinition->mTrackCount);
+    for (auto &track : local) {
+        // Allocation is zeroed. These are the nonzero native constructor defaults.
+        track.mTrackColor = Sexy::Color(255, 255, 255, 255);
+        track.mTruncateDisappearingFrames = true;
+        track.mBlendTransform.mText = "";
+    }
+    std::vector<ReanimatorTrackInstance> source(sourceLayout.tracks.size());
+    if (!ReadRemappedTracks(context, std::span(source), local, sourceLayout, localLayout, discardedAttachments))
+        return false;
+
+    LOG_ERROR("[SNAPSHOT] remapped_reanimation type={} source_tracks={} local_tracks={} source_clip={}:{} local_clip={}:{}",
+              static_cast<int>(reanimation.mReanimationType),
+              source.size(),
+              local.size(),
+              reanimation.mFrameStart,
+              reanimation.mFrameCount,
+              playback.start,
+              playback.count);
+    reanimation.mFrameStart = playback.start;
+    reanimation.mFrameCount = playback.count;
+    reanimation.mFrameBasePose = playback.basePose;
+    reanimation.SetAnimRate(playback.rate);
+    return true;
+}
+} // namespace
+
+void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameContext &theContext) {
+    static_assert(sizeof(ReanimatorTrackInstance) == 100); // 3215 ARM save layout
+    SnapshotReadStage diagnosticStage(theContext, "reanimation");
+    if (diagnosticStage.diagnostics)
+        diagnosticStage.diagnostics->reanimationType = static_cast<int>(theReanimation->mReanimationType);
     if (theContext.mReading) {
+        // The preceding raw object block contains the host's pointer values.
+        // Never leave those available to failure cleanup or a zero-track case.
+        theReanimation->mDefinition = nullptr;
+        theReanimation->mTrackInstances = nullptr;
+        theReanimation->mReanimatorTransforms = nullptr;
         theReanimation->mReanimationHolder = theBoard->mApp->mEffectSystem->mReanimationHolder;
     }
+    theContext.SyncReanimationDef(theReanimation->mDefinition);
+    if (theContext.mFailed || !theReanimation->mDefinition)
+        return;
 
+    int definitionType = -1;
+    for (int type = 0; type < ReanimationType::EXTENDED_NUM_REANIMS; ++type)
+        if (theReanimation->mDefinition == &gReanimatorDefArray[type]) {
+            definitionType = type;
+            break;
+        }
+    if (!theContext.mReading && gSnapshotLayoutCapture && !gSnapshotLayoutCapture->contains(definitionType)) {
+        netplay::snapshot::AnimationLayout layout;
+        if (definitionType < 0 || !netplay::snapshot::DescribeAnimation(*theReanimation->mDefinition, layout))
+            *gSnapshotLayoutCaptureValid = false;
+        else
+            gSnapshotLayoutCapture->emplace(definitionType, std::move(layout));
+    }
+    auto *diagnostics = diagnosticStage.diagnostics;
+    bool discardCosmetic = false;
+    auto localCosmetic = netplay::snapshot::LocalCosmeticAnimation::None;
+    if (theContext.mReading && diagnostics && diagnostics->allowTrackRemap) {
+        // Native SyncBoard has loaded all object/attachment IDs before entering
+        // this loop. Prune only classified cosmetic references, without calling
+        // gameplay code or following still-foreign object pointers.
+        if (!diagnostics->cosmetics.prepared && !netplay::snapshot::PrepareSnapshotCosmetics(*theBoard, diagnostics->cosmetics)) {
+            theContext.mFailed = true;
+            ReportSnapshotReadFailure(&theContext, "reanimation_cosmetic_attachment_invalid");
+            return;
+        }
+        const auto id = theBoard->mApp->mEffectSystem->mReanimationHolder->mReanimations.DataArrayGetID(theReanimation);
+        discardCosmetic = diagnostics->cosmetics.DiscardsAnimation(id);
+        localCosmetic = diagnostics->cosmetics.LocalAnimation(id);
+    }
+    const netplay::snapshot::AnimationLayout *sourceLayout = nullptr;
+    if (theContext.mReading && diagnostics && diagnostics->allowTrackRemap && diagnostics->sourceLayouts) {
+        const auto entry = diagnostics->sourceLayouts->find(definitionType);
+        if (entry == diagnostics->sourceLayouts->end()) {
+            theContext.mFailed = true;
+            ReportSnapshotReadFailure(&theContext, "reanimation_layout_missing");
+            return;
+        }
+        sourceLayout = &entry->second;
+    }
     const int aTrackCount = theReanimation->mDefinition->mTrackCount;
-    if (aTrackCount == 0) {
+    if (diagnosticStage.diagnostics)
+        diagnosticStage.diagnostics->trackCount = aTrackCount;
+    if (discardCosmetic || localCosmetic != netplay::snapshot::LocalCosmeticAnimation::None) {
+        // Read the complete 3215 payload, but neither resolve foreign images
+        // nor restore the host's cosmetic playback. Persistent visuals retain
+        // their slots/parents and restart using the local animation definition.
+        if (discardCosmetic) {
+            // Leave an inert, serializable slot for the normal deletion pass.
+            // A replay/checkpoint can be saved before that pass runs.
+            theReanimation->mDead = true;
+            theReanimation->mFrameStart = 0;
+            theReanimation->mFrameCount = aTrackCount ? theReanimation->mDefinition->mTracks[0].mTransformCount : 0;
+            theReanimation->mFrameBasePose = -1;
+            theReanimation->mAnimTime = 0;
+            theReanimation->mLastFrameTime = -1;
+            theReanimation->SetAnimRate(0);
+        }
+        const auto originalBlock = DescribeSnapshotRead(*diagnostics, "SyncBytes", aTrackCount * sizeof(ReanimatorTrackInstance), true, __builtin_return_address(0));
+        std::vector<ReanimatorTrackInstance> source;
+        const bool sourceEmpty = sourceLayout ? sourceLayout->tracks.empty() : aTrackCount == 0;
+        if (!sourceEmpty) {
+            const auto &buffer = theContext.mBuffer;
+            const auto block = netplay::snapshot::PeekTrackBlock(buffer.mData, buffer.mDataBitSize, buffer.mReadBitPos, sizeof(ReanimatorTrackInstance));
+            if (!block.complete) {
+                theContext.mFailed = true;
+                diagnostics->last = originalBlock;
+                ReportSnapshotReadFailure(&theContext, "reanimation_cosmetic_tracks_invalid");
+                return;
+            }
+            source.resize(block.count);
+            if (!netplay::snapshot::ReadDiscardedTracks(theContext, std::span(source))) {
+                theContext.mFailed = true;
+                ReportSnapshotReadFailure(&theContext, "reanimation_cosmetic_tracks_truncated");
+                return;
+            }
+        }
+        if (aTrackCount > 0) {
+            const size_t allocationSize = size_t(aTrackCount) * (sizeof(ReanimatorTrackInstance) + sizeof(ReanimatorTransform));
+            auto *memory = static_cast<unsigned char *>(FindGlobalAllocator(allocationSize)->Calloc(allocationSize));
+            HOMURA_ASSERT(memory != nullptr);
+            theReanimation->mTrackInstances = reinterpret_cast<ReanimatorTrackInstance *>(memory);
+            theReanimation->mReanimatorTransforms = reinterpret_cast<ReanimatorTransform *>(memory + size_t(aTrackCount) * sizeof(ReanimatorTrackInstance));
+            for (auto &track : std::span(theReanimation->mTrackInstances, aTrackCount)) {
+                track.mTrackColor = Sexy::Color(255, 255, 255, 255);
+                track.mTruncateDisappearingFrames = true;
+                track.mBlendTransform.mText = "";
+            }
+        }
+        if (!discardCosmetic) {
+            for (auto &track : source)
+                netplay::snapshot::ClearDiscardedAttachment(track, diagnostics->cosmetics.attachments);
+            if (!netplay::snapshot::RestoreLocalCosmeticAnimation(*theBoard, *theReanimation, localCosmetic, source)) {
+                theContext.mFailed = true;
+                diagnostics->last = originalBlock;
+                gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_RESOURCE_MISMATCH]";
+                ReportSnapshotReadFailure(&theContext, "reanimation_local_cosmetic_invalid");
+                return;
+            }
+            LOG_INFO("[SNAPSHOT] local_cosmetic_reanimation type={} source_tracks={} local_tracks={}", definitionType, source.size(), aTrackCount);
+        }
+        return;
+    }
+    if (aTrackCount == 0 || (sourceLayout && sourceLayout->tracks.empty())) {
+        if (sourceLayout && sourceLayout->tracks.size() != static_cast<size_t>(aTrackCount)) {
+            theContext.mFailed = true;
+            gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_RESOURCE_MISMATCH]";
+            ReportSnapshotReadFailure(&theContext, "reanimation_empty_layout_mismatch");
+        }
         return;
     }
 
@@ -1308,8 +1904,59 @@ void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameConte
         theReanimation->SetAnimRate(theReanimation->mAnimRate);
     }
 
+    // Adapt only incoming spectator snapshots. Metadata lets us also detect
+    // reordered tracks with the same count. Legacy hosts have no names: prefer
+    // the packaged baseline, then reconstruct unknown layouts from local state.
+    if (theContext.mReading && diagnostics && diagnostics->allowTrackRemap) {
+        const auto &buffer = theContext.mBuffer;
+        const auto block = netplay::snapshot::PeekTrackBlock(buffer.mData, buffer.mDataBitSize, buffer.mReadBitPos, sizeof(ReanimatorTrackInstance));
+        const bool outsideLocalFrames = !netplay::snapshot::ValidClip(theReanimation->mFrameStart, theReanimation->mFrameCount, theReanimation->mDefinition->mTracks[0].mTransformCount);
+        if (block.complete && (sourceLayout || block.bytes != static_cast<int>(aTrackInstancesSize) || outsideLocalFrames)) {
+            if (!sourceLayout) {
+                sourceLayout = netplay::snapshot::GetBundledAnimationLayout(definitionType);
+                if (sourceLayout
+                    && (sourceLayout->tracks.size() != static_cast<size_t>(block.count) || !netplay::snapshot::ValidClip(theReanimation->mFrameStart, theReanimation->mFrameCount, sourceLayout->frames)
+                        || theReanimation->mFrameBasePose >= sourceLayout->frames))
+                    sourceLayout = nullptr; // An old custom host cannot be identified from count alone.
+            }
+            if (sourceLayout) {
+                const auto originalBlock = DescribeSnapshotRead(*diagnostics, "SyncBytes", static_cast<int>(aTrackInstancesSize), true, __builtin_return_address(0));
+                auto [local, inserted] = diagnostics->localLayouts.try_emplace(definitionType);
+                const bool described = !inserted || netplay::snapshot::DescribeAnimation(*theReanimation->mDefinition, local->second);
+                if (described && *sourceLayout == local->second && sourceLayout->tracks.size() == static_cast<size_t>(block.count)) {
+                    // Identical definitions use the original native read below.
+                } else if (!described || sourceLayout->tracks.size() != static_cast<size_t>(block.count)
+                           || !RestoreDifferentReanimationTracks(*theReanimation, theContext, *sourceLayout, local->second, diagnostics->cosmetics.attachments)) {
+                    theContext.mFailed = true;
+                    diagnostics->last = originalBlock;
+                    gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_RESOURCE_MISMATCH]";
+                    ReportSnapshotReadFailure(&theContext, "reanimation_layout_incompatible");
+                    return;
+                } else {
+                    return;
+                }
+            } else {
+                auto [local, inserted] = diagnostics->localLayouts.try_emplace(definitionType);
+                const bool described = !inserted || netplay::snapshot::DescribeAnimation(*theReanimation->mDefinition, local->second);
+                const auto originalBlock = DescribeSnapshotRead(*diagnostics, "SyncBytes", static_cast<int>(aTrackInstancesSize), true, __builtin_return_address(0));
+                const char *failure =
+                    described ? RestoreLocalReanimation(*theBoard, *theReanimation, theContext, block.count, local->second, diagnostics->cosmetics.attachments) : "reanimation_local_layout_invalid";
+                if (failure) {
+                    theContext.mFailed = true;
+                    diagnostics->last = originalBlock;
+                    gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_RESOURCE_MISMATCH]";
+                    ReportSnapshotReadFailure(&theContext, failure);
+                }
+                return;
+            }
+        }
+    }
+
     // 原版存档只同步 TrackInstance，不同步后面的 ReanimatorTransform。
     theContext.SyncBytes(theReanimation->mTrackInstances, static_cast<int>(aTrackInstancesSize));
+
+    if (theContext.mFailed)
+        return;
 
     for (int aTrackIndex = 0; aTrackIndex < aTrackCount; ++aTrackIndex) {
         ReanimatorTrackInstance &aTrackInstance = theReanimation->mTrackInstances[aTrackIndex];
@@ -1317,6 +1964,8 @@ void SyncReanimation(Board *theBoard, Reanimation *theReanimation, SaveGameConte
         theContext.SyncImage(aTrackInstance.mImageOverride);
 
         if (theContext.mReading) {
+            if (diagnostics && diagnostics->allowTrackRemap)
+                netplay::snapshot::ClearDiscardedAttachment(aTrackInstance, diagnostics->cosmetics.attachments);
             aTrackInstance.mBlendTransform.mText = "";
 
             HOMURA_ASSERT(aTrackInstance.mBlendTransform.mFont == nullptr);
