@@ -765,7 +765,6 @@ void InitHookFunction() {
     homura::HookFunc(DefinitionGetCompiledFilePathFromXMLFilePathAddr, &DefinitionGetCompiledFilePathFromXMLFilePath, &old_DefinitionGetCompiledFilePathFromXMLFilePath);
     homura::HookFunc(SaveGameContext_SyncReanimationDefAddr, &SaveGameContext::SyncReanimationDef, nullptr);
     homura::HookFunc(SaveGameContext_SyncParticleDefAddr, &SaveGameContext::SyncParticleDef, nullptr);
-    netplay::RegisterSnapshotDiagnostics();
     homura::HookFunc(SyncReanimationAddr, &SyncReanimation, nullptr);
     homura::HookFunc(PoolEffect_PoolEffectDrawAddr, &PoolEffect::PoolEffectDraw, nullptr);
     homura::HookFunc(Sexy_MemoryImage_ClearRectAddr, &Sexy::MemoryImage::ClearRect, nullptr);
@@ -778,6 +777,8 @@ void InitHookFunction() {
     homura::HookFunc(TitleScreen__destructorAddr, &TitleScreen::_destructor, nullptr);
     homura::HookFunc(TitleScreen_ButtonPressAddr, &TitleScreen::ButtonPress, nullptr);
     homura::HookFunc(TitleScreen_VideoCompletedAddr, &TitleScreen::VideoCompleted, nullptr);
+
+    netplay::RegisterSnapshotDiagnostics();
 }
 
 void InitVTableHookFunction() {

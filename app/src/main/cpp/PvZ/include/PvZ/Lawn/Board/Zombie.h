@@ -443,6 +443,8 @@ public:
     bool HasScientistTriggerTarget();
     void ApplyScientistSpray();
     bool ApplyScientistHealing();
+    void SyncZombiePhase();
+    void SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePhaseData, float thePosX);
     void SetScientistPhase(ZombiePhase thePhase);
     bool FindTeleportationTarget();
     Zombie *FindCrossingGuardTarget();

@@ -3222,7 +3222,7 @@ void Board::processServerEvent(const BaseEvent *event) {
                 // 撑杆僵尸落地
                 // polevaulter landing is authoritative from EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_POST_VAULT
 
-                // dolphin rider phase transition is authoritative from EVENT_SERVER_BOARD_ZOMBIE_PHASE_COUNTER
+                // 海豚骑士的状态切换由主机通过 EVENT_SERVER_BOARD_ZOMBIE_PHASE 驱动。
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BOBSLED_PICK_SPEED: {
@@ -3578,40 +3578,11 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
             }
         } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_PIGEON_STATE: {
-            const auto *aState = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            uint16_t aZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
-                aZombie->mPosX = aState->data4.f32;
-                aZombie->SetPigeonPhase(ZombiePhase(aState->data2));
-            }
-        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_PIGEON_SUMMON: {
             const auto *aSummon = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t aZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, aSummon->data1, aZombieID)) {
                 mZombies.DataArrayGet(aZombieID)->PlaceSummonedPigeon(aSummon->data4.f32, aSummon->data2 != 0, aSummon->data3 != 0);
-            }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_GRAVEDIGGER_STATE: {
-            const auto *aState = static_cast<const U16U16_Event *>(event);
-            uint16_t aZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
-                if (aZombie != nullptr && !aZombie->IsDeadOrDying()) {
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
-                        aZombie->FinishZombieRiseFromGrave();
-                    }
-                    aZombie->SetGraveDiggerPhase(ZombiePhase(aState->data2));
-                }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_SCIENTIST_STATE: {
-            auto *stateEvent = static_cast<const U16U16_Event *>(event);
-            uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, stateEvent->data1, clientZombieID)) {
-                mZombies.DataArrayGet(clientZombieID)->SetScientistPhase(ZombiePhase(stateEvent->data2));
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SCIENTIST_HEAL: {
@@ -3621,150 +3592,12 @@ void Board::processServerEvent(const BaseEvent *event) {
                 mZombies.DataArrayGet(clientZombieID)->ApplyScientistHealing();
             }
         } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_PHASE_COUNTER: {
-            auto *eventZombiePhaseCounter = static_cast<const U8U8U16U16_Event *>(event);
-            uint8_t serverZombiePhase = eventZombiePhaseCounter->data1;
-            uint8_t serverZombieSummonCounter = eventZombiePhaseCounter->data2;
-            uint16_t serverZombieID = eventZombiePhaseCounter->data3;
-            uint16_t clientZombieID = 0;
-            uint16_t serverPhaseCounter = eventZombiePhaseCounter->data4;
-            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                ZombiePhase oldZombiePhase = aZombie->mZombiePhase;
-                aZombie->mZombiePhase = ZombiePhase(serverZombiePhase);
-                aZombie->mPhaseCounter = serverPhaseCounter;
-                if (aZombie->mZombieType == ZombieType::ZOMBIE_LADDER && aZombie->mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING) {
-                    aZombie->StartWalkAnim(0);
-                }
-                if (aZombie->mZombieType == ZombieType::ZOMBIE_JACK_IN_THE_BOX && aZombie->mZombiePhase == ZombiePhase::PHASE_JACK_IN_THE_BOX_POPPING) {
-                    aZombie->PlayZombieReanim("anim_pop", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 28.0f);
-                }
-                if (aZombie->mZombieType == ZombieType::ZOMBIE_JALAPENO_HEAD && aZombie->mZombiePhase == ZombiePhase::PHASE_JALAPENO_BURNNING
-                    && oldZombiePhase != ZombiePhase::PHASE_JALAPENO_BURNNING) {
-                    Reanimation *aHeadReanim = aZombie->mApp->ReanimationTryToGet(aZombie->mSpecialHeadReanimID);
-                    if (aHeadReanim) {
-                        aHeadReanim->SetFramesForLayer("anim_explode");
-                        aHeadReanim->mLoopType = ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD;
-                    }
-                    mApp->PlayFoley(FoleyType::FOLEY_REVERSE_EXPLOSION);
-                }
-                if (aZombie->mZombieType == ZombieType::ZOMBIE_GIGA_FOOTBALL) {
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_FOOTBALL_TACKLING) {
-                        aZombie->PlayZombieReanim("anim_tackle", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_FOOTBALL_KICKING) {
-                        aZombie->StopEating();
-                        aZombie->PlayZombieReanim("anim_kick", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 20.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_FOOTBALL_WALKING || aZombie->mZombiePhase == ZombiePhase::PHASE_FOOTBALL_CHARGING
-                               || aZombie->mZombiePhase == ZombiePhase::PHASE_FOOTBALL_PRE_CHARGE) {
-                        aZombie->StartWalkAnim(0);
-                    }
-                } else if (aZombie->mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER) {
-                    aZombie->mSummonCounter = serverZombieSummonCounter;
-                    // 校正客户端跳过 TAKE/PREPARE 动画事件时遗漏的备用杆显隐。
-                    aZombie->ReanimShowPrefix("anim_pole1", aZombie->mSummonCounter >= 3 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
-                    aZombie->ReanimShowPrefix("anim_pole2", aZombie->mSummonCounter >= 2 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
-                    aZombie->ReanimShowPrefix("anim_pole3", aZombie->mSummonCounter >= 1 ? RENDER_GROUP_NORMAL : RENDER_GROUP_HIDDEN);
-                    aZombie->mPhaseCounter = serverPhaseCounter;
-                    aZombie->mHasObject = aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PRE_VAULT || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PREPARE
-                        || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_THROW;
-                    if (aZombie->mHasObject) {
-                        aZombie->mZombieAttackRect = Rect(-29, 0, 70, 115);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_POST_VAULT || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PICK
-                               || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_TAKE || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_IN_VAULT) {
-                        aZombie->mZombieAttackRect = Rect(50, 0, 20, 115);
-                    }
-
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_THROW) {
-                        aZombie->PlayZombieReanim("anim_throw", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 36.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PREPARE) {
-                        aZombie->PlayZombieReanim("anim_prepare", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 40.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PICK) {
-                        aZombie->StopEating();
-                        aZombie->PlayZombieReanim("anim_pick", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_TAKE) {
-                        aZombie->PlayZombieReanim("anim_take", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 16.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PRE_VAULT || aZombie->mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_POST_VAULT) {
-                        aZombie->StartWalkAnim(0);
-                    }
-                } else if (aZombie->mZombieType == ZombieType::ZOMBIE_JACKSON) {
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_DANCER_SNAPPING_FINGERS_WITH_LIGHT) {
-                        aZombie->PlayZombieReanim("anim_point", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-                    }
-                } else if (aZombie->mZombieType == ZombieType::ZOMBIE_CATAPULT) {
-                    int oldSummonCounter = aZombie->mSummonCounter;
-                    aZombie->mSummonCounter = serverZombieSummonCounter;
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_ZOMBIE_NORMAL) {
-                        aZombie->StartWalkAnim(20);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_CATAPULT_LAUNCHING) {
-                        aZombie->PlayZombieReanim("anim_shoot", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_CATAPULT_RELOADING) {
-                        aZombie->PlayZombieReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 12.0f);
-                    }
-                    if (oldSummonCounter != aZombie->mSummonCounter) {
-                        if (aZombie->mSummonCounter == 4) {
-                            aZombie->ReanimShowTrack("Zombie_catapult_basketball", -1);
-                        } else if (aZombie->mSummonCounter == 3) {
-                            aZombie->ReanimShowTrack("Zombie_catapult_basketball2", -1);
-                        } else if (aZombie->mSummonCounter == 2) {
-                            aZombie->ReanimShowTrack("Zombie_catapult_basketball3", -1);
-                        } else if (aZombie->mSummonCounter == 1) {
-                            aZombie->ReanimShowTrack("Zombie_catapult_basketball4", -1);
-                        }
-                    }
-                } else if (aZombie->mZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER) {
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_INTO_POOL) {
-                        aZombie->PlayZombieReanim("anim_jumpinpool", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 16.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_RIDING) {
-                        aZombie->mInPool = true;
-                        aZombie->mPosX -= 70.0f;
-                        aZombie->mZombieAttackRect = Rect(-29, 0, 70, 115);
-                        aZombie->PlayZombieReanim("anim_ride", ReanimLoopType::REANIM_LOOP_FULL_LAST_FRAME, 0, 12.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_IN_JUMP) {
-                        aZombie->mVelX = 0.5f;
-                        aZombie->PlayZombieReanim("anim_dolphinjump", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 10.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING_IN_POOL) {
-                        aZombie->mZombieAttackRect = Rect(30, 0, 30, 115);
-                        aZombie->mZombieRect = Rect(20, 0, 42, 115);
-                        aZombie->mUnk95 = 0;
-                        aZombie->StartWalkAnim(0);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING_WITHOUT_DOLPHIN) {
-                        aZombie->mZombieHeight = ZombieHeight::HEIGHT_OUT_OF_POOL;
-                        aZombie->mAltitude = -40.0f;
-                        aZombie->PlayZombieReanim("anim_walk", ReanimLoopType::REANIM_LOOP, 0, 0.0f);
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING) {
-                        aZombie->mZombieHeight = ZombieHeight::HEIGHT_OUT_OF_POOL;
-                        aZombie->mAltitude = -40.0f;
-                        aZombie->PlayZombieReanim("anim_walkdolphin", ReanimLoopType::REANIM_LOOP, 0, 0.0f);
-                    }
-                } else if (aZombie->mZombieType == ZombieType::ZOMBIE_SQUASH_HEAD) {
-                    aZombie->mSquashHeadCol = serverZombieSummonCounter == 255 ? -1 : short(serverZombieSummonCounter);
-
-                    if (aZombie->mZombiePhase == ZombiePhase::PHASE_SQUASH_RISING && oldZombiePhase != ZombiePhase::PHASE_SQUASH_RISING) {
-                        aZombie->StopEating();
-                        aZombie->PlayZombieReanim("anim_idle", ReanimLoopType::REANIM_LOOP, 20, 12.0f);
-                        aZombie->mHasHead = false;
-
-                        Reanimation *aHeadReanim = aZombie->mApp->ReanimationTryToGet(aZombie->mSpecialHeadReanimID);
-                        if (aHeadReanim) {
-                            aHeadReanim->PlayReanim("anim_jumpup", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-                            aHeadReanim->mRenderOrder = aZombie->mRenderOrder + 1;
-                            aHeadReanim->SetPosition(aZombie->mPosX + 6.0f, aZombie->mPosY - 21.0f);
-                            aHeadReanim->OverrideScale(0.75f, 0.75f);
-                            aHeadReanim->mOverlayMatrix.m10 = 0.0f;
-                        }
-                        Reanimation *aBodyReanim = aZombie->mApp->ReanimationTryToGet(aZombie->mBodyReanimID);
-                        if (aBodyReanim) {
-                            ReanimatorTrackInstance *aTrackInstance = aBodyReanim->GetTrackInstanceByName("anim_head1");
-                            if (aTrackInstance) {
-                                AttachmentDetach(aTrackInstance->mAttachmentID);
-                            }
-                        }
-                    } else if (aZombie->mZombiePhase == ZombiePhase::PHASE_SQUASH_FALLING && oldZombiePhase != ZombiePhase::PHASE_SQUASH_FALLING) {
-                        Reanimation *aHeadReanim = aZombie->mApp->ReanimationTryToGet(aZombie->mSpecialHeadReanimID);
-                        if (aHeadReanim) {
-                            aHeadReanim->PlayReanim("anim_jumpdown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 60.0f);
-                        }
-                    }
+        case EVENT_SERVER_BOARD_ZOMBIE_PHASE: {
+            const auto *aState = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
+            uint16_t aZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
+                if (Zombie *aZombie = mZombies.DataArrayGet(aZombieID)) {
+                    aZombie->SetZombiePhase(ZombiePhase(aState->data2), aState->data4.i32, int16_t(aState->data3), aState->data5.f32);
                 }
             }
         } break;
