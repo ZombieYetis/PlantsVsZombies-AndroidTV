@@ -570,6 +570,7 @@ inline void *Zombie_AddAttachedReanimAddr;
 inline void *Zombie_SetupWaterTrackAddr;
 inline void *Zombie_UpdateZombiePoolAddr;
 inline void *Zombie_ApplyAnimRateAddr;
+inline void *Zombie_IsMovingAtChilledSpeedAddr;
 inline void *Zombie_SummonBackupDancersAddr;
 inline void *Zombie_RemoveButterAddr;
 inline void *Zombie_CheckForPoolAddr;

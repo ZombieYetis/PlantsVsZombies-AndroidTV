@@ -571,6 +571,7 @@ bool LoadGameMain() {
     Zombie_SetupWaterTrackAddr = GetLibGameMain().GetSymbol("_ZN6Zombie15SetupWaterTrackEPKc");
     Zombie_UpdateZombiePoolAddr = GetLibGameMain().GetSymbol("_ZN6Zombie16UpdateZombiePoolEv");
     Zombie_ApplyAnimRateAddr = GetLibGameMain().GetSymbol("_ZN6Zombie13ApplyAnimRateEf");
+    Zombie_IsMovingAtChilledSpeedAddr = GetLibGameMain().GetSymbol("_ZN6Zombie22IsMovingAtChilledSpeedEv");
     Zombie_SummonBackupDancersAddr = GetLibGameMain().GetSymbol("_ZN6Zombie19SummonBackupDancersEv");
     Zombie_RemoveButterAddr = GetLibGameMain().GetSymbol("_ZN6Zombie12RemoveButterEv");
     Zombie_CheckForPoolAddr = GetLibGameMain().GetSymbol("_ZN6Zombie12CheckForPoolEv");

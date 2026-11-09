@@ -554,6 +554,7 @@ void InitHookFunction() {
     homura::HookFunc(Zombie_BungeeDropZombieAddr, &Zombie::BungeeDropZombie, nullptr);
     homura::HookFunc(Zombie_PickRandomSpeedAddr, &Zombie::PickRandomSpeed, nullptr);
     homura::HookFunc(Zombie_UpdateAnimSpeedAddr, &Zombie::UpdateAnimSpeed, nullptr);
+    homura::HookFunc(Zombie_IsMovingAtChilledSpeedAddr, &Zombie::IsMovingAtChilledSpeed, nullptr);
     homura::HookFunc(Zombie_AnimateChewSoundAddr, &Zombie::AnimateChewSound, nullptr);
     homura::HookFunc(Zombie_AnimateAddr, &Zombie::Animate, nullptr);
     homura::HookFunc(Zombie_UpdateZombieWalkingAddr, &Zombie::UpdateZombieWalking, nullptr);

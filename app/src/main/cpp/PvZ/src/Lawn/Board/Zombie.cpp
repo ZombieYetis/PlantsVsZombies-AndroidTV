@@ -9879,6 +9879,14 @@ bool Zombie::IsMovingAtChilledSpeed() {
     if (mChilledCounter > 0 || mIceTrapCounter > 0)
         return true;
 
+    // 遛狗僵尸与僵尸狗共享减速状态
+    if ((mZombieType == ZombieType::ZOMBIE_DOGWALKER && mHasObject) || mZombiePhase == ZombiePhase::PHASE_DOG_WALKING) {
+        Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
+        if (aPartner != nullptr && !aPartner->IsDeadOrDying() && (aPartner->mChilledCounter > 0 || aPartner->mIceTrapCounter > 0)) {
+            return true;
+        }
+    }
+
     if (mZombieType == ZombieType::ZOMBIE_DANCER || mZombieType == ZombieType::ZOMBIE_BACKUP_DANCER) {
         Zombie *aLeader = nullptr;
         if (mZombieType == ZombieType::ZOMBIE_DANCER) {
