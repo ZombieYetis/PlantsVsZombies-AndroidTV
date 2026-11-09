@@ -531,6 +531,15 @@ bool Board::TeleportPlant(Plant *thePlant, int theDestGridX, int theDestGridY) {
         }
     }
 
+    // 先同步传送特效，再同步越界死亡，避免客户端先删除植物映射。
+    if (IsRemoteServer()) {
+        U16U16_Event event{};
+        event.type = EventType::EVENT_SERVER_BOARD_PLANT_TELEPORT;
+        event.data1 = uint16_t(mPlants.DataArrayGetID(thePlant));
+        event.data2 = aDestGridX == -1 ? UINT16_MAX : uint16_t(aDestGridX);
+        netplay::PutEvent(event);
+    }
+
     if (aDestGridX == -1) {
         thePlant->Die();
         return false;
@@ -3399,18 +3408,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
             }
         } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_CATAPLUT_LAUNCHIING: {
-            auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
-            uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = event1->data2.f32;
-                aZombie->mZombiePhase = PHASE_CATAPULT_LAUNCHING;
-                aZombie->mPhaseCounter = 300;
-                aZombie->PlayZombieReanim("anim_shoot", REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-            }
-        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_CATAPLUT_FIRE: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
             uint16_t serverZombieID = event1->data1;
@@ -3423,18 +3420,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                     Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
                     aZombie->ZombieCatapultFire(aPlant);
                 }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_LADDER_START_PLACING: {
-            auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
-            uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = event1->data2.f32;
-                aZombie->StopEating();
-                aZombie->mZombiePhase = PHASE_LADDER_PLACING;
-                aZombie->PlayZombieReanim("anim_placeladder", REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_LADDER_PLACED: {
@@ -3481,16 +3466,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                 mApp->PlaySample(SOUND_GULP);
             }
         } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_TELEPORTATION_SHOOT: {
-            auto *eventShoot = static_cast<const U16_Event *>(event);
-            uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventShoot->data, clientZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->StopEating();
-                aZombie->mZombiePhase = ZombiePhase::PHASE_TELEPORTATION_SHOOTING;
-                aZombie->PlayZombieReanim("anim_shoot", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
-            }
-        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_TELEPORT: {
             auto *eventTeleport = static_cast<const U16UNI32_Event *>(event);
             uint16_t clientZombieID = 0;
@@ -3503,25 +3478,7 @@ void Board::processServerEvent(const BaseEvent *event) {
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, eventTeleport->data1, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                if (eventTeleport->data2 == UINT16_MAX) {
-                    TeleportPlant(aPlant, int(UINT16_MAX), aPlant->mRow);
-                    serverPlantIDMap.erase(eventTeleport->data1);
-                } else {
-                    TeleportPlant(aPlant, eventTeleport->data2, aPlant->mRow);
-                }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_THROW: {
-            auto *eventThrow = static_cast<const U16_Event *>(event);
-            uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventThrow->data, clientZombieID)) {
-                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                if (aZombie->mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
-                    aZombie->FinishZombieRiseFromGrave();
-                }
-                aZombie->StopEating();
-                aZombie->mZombiePhase = ZombiePhase::PHASE_CROSSING_GUARD_THROWING;
-                aZombie->PlayZombieReanim("anim_throw", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 16.0f);
+                TeleportPlant(aPlant, eventTeleport->data2, aPlant->mRow);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_FIRE: {

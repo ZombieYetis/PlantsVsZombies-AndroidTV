@@ -1674,15 +1674,7 @@ void Projectile::CheckForCollision() {
             if (aHitPlant) {
                 const int aSearchStartGridX = aPlant->mPlantCol + 2;
                 const int aDestGridY = aPlant->mRow;
-                const uint16_t aPlantID = uint16_t(mBoard->mPlants.DataArrayGetID(aPlant));
-                const bool aDidTeleport = mBoard->TeleportPlant(aPlant, aSearchStartGridX, aDestGridY);
-                if (IsRemoteServer()) {
-                    U16U16_Event event{};
-                    event.type = EventType::EVENT_SERVER_BOARD_PLANT_TELEPORT;
-                    event.data1 = aPlantID;
-                    event.data2 = aDidTeleport ? uint16_t(aPlant->mPlantCol) : UINT16_MAX;
-                    netplay::PutEvent(event);
-                }
+                mBoard->TeleportPlant(aPlant, aSearchStartGridX, aDestGridY);
             } else {
                 const float aDestX = mReturning ? aBestZombie->mPosX + 160.0f : std::max(0.0f, aBestZombie->mPosX - 160.0f);
                 mBoard->TeleportZombie(aBestZombie, aDestX);
