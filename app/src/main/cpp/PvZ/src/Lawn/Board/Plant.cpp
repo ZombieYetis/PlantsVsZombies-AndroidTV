@@ -1685,7 +1685,7 @@ void Plant::UpdateCobCannon() {
 }
 
 void Plant::SyncPlantState() {
-    if (IsRemoteClientOrViewer()) {
+    if (!IsRemoteServer()) {
         return;
     }
 
@@ -4483,7 +4483,6 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
 
     if (result) {
         if (IsRemoteServer()) {
-
             if (mSeedType == SEED_KERNELPULT) {
                 U8U8U16U16_Event event = {
                     {EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};

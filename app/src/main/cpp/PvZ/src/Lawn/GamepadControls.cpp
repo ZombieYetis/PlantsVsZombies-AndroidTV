@@ -1316,6 +1316,10 @@ void GamepadControls::OnButtonDown(Sexy::GamepadButton theButton, int thePlayerI
             } else if (aZombieType == ZombieType::ZOMBIE_FLAG) {
                 mBoard->DisplayAdviceAgain("[ADVICE_HUGE_WAVE]", MessageStyle::MESSAGE_STYLE_HUGE_WAVE, AdviceType::ADVICE_HUGE_WAVE);
                 mApp->PlaySample(Sexy::SOUND_HUGE_WAVE); // 播放大波僵尸音效
+                if (IsRemoteServer()) {
+                    BaseEvent event = {EventType::EVENT_SERVER_BOARD_ZOMBIE_HUGE_WAVE};
+                    netplay::PutEvent(event);
+                }
                 mBoard->SpawnZombieWave();
             } else if (Challenge::IsMPZombieTypeAddInRow(aZombieType)) {
                 mBoard->AddZombieInRow(aZombieType, aGridY, Zombie::ZOMBIE_WAVE_VS, true);
