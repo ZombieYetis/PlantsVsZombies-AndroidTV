@@ -863,24 +863,22 @@ void Plant::UpdateSweetPotato() {
         return;
     }
 
-    const int aFrontCol = mPlantCol + 1;
-    if (aFrontCol >= MAX_GRID_SIZE_X) {
-        return;
-    }
+    const Rect aAttackRect = GetPlantAttackRect(PlantWeapon::WEAPON_PRIMARY);
 
     auto IsPoolRow = [this](int theRow) -> bool { //
         return theRow >= 0 && theRow < MAX_GRID_SIZE_Y && mBoard->mPlantRow[theRow] == PlantRowType::PLANTROW_POOL;
     };
 
     // 为每个僵尸确定唯一的甜薯归属，防止相邻行的多个甜薯反复抢夺：
-    auto FindSweetPotatoOwner = [this, &IsPoolRow](Zombie *theZombie) -> Plant * {
+    auto FindSweetPotatoOwner = [this, &IsPoolRow](Zombie *theZombie, const Rect &theZombieRect) -> Plant * {
         Plant *anOwner = nullptr;
         Plant *aSweetPotato = nullptr;
 
         const bool aZombieIsPoolRow = IsPoolRow(theZombie->mRow);
 
         while (mBoard->IteratePlants(aSweetPotato)) {
-            if (aSweetPotato->mSeedType != SeedType::SEED_SWEET_POTATO || aSweetPotato->mPlantCol != mPlantCol || mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) != nullptr) {
+            if (aSweetPotato->mSeedType != SeedType::SEED_SWEET_POTATO || mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) != nullptr
+                || GetRectOverlap(aSweetPotato->GetPlantAttackRect(PlantWeapon::WEAPON_PRIMARY), theZombieRect) <= 0) {
                 continue;
             }
 
@@ -889,7 +887,7 @@ void Plant::UpdateSweetPotato() {
                 continue;
             }
 
-            // 如果僵尸当前逻辑行已有同列甜薯，则由同行甜薯锁定。
+            // 如果僵尸当前逻辑行已有覆盖它的甜薯，则由同行甜薯锁定。
             if (aSweetPotato->mRow == theZombie->mRow) {
                 return aSweetPotato;
             }
@@ -928,13 +926,11 @@ void Plant::UpdateSweetPotato() {
         }
 
         const Rect aZombieRect = aZombie->GetZombieRect();
-        const int aZombieCenterX = aZombieRect.mX + aZombieRect.mWidth / 2;
-        const int aZombieCenterY = aZombieRect.mY + aZombieRect.mHeight / 2;
-        if (mBoard->PixelToGridX(aZombieCenterX, aZombieCenterY) != aFrontCol) {
+        if (GetRectOverlap(aAttackRect, aZombieRect) <= 0) {
             continue;
         }
 
-        if (FindSweetPotatoOwner(aZombie) != this) {
+        if (FindSweetPotatoOwner(aZombie, aZombieRect) != this) {
             continue;
         }
 
@@ -3364,6 +3360,9 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon) {
                 break;
             case SeedType::SEED_BONK_CHOY:
                 aRect = Rect(mX - 95, mY, 270, mHeight);
+                break;
+            case SeedType::SEED_SWEET_POTATO:
+                aRect = Rect(mX + 60, mY, 100, mHeight);
                 break;
             case SeedType::SEED_ENDURIAN: {
                 Plant *aPumpkin = mBoard->GetPumpkinAt(mPlantCol, mRow);

@@ -2051,13 +2051,9 @@ void Zombie::UpdateZombieDog() {
     Plant *aSweetPotato = mBoard->mPlants.DataArrayTryToGet(mTargetPlantID);
     if (aSweetPotato != nullptr && !aSweetPotato->NotOnGround() && aSweetPotato->mSeedType == SeedType::SEED_SWEET_POTATO && aSweetPotato->mRow == mRow
         && mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) == nullptr) {
-        float aPlantCenterX = aSweetPotato->mX + aSweetPotato->mWidth * 0.5f;
-        float aForwardDistance = IsWalkingBackwards() ? (aPlantCenterX - aDogCenterX) : (aDogCenterX - aPlantCenterX);
-        const bool aDogInRange = (aSweetPotato->mPlantCol == aDogCol || aSweetPotato->mPlantCol == aFrontCol) && aForwardDistance >= -20.0f;
-        const Rect aWalkerRect = aWalker->GetZombieRect();
-        const int aWalkerCol = mBoard->PixelToGridX(aWalkerRect.mX + aWalkerRect.mWidth / 2, aWalkerRect.mY + aWalkerRect.mHeight / 2);
-        // 主人仍在甜薯的吸引列时，狗不能因走在前面而提前放弃目标。
-        if (aDogInRange || aWalkerCol == aSweetPotato->mPlantCol + 1) {
+        const Rect aAttackRect = aSweetPotato->GetPlantAttackRect(PlantWeapon::WEAPON_PRIMARY);
+        // 狗或主人仍与甜薯的吸引范围重叠时保持目标。
+        if (GetRectOverlap(aAttackRect, aDogRect) > 0 || GetRectOverlap(aAttackRect, aWalker->GetZombieRect()) > 0) {
             mPhaseCounter = 300;
             return;
         }

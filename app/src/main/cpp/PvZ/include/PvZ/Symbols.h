@@ -819,6 +819,7 @@ inline void *Plant_FindStarFruitTargetAddr;
 inline void *Plant_FindTargetGridItemAddr;
 inline void *Plant_GetImageAddr;
 inline void *Plant_GetPlantRectAddr;
+inline void *Plant_GetPlantAttackRectAddr;
 inline void *Plant_NotOnGroundAddr;
 inline void *Plant_IsUpgradeAddr;
 inline void *Plant_IsOnBoardAddr;

@@ -820,6 +820,7 @@ bool LoadGameMain() {
     Plant_FindTargetGridItemAddr = GetLibGameMain().GetSymbol("_ZN5Plant18FindTargetGridItemEi11PlantWeapon");
     Plant_GetImageAddr = GetLibGameMain().GetSymbol("_ZN5Plant8GetImageE8SeedType");
     Plant_GetPlantRectAddr = GetLibGameMain().GetSymbol("_ZN5Plant12GetPlantRectEv");
+    Plant_GetPlantAttackRectAddr = GetLibGameMain().GetSymbol("_ZN5Plant18GetPlantAttackRectE11PlantWeapon");
     Plant_NotOnGroundAddr = GetLibGameMain().GetSymbol("_ZN5Plant11NotOnGroundEv");
     Plant_IsUpgradeAddr = GetLibGameMain().GetSymbol("_ZN5Plant9IsUpgradeE8SeedType");
     Plant_IsOnBoardAddr = GetLibGameMain().GetSymbol("_ZN5Plant9IsOnBoardEv");
