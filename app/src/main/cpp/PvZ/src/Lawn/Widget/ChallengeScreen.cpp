@@ -25,6 +25,7 @@
 #include "PvZ/Lawn/System/Music.h"
 #include "PvZ/Lawn/System/PlayerInfo.h"
 #include "PvZ/Lawn/Widget/GameButton.h"
+#include "PvZ/Lawn/Widget/VSResultsMenu.h"
 #include "PvZ/Lawn/Widget/VSSetupMenu.h"
 #include "PvZ/SexyAppFramework/Graphics/Font.h"
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
@@ -797,6 +798,8 @@ void ChallengeScreen::Update() {
         if (!gNetplayLobbyFinished && mNetplayLobbyWidget == nullptr && mApp->mHelpTextScreen == nullptr && !IsRemoteClient() && !IsRemoteServer()) {
             mNetplayLobbyWidget = new NetplayLobbyWidget(mApp, mPage == ChallengePage::CHALLENGE_PAGE_COOP);
             AddWidget(mNetplayLobbyWidget);
+            // 重新进入大厅时清除上一房间的战绩；同房再来一局不会经过这里。
+            VSResultsMenu::ClearPlayerRecords();
             VSSetupAddonWidget::ResetGlobalBpState();
             if (gChallengeScreenOpenReplayManage) {
                 gChallengeScreenOpenReplayManage = false;
