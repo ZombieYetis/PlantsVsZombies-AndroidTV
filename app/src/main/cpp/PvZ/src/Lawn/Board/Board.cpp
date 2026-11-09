@@ -545,11 +545,19 @@ bool Board::TeleportPlant(Plant *thePlant, int theDestGridX, int theDestGridY) {
         return false;
     }
 
+    const int aOriginX = thePlant->mX;
+    const int aOriginY = thePlant->mY;
     thePlant->mPlantCol = aDestGridX;
     thePlant->mRow = aDestGridY;
     thePlant->mX = GridToPixelX(aDestGridX, aDestGridY);
     thePlant->mY = GridToPixelY(aDestGridX, aDestGridY);
     thePlant->mEatenFlashCountdown = 150;
+
+    // 睡眠动画独立于植物本体，传送时同步平移，保留各类蘑菇的原始偏移。
+    if (Reanimation *aSleepingReanim = mApp->ReanimationTryToGet(thePlant->mSleepingReanimID)) {
+        aSleepingReanim->mOverlayMatrix.m02 += thePlant->mX - aOriginX;
+        aSleepingReanim->mOverlayMatrix.m12 += thePlant->mY - aOriginY;
+    }
 
     if (aLadder != nullptr) {
         aLadder->mGridX = aDestGridX;
