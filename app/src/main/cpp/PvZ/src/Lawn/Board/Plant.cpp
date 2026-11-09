@@ -580,10 +580,33 @@ void Plant::Update() {
         UpdateRedStingerForm();
     }
 
-    const PlantState previousState = mState;
+    const PlantState aPreviousState = mState;
     old_Plant_Update(this);
-    if (IsRemoteServer() && !mDead && mSeedType == SEED_COBCANNON && mState != previousState) {
-        SyncCobCannonState();
+    if (IsRemoteClientOrViewer() || mState == aPreviousState) {
+        return;
+    }
+
+    // 只同步统一状态事件负责的切换，吞食目标和加农炮开火仍由专用事件处理。
+    bool aSyncState = false;
+    switch (mSeedType) {
+        case SeedType::SEED_CHOMPER:
+            aSyncState = mState == PlantState::STATE_CHOMPER_BITING || mState == PlantState::STATE_CHOMPER_BITING_MISSED;
+            break;
+        case SeedType::SEED_SQUASH:
+            aSyncState =
+                mState == PlantState::STATE_SQUASH_LOOK || mState == PlantState::STATE_SQUASH_PRE_LAUNCH || mState == PlantState::STATE_SQUASH_RISING || mState == PlantState::STATE_SQUASH_FALLING;
+            break;
+        case SeedType::SEED_COBCANNON:
+            aSyncState = mState == PlantState::STATE_COBCANNON_ARMING || mState == PlantState::STATE_COBCANNON_LOADING || mState == PlantState::STATE_COBCANNON_READY;
+            break;
+        case SeedType::SEED_ICEBERG_LETTUCE:
+            aSyncState = aPreviousState == PlantState::STATE_NOTREADY && mState == PlantState::STATE_READY;
+            break;
+        default:
+            break;
+    }
+    if (aSyncState) {
+        SyncPlantState();
     }
 }
 
@@ -1661,19 +1684,64 @@ void Plant::UpdateCobCannon() {
     }
 }
 
-void Plant::SyncCobCannonState() {
+void Plant::SyncPlantState() {
+    if (IsRemoteClientOrViewer()) {
+        return;
+    }
+
     U16U16U16UNI32UNI32_Event aEvent{};
-    aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_COB_CANNON_STATE;
+    aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_STATE;
     aEvent.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
     aEvent.data2 = uint16_t(mState);
     aEvent.data3 = uint16_t(mStateCountdown);
-    aEvent.data4.i32 = mShootingCounter;
-    Reanimation *aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
-    aEvent.data5.f32 = aBodyReanim->mAnimTime;
+    // 附加数据按植物类型解释，沿用通用事件结构。
+    if (mSeedType == SeedType::SEED_SQUASH) {
+        aEvent.data4.i32 = mTargetX;
+    } else if (mSeedType == SeedType::SEED_COBCANNON) {
+        aEvent.data4.i32 = mShootingCounter;
+    }
     netplay::PutEvent(aEvent);
 }
 
-void Plant::ApplyCobCannonState(PlantState theState, int theCountdown, int theShootingCounter, float theAnimTime) {
+void Plant::SetPlantState(PlantState theState, int theCountdown, int theStateData) {
+    if (mDead) {
+        return;
+    }
+
+    if (mSeedType == SeedType::SEED_CHOMPER) {
+        if (theState == PlantState::STATE_CHOMPER_BITING) {
+            PlayBodyReanim("anim_bite", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
+            mStateCountdown = 70;
+            mState = theState;
+        } else if (theState == PlantState::STATE_CHOMPER_BITING_MISSED) {
+            mState = theState;
+        }
+    } else if (mSeedType == SeedType::SEED_SQUASH) {
+        const PlantState aOldState = mState;
+        mState = theState;
+        mStateCountdown = int16_t(theCountdown);
+        mTargetX = theStateData;
+
+        if (theState == PlantState::STATE_SQUASH_LOOK && aOldState != PlantState::STATE_SQUASH_LOOK) {
+            PlayBodyReanim(mTargetX < mX ? "anim_lookleft" : "anim_lookright", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
+        } else if (theState == PlantState::STATE_SQUASH_PRE_LAUNCH && aOldState != PlantState::STATE_SQUASH_PRE_LAUNCH) {
+            PlayBodyReanim("anim_jumpup", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
+        } else if (theState == PlantState::STATE_SQUASH_RISING && aOldState != PlantState::STATE_SQUASH_RISING) {
+            mRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
+        } else if (theState == PlantState::STATE_SQUASH_FALLING && aOldState != PlantState::STATE_SQUASH_FALLING) {
+            PlayBodyReanim("anim_jumpdown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 60.0f);
+        }
+    } else if (mSeedType == SeedType::SEED_COBCANNON) {
+        ApplyCobCannonState(theState, theCountdown, theStateData);
+    } else if (mSeedType == SeedType::SEED_ICEBERG_LETTUCE && theState == PlantState::STATE_READY) {
+        mState = theState;
+        mStateCountdown = theCountdown;
+        mApp->PlayFoley(FoleyType::FOLEY_ICEBERG);
+        PlayBodyReanim("anim_explode", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 12.0f);
+    }
+}
+
+void Plant::ApplyCobCannonState(PlantState theState, int theCountdown, int theShootingCounter) {
     mState = theState;
     mStateCountdown = theCountdown;
     mShootingCounter = theShootingCounter;
@@ -1686,7 +1754,6 @@ void Plant::ApplyCobCannonState(PlantState theState, int theCountdown, int theSh
     } else if (mState == PlantState::STATE_COBCANNON_READY) {
         PlayIdleAnim(12.0f);
     }
-    aBodyReanim->mAnimTime = theAnimTime;
 }
 
 void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem) {
@@ -4465,13 +4532,6 @@ void Plant::UpdateGraveBuster() {
 }
 
 void Plant::UpdateChomper() {
-    auto syncBiteState = [this]() {
-        if (IsRemoteServer()) {
-            U16U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_CHOMPER_STATE}, uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
-            netplay::PutEvent(event);
-        }
-    };
-
     Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
     if (mState == PlantState::STATE_READY) {
         // 只由主机索敌起咬，客机收到通知后播放相同的固定动画。
@@ -4482,7 +4542,6 @@ void Plant::UpdateChomper() {
             PlayBodyReanim("anim_bite", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
             mState = PlantState::STATE_CHOMPER_BITING;
             mStateCountdown = 70;
-            syncBiteState();
         }
     } else if (mState == PlantState::STATE_CHOMPER_BITING) {
         // 客机等待主机的吞食/咬空结果，不按本地僵尸位置自行分支。
@@ -4530,9 +4589,6 @@ void Plant::UpdateChomper() {
                 }
                 aZombie->DieWithLoot();
                 mState = PlantState::STATE_CHOMPER_BITING_GOT_ONE;
-            }
-            if (mState == PlantState::STATE_CHOMPER_BITING_MISSED) {
-                syncBiteState();
             }
         }
     } else if (mState == PlantState::STATE_CHOMPER_BITING_GOT_ONE) {
@@ -4796,18 +4852,6 @@ void Plant::UpdateSquash() {
         }
         return false;
     };
-    auto syncSquashState = [this]() {
-        if (!IsRemoteServer()) {
-            return;
-        }
-        U16U16I16I16_Event event{};
-        event.type = EventType::EVENT_SERVER_BOARD_PLANT_SQUASH_STATE;
-        event.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
-        event.data2 = uint16_t(mState);
-        event.data3 = int16_t(mStateCountdown);
-        event.data4 = int16_t(mTargetX);
-        netplay::PutEvent(event);
-    };
 
     if (mState == PlantState::STATE_NOTREADY) {
         if (IsRemoteClientOrViewer()) {
@@ -4818,7 +4862,6 @@ void Plant::UpdateSquash() {
             mStateCountdown = 80;
             PlayBodyReanim(mTargetX < mX ? "anim_lookleft" : "anim_lookright", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
             mApp->PlayFoley(FoleyType::FOLEY_SQUASH_HMM);
-            syncSquashState();
         }
     } else if (mState == PlantState::STATE_SQUASH_LOOK) {
         if (IsRemoteClientOrViewer()) {
@@ -4828,7 +4871,6 @@ void Plant::UpdateSquash() {
             PlayBodyReanim("anim_jumpup", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
             mState = PlantState::STATE_SQUASH_PRE_LAUNCH;
             mStateCountdown = 45;
-            syncSquashState();
         }
     } else if (mState == PlantState::STATE_SQUASH_PRE_LAUNCH) {
         if (mStateCountdown == 1) {
@@ -4843,7 +4885,6 @@ void Plant::UpdateSquash() {
             mState = PlantState::STATE_SQUASH_RISING;
             mStateCountdown = 50;
             mRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
-            syncSquashState();
         }
     } else {
         int aTargetCol = mBoard->PixelToGridXKeepOnBoard(mTargetX, mY);
@@ -4857,7 +4898,6 @@ void Plant::UpdateSquash() {
                 PlayBodyReanim("anim_jumpdown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 60.0f);
                 mState = PlantState::STATE_SQUASH_FALLING;
                 mStateCountdown = 10;
-                syncSquashState();
             }
         } else if (mState == PlantState::STATE_SQUASH_FALLING) {
             mY = TodAnimateCurve(10, 0, mStateCountdown, aDestY - 120, aDestY, TodCurves::CURVE_LINEAR);
@@ -4892,16 +4932,6 @@ void Plant::UpdateSquash() {
 }
 
 void Plant::UpdateIcebergLettuce() {
-    auto syncIcebergLettuceState = [this]() {
-        if (!IsRemoteServer()) {
-            return;
-        }
-        U16_Event event{};
-        event.type = EventType::EVENT_SERVER_BOARD_PLANT_ICEBERG_LETTUCE_LAUNCH;
-        event.data = uint16_t(mBoard->mPlants.DataArrayGetID(this));
-        netplay::PutEvent(event);
-    };
-
     if (mState == PlantState::STATE_NOTREADY) {
         if (IsRemoteClientOrViewer()) {
             return;
@@ -4912,7 +4942,6 @@ void Plant::UpdateIcebergLettuce() {
             mState = PlantState::STATE_READY;
             mStateCountdown = 50;
             mTargetZombieID = mBoard->ZombieGetID(aZombie);
-            syncIcebergLettuceState();
         }
     } else if (mState == PlantState::STATE_READY) {
         if (mStateCountdown <= 0) {

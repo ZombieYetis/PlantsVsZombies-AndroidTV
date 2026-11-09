@@ -2681,16 +2681,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
             }
         } break;
-        case EVENT_SERVER_BOARD_PLANT_COB_CANNON_STATE: {
-            const auto *stateEvent = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, stateEvent->data1, clientPlantID)) {
-                Plant *cobCannon = mPlants.DataArrayGet(clientPlantID);
-                if (!cobCannon->mDead && cobCannon->mSeedType == SEED_COBCANNON) {
-                    cobCannon->ApplyCobCannonState(PlantState(stateEvent->data2), stateEvent->data3, stateEvent->data4.i32, stateEvent->data5.f32);
-                }
-            }
-        } break;
         case EVENT_SERVER_BOARD_PLANT_ADD: {
             auto *eventPlantAdd = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             int gridX = eventPlantAdd->data1;
@@ -2875,21 +2865,12 @@ void Board::processServerEvent(const BaseEvent *event) {
                 aPlant->mState = PlantState::STATE_CHOMPER_BITING_GOT_ONE;
             }
         } break;
-        case EVENT_SERVER_BOARD_PLANT_CHOMPER_STATE: {
-            const auto *stateEvent = static_cast<const U16U16_Event *>(event);
+        case EVENT_SERVER_BOARD_PLANT_STATE: {
+            const auto *stateEvent = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, stateEvent->data1, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                if (!aPlant->mDead && aPlant->mSeedType == SeedType::SEED_CHOMPER) {
-                    const auto state = PlantState(stateEvent->data2);
-                    if (state == PlantState::STATE_CHOMPER_BITING) {
-                        aPlant->PlayBodyReanim("anim_bite", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-                        aPlant->mStateCountdown = 70;
-                        aPlant->mState = state;
-                    } else if (state == PlantState::STATE_CHOMPER_BITING_MISSED) {
-                        aPlant->mState = state;
-                    }
-                }
+                aPlant->SetPlantState(PlantState(stateEvent->data2), stateEvent->data3, stateEvent->data4.i32);
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_MAGNETSHROOM_ATTACK: {
@@ -2927,39 +2908,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                 aMagnetItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 10.0f;
                 aMagnetItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f);
                 aMagnetItem->mItemType = MagnetItemType::MAGNET_ITEM_LADDER_PLACED;
-            }
-        } break;
-        case EVENT_SERVER_BOARD_PLANT_SQUASH_STATE: {
-            auto *eventPlantSquashState = static_cast<const U16U16I16I16_Event *>(event);
-            uint16_t serverPlantID = eventPlantSquashState->data1;
-            uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
-                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                PlantState oldState = aPlant->mState;
-                auto serverState = PlantState(eventPlantSquashState->data2);
-                aPlant->mState = serverState;
-                aPlant->mStateCountdown = eventPlantSquashState->data3;
-                aPlant->mTargetX = eventPlantSquashState->data4;
-
-                if (serverState == PlantState::STATE_SQUASH_LOOK && oldState != PlantState::STATE_SQUASH_LOOK) {
-                    aPlant->PlayBodyReanim(aPlant->mTargetX < aPlant->mX ? "anim_lookleft" : "anim_lookright", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
-                } else if (serverState == PlantState::STATE_SQUASH_PRE_LAUNCH && oldState != PlantState::STATE_SQUASH_PRE_LAUNCH) {
-                    aPlant->PlayBodyReanim("anim_jumpup", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-                } else if (serverState == PlantState::STATE_SQUASH_RISING && oldState != PlantState::STATE_SQUASH_RISING) {
-                    aPlant->mRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, aPlant->mRow, 0);
-                } else if (serverState == PlantState::STATE_SQUASH_FALLING && oldState != PlantState::STATE_SQUASH_FALLING) {
-                    aPlant->PlayBodyReanim("anim_jumpdown", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 60.0f);
-                }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_PLANT_ICEBERG_LETTUCE_LAUNCH: {
-            auto *eventPlantLaunch = static_cast<const U16_Event *>(event);
-            uint16_t serverPlantID = eventPlantLaunch->data;
-            uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
-                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                mApp->PlayFoley(FoleyType::FOLEY_ICEBERG);
-                aPlant->PlayBodyReanim("anim_explode", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 12.0f);
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_WIN: {
