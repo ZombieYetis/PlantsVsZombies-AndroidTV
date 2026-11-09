@@ -9507,9 +9507,19 @@ float Zombie::ZombieTargetLeadX(float theTime) {
 }
 
 void Zombie::ApplyBurn() {
-    if (mDead || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED)
+    if (IsRemoteClientOrViewer() || mDead || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED)
         return;
 
+    // 必须先于伤害和死亡事件发送，客户端才能在目标被清理前播放灰烬效果。
+    if (IsRemoteServer()) {
+        U16_Event event = {{EventType::EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN}, uint16_t(mBoard->mZombies.DataArrayGetID(this))};
+        netplay::PutEvent(event);
+    }
+
+    ApplyBurn_Origin();
+}
+
+void Zombie::ApplyBurn_Origin() {
     //    if (mZombieType == ZombieType::ZOMBIE_SKELETON) {
     //        SettleSunBeanSun();
     //        DieWithLoot();

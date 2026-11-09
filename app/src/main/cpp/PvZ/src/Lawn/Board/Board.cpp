@@ -2919,6 +2919,14 @@ void Board::processServerEvent(const BaseEvent *event) {
             //                PlantsWon_Origin(aGridItem);
             //            }
         } break;
+        case EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN: {
+            const auto *burnEvent = static_cast<const U16_Event *>(event);
+            uint16_t clientZombieID = 0;
+            if (homura::FindInMap(serverZombieIDMap, burnEvent->data, clientZombieID)) {
+                Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
+                aZombie->ApplyBurn_Origin();
+            }
+        } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DIE: {
             auto *eventZombieDie = static_cast<const U16_Event *>(event);
             uint16_t serverZombieID = eventZombieDie->data;

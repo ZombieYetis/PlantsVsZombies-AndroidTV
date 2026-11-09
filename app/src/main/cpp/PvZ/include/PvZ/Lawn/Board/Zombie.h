@@ -587,6 +587,7 @@ public:
     void ApplySyncedSpeed(float theVelX, short theAnimTicks);
     float ZombieTargetLeadX(float theTime);
     void ApplyBurn();
+    void ApplyBurn_Origin();
     void ApplyButter();
     void ApplyChill(bool theIsIceTrap);
     void HitIceTrap();
