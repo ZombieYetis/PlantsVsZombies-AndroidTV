@@ -4182,8 +4182,8 @@ void Plant::UpdateShooter() {
     }
     if (mLaunchCounter <= 0) {
         mLaunchCounter = mLaunchRate - Sexy::Rand(15);
-        if (IsRemoteServer()) {
-            U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_SHOOTER_LAUNCH}, uint16_t(mBoard->mPlants.DataArrayGetID(this))};
+        if (IsRemoteServer() && (mSeedType == SeedType::SEED_THREEPEATER || mSeedType == SeedType::SEED_STARFRUIT)) {
+            U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint16_t(mBoard->mPlants.DataArrayGetID(this))};
             netplay::PutEvent(event);
         }
         if (mSeedType == SeedType::SEED_THREEPEATER) {
@@ -4486,7 +4486,7 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
 
             if (mSeedType == SEED_KERNELPULT) {
                 U8U8U16U16_Event event = {
-                    {EventType::EVENT_SERVER_BOARD_PLANT_KERNELPLUT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
+                    {EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
                 netplay::PutEvent(event);
             } else {
                 U8U8U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this))};

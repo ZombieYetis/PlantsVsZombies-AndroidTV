@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3220;
+inline constexpr uint32_t NETPLAY_VERSION = 3222;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -131,13 +131,11 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_GRIDITEM_SKELETON_REBIRTH,
     EVENT_SERVER_BOARD_GRIDITEM_SKELETON_SPAWN,
 
-    EVENT_SERVER_BOARD_PLANT_LAUNCHCOUNTER,                // 同步生产植物如向日葵、阳光菇的生产发光
-    EVENT_SERVER_BOARD_PLANT_SHOOTER_LAUNCH,               // 播放杨桃、三线射手的开火动画
-    EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE,            // 播放其他植物的开火动画
-    EVENT_SERVER_BOARD_PLANT_KERNELPLUT_FINDTARGETANDFIRE, // 黄油投手
-    EVENT_SERVER_BOARD_PLANT_PINGPONG_ANIMATION,           // 似乎无用，先不同步
-    EVENT_SERVER_BOARD_PLANT_OTHER_ANIMATION,              // 同步摇摆动画、开火动画的帧率和播放进度
-    EVENT_SERVER_BOARD_PLANT_FIRE,                         // 射出子弹
+    EVENT_SERVER_BOARD_PLANT_LAUNCHCOUNTER,      // 同步生产植物如向日葵、阳光菇的生产发光
+    EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE,  // 播放植物的开火动画
+    EVENT_SERVER_BOARD_PLANT_PINGPONG_ANIMATION, // 似乎无用，先不同步
+    EVENT_SERVER_BOARD_PLANT_OTHER_ANIMATION,    // 同步摇摆动画、开火动画的帧率和播放进度
+    EVENT_SERVER_BOARD_PLANT_FIRE,               // 射出子弹
     EVENT_SERVER_BOARD_PLANT_ADD,
     EVENT_SERVER_BOARD_PLANT_DIE,
     EVENT_SERVER_BOARD_PLANT_DO_SPECIAL, // 同步植物触发特性

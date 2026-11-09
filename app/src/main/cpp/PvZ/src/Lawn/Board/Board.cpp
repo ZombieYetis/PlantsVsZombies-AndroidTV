@@ -2792,17 +2792,46 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE: {
+            const bool aIsShortEvent = event->size == sizeof(U16_Event);
+            if (!aIsShortEvent && event->size != sizeof(U8U8U16_Event) && event->size != sizeof(U8U8U16U16_Event)) {
+                break;
+            }
             auto *event1 = static_cast<const U8U8U16_Event *>(event);
-            uint16_t serverPlantID = event1->data3;
+            uint16_t serverPlantID = aIsShortEvent ? static_cast<const U16_Event *>(event)->data : event1->data3;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
+                // 短包没有行号和武器字段，只处理杨桃、三线射手起手。
+                if (aIsShortEvent) {
+                    if (aPlant->mSeedType == SEED_THREEPEATER) {
+                        aPlant->LaunchThreepeater();
+                    } else if (aPlant->mSeedType == SEED_STARFRUIT) {
+                        aPlant->LaunchStarFruit();
+                    }
+                    break;
+                }
                 if (aPlant->mSeedType == SeedType::SEED_PEANUT) {
                     aPlant->LaunchPeanut();
                 } else if (aPlant->mSeedType == SeedType::SEED_RED_STINGER) {
                     aPlant->LaunchRedStinger();
                 } else {
                     old_Plant_FindTargetAndFire(aPlant, event1->data1, PlantWeapon(event1->data2));
+                }
+                // 扩展包在公共字段后附带玉米或黄油状态，先播放起手再校正图层。
+                if (aPlant->mSeedType == SeedType::SEED_KERNELPULT && event->size == sizeof(U8U8U16U16_Event)) {
+                    const auto *kernelEvent = static_cast<const U8U8U16U16_Event *>(event);
+                    auto serverState = PlantState(kernelEvent->data4);
+                    if (aPlant->mState != serverState) {
+                        aPlant->mState = serverState;
+                        Reanimation *aReanim = mApp->ReanimationGet(aPlant->mBodyReanimID);
+                        if (serverState == STATE_KERNELPULT_BUTTER) {
+                            aReanim->AssignRenderGroupToPrefix("Cornpult_butter", RENDER_GROUP_NORMAL);
+                            aReanim->AssignRenderGroupToPrefix("Cornpult_kernal", RENDER_GROUP_HIDDEN);
+                        } else {
+                            aReanim->AssignRenderGroupToPrefix("Cornpult_butter", RENDER_GROUP_HIDDEN);
+                            aReanim->AssignRenderGroupToPrefix("Cornpult_kernal", RENDER_GROUP_NORMAL);
+                        }
+                    }
                 }
                 if (aPlant->mSeedType == SEED_LEFTPEATER) {
                     Reanimation *aHeadReanim = mApp->ReanimationGet(aPlant->mHeadReanimID);
@@ -2815,40 +2844,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                 }
                 if (aPlant->mSeedType == SeedType::SEED_BLOOMERANG) {
                     mApp->PlayFoley(FoleyType::FOLEY_BLOOMERANG);
-                }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_PLANT_KERNELPLUT_FINDTARGETANDFIRE: {
-            auto *event1 = static_cast<const U8U8U16U16_Event *>(event);
-            uint16_t serverPlantID = event1->data3;
-            uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
-                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                old_Plant_FindTargetAndFire(aPlant, event1->data1, PlantWeapon(event1->data2));
-                auto serverState = PlantState(event1->data4);
-                if (aPlant->mState != serverState) {
-                    aPlant->mState = serverState;
-                    Reanimation *reanimation = mApp->ReanimationGet(aPlant->mBodyReanimID);
-                    if (serverState == STATE_KERNELPULT_BUTTER) {
-                        reanimation->AssignRenderGroupToPrefix("Cornpult_butter", RENDER_GROUP_NORMAL);
-                        reanimation->AssignRenderGroupToPrefix("Cornpult_kernal", RENDER_GROUP_HIDDEN);
-                    } else {
-                        reanimation->AssignRenderGroupToPrefix("Cornpult_butter", RENDER_GROUP_HIDDEN);
-                        reanimation->AssignRenderGroupToPrefix("Cornpult_kernal", RENDER_GROUP_NORMAL);
-                    }
-                }
-            }
-        } break;
-        case EVENT_SERVER_BOARD_PLANT_SHOOTER_LAUNCH: {
-            auto *event1 = static_cast<const U16_Event *>(event);
-            uint16_t serverPlantID = event1->data;
-            uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
-                Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                if (aPlant->mSeedType == SEED_THREEPEATER) {
-                    aPlant->LaunchThreepeater();
-                } else if (aPlant->mSeedType == SEED_STARFRUIT) {
-                    aPlant->LaunchStarFruit();
                 }
             }
         } break;
