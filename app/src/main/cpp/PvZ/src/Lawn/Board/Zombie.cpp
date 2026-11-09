@@ -2050,10 +2050,14 @@ void Zombie::UpdateZombieDog() {
     // 甜薯主动吸引成功后优先保持该目标，不受普通追猎的出生行范围限制。
     Plant *aSweetPotato = mBoard->mPlants.DataArrayTryToGet(mTargetPlantID);
     if (aSweetPotato != nullptr && !aSweetPotato->NotOnGround() && aSweetPotato->mSeedType == SeedType::SEED_SWEET_POTATO && aSweetPotato->mRow == mRow
-        && (aSweetPotato->mPlantCol == aDogCol || aSweetPotato->mPlantCol == aFrontCol) && mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) == nullptr) {
+        && mBoard->GetLadderAt(aSweetPotato->mPlantCol, aSweetPotato->mRow) == nullptr) {
         float aPlantCenterX = aSweetPotato->mX + aSweetPotato->mWidth * 0.5f;
         float aForwardDistance = IsWalkingBackwards() ? (aPlantCenterX - aDogCenterX) : (aDogCenterX - aPlantCenterX);
-        if (aForwardDistance >= -20.0f) {
+        const bool aDogInRange = (aSweetPotato->mPlantCol == aDogCol || aSweetPotato->mPlantCol == aFrontCol) && aForwardDistance >= -20.0f;
+        const Rect aWalkerRect = aWalker->GetZombieRect();
+        const int aWalkerCol = mBoard->PixelToGridX(aWalkerRect.mX + aWalkerRect.mWidth / 2, aWalkerRect.mY + aWalkerRect.mHeight / 2);
+        // 主人仍在甜薯的吸引列时，狗不能因走在前面而提前放弃目标。
+        if (aDogInRange || aWalkerCol == aSweetPotato->mPlantCol + 1) {
             mPhaseCounter = 300;
             return;
         }
