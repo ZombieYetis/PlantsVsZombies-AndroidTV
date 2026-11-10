@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3222;
+inline constexpr uint32_t NETPLAY_VERSION = 3223;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -42,6 +42,12 @@ inline constexpr uint32_t NETPLAY_VERSION = 3222;
 inline constexpr uint16_t NETPLAY_PLANT_ID_NULL = UINT16_MAX;
 inline constexpr uint16_t NETPLAY_ZOMBIE_ID_NULL = UINT16_MAX;
 inline constexpr uint16_t NETPLAY_GRIDITEM_ID_NULL = UINT16_MAX;
+
+using IdMap = std::unordered_map<uint16_t, uint16_t>;
+inline IdMap serverPlantIDMap;
+inline IdMap serverZombieIDMap;
+inline IdMap serverCoinIDMap;
+inline IdMap serverGridItemIDMap;
 
 enum EventType : uint8_t {
     EVENT_NULL,
@@ -175,6 +181,7 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_ZOMBIE_CATAPLUT_FIRE,
     EVENT_SERVER_BOARD_ZOMBIE_LADDER_PLACED,
     EVENT_SERVER_BOARD_ZOMBIE_START_EATING,
+    EVENT_CLIENT_BOARD_ZOMBIE_CHECK_EATING, // 客户端请求主机校验啃咬，未啃咬时同步位置。
     EVENT_SERVER_BOARD_ZOMBIE_BOBSLED_PICK_SPEED,
     EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN,
     EVENT_SERVER_BOARD_ZOMBIE_IMP_KICKED,

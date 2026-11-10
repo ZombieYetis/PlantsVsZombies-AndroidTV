@@ -80,11 +80,6 @@
 using namespace Sexy;
 
 namespace {
-using IdMap = std::unordered_map<uint16_t, uint16_t>;
-IdMap serverPlantIDMap;
-IdMap serverZombieIDMap;
-IdMap serverCoinIDMap;
-IdMap serverGridItemIDMap;
 uint32_t gSyncedCobCannonSelection[2] = {};
 int gSyncedProgressMeterWidth = -1;
 int gSyncedProgressMeterWave = -1;
@@ -2364,6 +2359,14 @@ void Board::processClientEvent(const BaseEvent *event) {
             mApp->ShowVSResultsScreen();
             mApp->mVSResultsMenu->InitFromBoard(this);
             mApp->KillBoard();
+        } break;
+        case EVENT_CLIENT_BOARD_ZOMBIE_CHECK_EATING: {
+            auto *request = static_cast<const U16_Event *>(event);
+            Zombie *aZombie = mZombies.DataArrayGet(request->data);
+            if (!aZombie->mIsEating && !aZombie->IsDeadOrDying()) {
+                U16UNI32_Event reply = {{EVENT_SERVER_BOARD_ZOMBIE_START_EATING}, request->data, {.f32 = aZombie->mPosX}};
+                netplay::PutEvent(reply);
+            }
         } break;
         default:
             break;

@@ -6135,14 +6135,22 @@ void Zombie::ShowDoorArms(bool theShow) {
 }
 
 void Zombie::StartEating() {
-    // 为确保视觉的流畅性允许客户端擅自触发啃咬，仅权威同步僵尸的位置以优化高移速僵尸“借过”植物的问题
+    // 为确保视觉的流畅性允许客户端立即表现啃咬，同时向主机校验；误判时校正位置
     if (mApp->mGameScene == SCENE_PLAYING) {
-        //        if (IsRemoteClientOrViewer()) {
-        //            return;
-        //        }
-
         if (mIsEating) {
             return;
+        }
+
+        if (IsRemoteClient() && !gIsServerModeSpectator && !gIsReplayMode) {
+            const auto localID = uint16_t(mBoard->ZombieGetID(this));
+            for (const auto &[serverID, clientID] : serverZombieIDMap) {
+                if (clientID != localID) {
+                    continue;
+                }
+                U16_Event event = {{EVENT_CLIENT_BOARD_ZOMBIE_CHECK_EATING}, serverID};
+                netplay::PutEvent(event);
+                break;
+            }
         }
 
         if (IsRemoteServer()) {
