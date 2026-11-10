@@ -973,8 +973,8 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
     for (size_t sent = 0; gSpectatorSnapshotOffset < gSpectatorSnapshotOut.size() && sent + sizeof(U16U8x240_Event) <= 16 * 1024; sent += sizeof(U16U8x240_Event)) {
         U16U8x240_Event chunk{};
         chunk.type = EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK;
-        chunk.u16_0 =
-            netplay::snapshot::FillSnapshotChunk(chunk.u8x240_0, std::span(gSpectatorSnapshotOut).subspan(gSpectatorSnapshotOffset), gSpectatorLayoutsOut, gSpectatorLayoutsHash, gSpectatorLayoutsOffset);
+        chunk.u16_0 = netplay::snapshot::FillSnapshotChunk(
+            chunk.u8x240_0, std::span(gSpectatorSnapshotOut).subspan(gSpectatorSnapshotOffset), gSpectatorLayoutsOut, gSpectatorLayoutsHash, gSpectatorLayoutsOffset);
         PutEvent(chunk);
         gSpectatorSnapshotOffset += chunk.u16_0;
     }

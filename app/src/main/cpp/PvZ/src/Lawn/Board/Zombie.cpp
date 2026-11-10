@@ -3716,6 +3716,10 @@ void Zombie::UpdateGigaGargantuar() {
                     continue;
                 }
 
+                if (aPlant->mSeedType != SeedType::SEED_PUMPKINSHELL && mBoard->GetPumpkinAt(aPlant->mPlantCol, aPlant->mRow)) {
+                    continue;
+                }
+
                 Rect aPlantRect = aPlant->GetPlantRect();
                 const int aCenterX = aPlantRect.mX + aPlantRect.mWidth / 2;
                 const int aCenterY = aPlantRect.mY + aPlantRect.mHeight / 2;
@@ -3993,6 +3997,10 @@ void Zombie::UpdateGigaGargantuar() {
                 }
 
                 if (std::abs(aPlant->mRow - mRow) > 1) {
+                    continue;
+                }
+
+                if (aPlant->mSeedType != SeedType::SEED_PUMPKINSHELL && mBoard->GetPumpkinAt(aPlant->mPlantCol, aPlant->mRow)) {
                     continue;
                 }
 
