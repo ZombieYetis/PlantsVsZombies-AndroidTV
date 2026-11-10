@@ -840,6 +840,10 @@ void Zombie::SyncZombiePhase() {
 
 // 统一应用远端状态；倒计时为 -1 时保留本地值，由各类型的状态函数处理。
 void Zombie::SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePhaseData, float thePosX) {
+    if (mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
+        FinishZombieRiseFromGrave();
+    }
+
     switch (mZombieType) {
         case ZombieType::ZOMBIE_TELEPORTATION:
             StopEating();
@@ -847,9 +851,6 @@ void Zombie::SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePh
             PlayZombieReanim("anim_shoot", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 24.0f);
             return;
         case ZombieType::ZOMBIE_CROSSING_GUARD:
-            if (mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
-                FinishZombieRiseFromGrave();
-            }
             StopEating();
             mZombiePhase = thePhase;
             PlayZombieReanim("anim_throw", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 10, 16.0f);
@@ -859,9 +860,6 @@ void Zombie::SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePh
             return;
         case ZombieType::ZOMBIE_GRAVEDIGGER:
             if (!IsDeadOrDying()) {
-                if (mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
-                    FinishZombieRiseFromGrave();
-                }
                 SetGraveDiggerPhase(thePhase);
             }
             return;
