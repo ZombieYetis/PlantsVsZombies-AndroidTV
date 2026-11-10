@@ -1242,11 +1242,11 @@ void ChallengeScreen::processClientEvent(const BaseEvent *event) const {
     switch (event->type) {
         case EVENT_CLIENT_CHALLENGESCREEN_SELECT_MODE: {
             auto *eventButtonDepress = static_cast<const U16_Event *>(event);
-            if (IsNetplayChallengePage(mPage) && !IsValidModeForPage(mPage, eventButtonDepress->data)) {
-                LOG_WARN("[ChallengeScreen] ignore invalid client netplay request mode={} page={}", eventButtonDepress->data, int(mPage));
+            if (IsNetplayChallengePage(mPage) && !IsValidModeForPage(mPage, eventButtonDepress->u16_0)) {
+                LOG_WARN("[ChallengeScreen] ignore invalid client netplay request mode={} page={}", eventButtonDepress->u16_0, int(mPage));
                 break;
             }
-            gChallengeScreenRequestState = eventButtonDepress->data;
+            gChallengeScreenRequestState = eventButtonDepress->u16_0;
         } break;
 
         default:
@@ -1259,7 +1259,7 @@ void ChallengeScreen::processServerEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_SERVER_CHALLENGESCREEN_BUTTON_DEPRESS: {
             auto *eventBtnDepress = static_cast<const U16_Event *>(event);
-            int theId = eventBtnDepress->data;
+            int theId = eventBtnDepress->u16_0;
             if (!IsValidModeForPage(mPage, theId)) {
                 LOG_WARN("[ChallengeScreen] ignore invalid netplay button depress mode={} page={}", theId, int(mPage));
                 break;
@@ -1313,7 +1313,7 @@ void ChallengeScreen::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_CHALLENGESCREEN_SELECT_MODE: {
             auto *event1 = static_cast<const U16_Event *>(event);
-            int theId = event1->data;
+            int theId = event1->u16_0;
             if (!IsValidModeForPage(mPage, theId)) {
                 LOG_WARN("[ChallengeScreen] ignore invalid netplay select mode={} page={}", theId, int(mPage));
                 break;

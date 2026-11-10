@@ -806,9 +806,9 @@ void Zombie::SyncZombiePhase() {
 
     U16U16U16UNI32UNI32_Event event{};
     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PHASE;
-    event.data1 = uint16_t(mBoard->ZombieGetID(this));
-    event.data2 = uint16_t(mZombiePhase);
-    event.data4.i32 = -1;
+    event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+    event.u16_1 = uint16_t(mZombiePhase);
+    event.uni32_0.i32 = -1;
     switch (mZombieType) {
         case ZombieType::ZOMBIE_YETI:
         case ZombieType::ZOMBIE_TELEPORTATION:
@@ -818,22 +818,22 @@ void Zombie::SyncZombiePhase() {
             break;
         case ZombieType::ZOMBIE_PIGEON_FEEDER:
         case ZombieType::ZOMBIE_PIGEON:
-            event.data5.f32 = mPosX;
+            event.uni32_1.f32 = mPosX;
             break;
         default:
             // 原状态事件仍保留倒计时，避免影响跳跃高度、爆炸和随机冷却。
-            event.data4.i32 = mPhaseCounter;
+            event.uni32_0.i32 = mPhaseCounter;
             break;
     }
     // 投篮和放梯起手需要校正位置，其余状态继续沿用原有的位置同步。
     if ((mZombieType == ZombieType::ZOMBIE_CATAPULT && mZombiePhase == ZombiePhase::PHASE_CATAPULT_LAUNCHING)
         || (mZombieType == ZombieType::ZOMBIE_LADDER && mZombiePhase == ZombiePhase::PHASE_LADDER_PLACING)) {
-        event.data5.f32 = mPosX;
+        event.uni32_1.f32 = mPosX;
     }
     if (mZombieType == ZombieType::ZOMBIE_GIGA_POLEVAULTER || mZombieType == ZombieType::ZOMBIE_CATAPULT) {
-        event.data3 = uint16_t(mSummonCounter);
+        event.u16_2 = uint16_t(mSummonCounter);
     } else if (mZombieType == ZombieType::ZOMBIE_SQUASH_HEAD) {
-        event.data3 = uint16_t(mSquashHeadCol);
+        event.u16_2 = uint16_t(mSquashHeadCol);
     }
     netplay::PutEvent(event);
 }
@@ -1109,10 +1109,10 @@ void Zombie::SummonPigeons() {
         if (IsRemoteServer()) {
             U16U16U16UNI32UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PIGEON_SUMMON;
-            event.data1 = uint16_t(mBoard->ZombieGetID(aPigeon));
-            event.data2 = uint16_t(mMindControlled);
-            event.data3 = uint16_t(aPlayArrivalSound);
-            event.data4.f32 = aPigeon->mPosX;
+            event.u16_0 = uint16_t(mBoard->ZombieGetID(aPigeon));
+            event.u16_1 = uint16_t(mMindControlled);
+            event.u16_2 = uint16_t(aPlayArrivalSound);
+            event.uni32_0.f32 = aPigeon->mPosX;
             netplay::PutEvent(event);
         }
         aPlayArrivalSound = false;
@@ -1565,8 +1565,8 @@ void Zombie::UpdateZombieCrossingGuard() {
                 if (IsRemoteServer()) {
                     U16U16_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_FIRE;
-                    event.data1 = uint16_t(mBoard->ZombieGetID(this));
-                    event.data2 = uint16_t(mBoard->ZombieGetID(aZombie));
+                    event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+                    event.u16_1 = uint16_t(mBoard->ZombieGetID(aZombie));
                     netplay::PutEvent(event);
                 }
                 UnbindRealatedZombie();
@@ -1577,8 +1577,8 @@ void Zombie::UpdateZombieCrossingGuard() {
                 if (IsRemoteServer()) {
                     U16U16_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_FIRE;
-                    event.data1 = uint16_t(mBoard->ZombieGetID(this));
-                    event.data2 = NETPLAY_ZOMBIE_ID_NULL;
+                    event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+                    event.u16_1 = NETPLAY_ZOMBIE_ID_NULL;
                     netplay::PutEvent(event);
                 }
                 return;
@@ -1592,8 +1592,8 @@ void Zombie::UpdateZombieCrossingGuard() {
                 if (aThrowWasCancelled && IsRemoteServer()) {
                     U16U16_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_FIRE;
-                    event.data1 = uint16_t(mBoard->ZombieGetID(this));
-                    event.data2 = NETPLAY_ZOMBIE_ID_NULL;
+                    event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+                    event.u16_1 = NETPLAY_ZOMBIE_ID_NULL;
                     netplay::PutEvent(event);
                 }
             }
@@ -1764,7 +1764,7 @@ void Zombie::ApplyScientistSpray() {
         if (aHealed && IsRemoteServer()) {
             U16_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SCIENTIST_HEAL;
-            event.data = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
             netplay::PutEvent(event);
         }
     }
@@ -2132,8 +2132,8 @@ void Zombie::UpdateZombieDog() {
     if (IsRemoteServer()) {
         U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SET_ROW;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = uint16_t(aNewRow);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = uint16_t(aNewRow);
         netplay::PutEvent(event);
     }
 }
@@ -2338,9 +2338,9 @@ void Zombie::UpdateSuperFanImp() {
                 if (IsRemoteServer()) {
                     U16UNI32UNI32_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_KICKED;
-                    event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                    event.data2.f32 = aKickingDistance;
-                    event.data3.f32 = mPosX;
+                    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                    event.uni32_0.f32 = aKickingDistance;
+                    event.uni32_1.f32 = mPosX;
                     netplay::PutEvent(event);
                 }
             }
@@ -2462,7 +2462,7 @@ void Zombie::UpdateSuperFanImp() {
         if (IsRemoteServer()) {
             U16_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_POP;
-            event.data = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
             netplay::PutEvent(event);
         }
     }
@@ -2763,13 +2763,13 @@ void Zombie::RaiseDeadZombies() {
     if (IsRemoteServer()) {
         U16UNI32U8x16U16x15UNI32x15_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2.f32 = mPosX;
-        event.data3[0] = uint8_t(std::min<size_t>(15, std::min(deadFollowers.size(), revivedServerIDs.size())));
-        for (int i = 0; i < event.data3[0]; ++i) {
-            event.data3[i + 1] = uint8_t(deadFollowers[i]);
-            event.data4[i] = revivedServerIDs[i];
-            event.data5[i].f32 = revivedVelXs[i];
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.uni32_0.f32 = mPosX;
+        event.u8x16_0[0] = uint8_t(std::min<size_t>(15, std::min(deadFollowers.size(), revivedServerIDs.size())));
+        for (int i = 0; i < event.u8x16_0[0]; ++i) {
+            event.u8x16_0[i + 1] = uint8_t(deadFollowers[i]);
+            event.u16x15_0[i] = revivedServerIDs[i];
+            event.uni32x15_0[i].f32 = revivedVelXs[i];
         }
         netplay::PutEvent(event);
     }
@@ -2795,10 +2795,10 @@ void Zombie::SquishAllInSquare(int theX, int theY, ZombieAttackType theAttackTyp
     if (IsRemoteServer()) {
         U16UNI32_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SQUISH_ALL_IN_SQUARE;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2.u8x4.u8_1 = uint8_t(theX);
-        event.data2.u8x4.u8_2 = uint8_t(theY);
-        event.data2.u8x4.u8_3 = uint8_t(theAttackType);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.uni32_0.u8x4.u8_1 = uint8_t(theX);
+        event.uni32_0.u8x4.u8_2 = uint8_t(theY);
+        event.uni32_0.u8x4.u8_3 = uint8_t(theAttackType);
         netplay::PutEvent(event);
     }
 
@@ -2920,9 +2920,9 @@ void Zombie::UpdateZombiePolevaulter() {
             if (IsRemoteServer()) {
                 U16UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_IN_VAULT;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2.i16x2.i16_1 = int16_t(mX);
-                event.data2.i16x2.i16_2 = int16_t(aJumpDistance);
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.uni32_0.i16x2.i16_1 = int16_t(mX);
+                event.uni32_0.i16x2.i16_2 = int16_t(aJumpDistance);
                 netplay::PutEvent(event);
             }
         }
@@ -2971,8 +2971,8 @@ void Zombie::UpdateZombiePolevaulter() {
             if (IsRemoteServer()) {
                 U16UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_POST_VAULT;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2.f32 = mPosY;
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.uni32_0.f32 = mPosY;
                 netplay::PutEvent(event);
             }
         } else {
@@ -3293,9 +3293,9 @@ void Zombie::UpdateGigaPolevaulter() {
             if (IsRemoteServer()) {
                 U16UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_IN_VAULT;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2.i16x2.i16_1 = int16_t(mX);
-                event.data2.i16x2.i16_2 = int16_t(aJumpDistance);
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.uni32_0.i16x2.i16_1 = int16_t(mX);
+                event.uni32_0.i16x2.i16_2 = int16_t(aJumpDistance);
                 netplay::PutEvent(event);
             }
         }
@@ -3347,8 +3347,8 @@ void Zombie::UpdateGigaPolevaulter() {
             if (IsRemoteServer()) {
                 U16UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_POST_VAULT;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2.f32 = mPosY;
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.uni32_0.f32 = mPosY;
                 netplay::PutEvent(event);
             }
         } else {
@@ -3811,10 +3811,10 @@ void Zombie::UpdateGigaGargantuar() {
         if (IsRemoteServer()) {
             U16U16U16UNI32UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aGigaImp));
-            event.data3 = uint16_t(aGigaImp->mTargetCol);
-            event.data4.f32 = 0.0f;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(aGigaImp));
+            event.u16_2 = uint16_t(aGigaImp->mTargetCol);
+            event.uni32_0.f32 = 0.0f;
             netplay::PutEvent(event);
         }
 
@@ -4138,9 +4138,9 @@ void Zombie::UpdateGigaGargantuar() {
         if (IsRemoteServer()) {
             U16UNI32UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GIGA_GARGANTUAR_START_LIGHTNING;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2.f32 = mPosX;
-            event.data3.i32 = mTargetCol;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.uni32_0.f32 = mPosX;
+            event.uni32_1.i32 = mTargetCol;
             netplay::PutEvent(event);
         }
 
@@ -4172,8 +4172,8 @@ void Zombie::UpdateGigaGargantuar() {
         if (IsRemoteServer()) {
             U16UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_SMASH;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2.f32 = mPosX;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.uni32_0.f32 = mPosX;
             netplay::PutEvent(event);
         }
 
@@ -4189,8 +4189,8 @@ void Zombie::UpdateGigaGargantuar() {
         if (IsRemoteServer()) {
             U16UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_THROW;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2.f32 = mPosX;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.uni32_0.f32 = mPosX;
             netplay::PutEvent(event);
         }
 
@@ -4327,7 +4327,7 @@ void Zombie::UpdateGigaImp() {
         if (IsRemoteServer()) {
             U16_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_POP;
-            event.data = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
             netplay::PutEvent(event);
         }
         return;
@@ -4456,8 +4456,8 @@ void Zombie::UpdateSuperNovaGargantuar() {
     if (IsRemoteServer()) {
         U16UNI32_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_SMASH;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2.f32 = mPosX;
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.uni32_0.f32 = mPosX;
         netplay::PutEvent(event);
     }
 
@@ -4558,9 +4558,9 @@ void Zombie::UpdateZombieGargantuar() {
             if (IsRemoteServer()) {
                 U16U16U16UNI32UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombieImp));
-                event.data4.f32 = aOffsetDistance;
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombieImp));
+                event.uni32_0.f32 = aOffsetDistance;
                 netplay::PutEvent(event);
             }
 
@@ -4609,8 +4609,8 @@ void Zombie::UpdateZombieGargantuar() {
         if (IsRemoteServer()) {
             U16UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_THROW;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2.f32 = mPosX;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.uni32_0.f32 = mPosX;
             netplay::PutEvent(event);
         }
         mZombiePhase = ZombiePhase::PHASE_GARGANTUAR_THROWING;
@@ -4637,8 +4637,8 @@ void Zombie::UpdateZombieGargantuar() {
         if (IsRemoteServer()) {
             U16UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_SMASH;
-            event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-            event.data2.f32 = mPosX;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+            event.uni32_0.f32 = mPosX;
             netplay::PutEvent(event);
         }
 
@@ -6157,8 +6157,8 @@ void Zombie::StartEating() {
             const auto syncEatingPosition = [this](Zombie *theZombie) {
                 U16UNI32_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_START_EATING;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(theZombie));
-                event.data2.f32 = theZombie->mPosX;
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(theZombie));
+                event.uni32_0.f32 = theZombie->mPosX;
                 netplay::PutEvent(event);
             };
             syncEatingPosition(this);
@@ -6588,15 +6588,15 @@ void Zombie::UpdateZombieBobsled() {
                 if (IsRemoteServer()) {
                     U8x2U16x4UNI32x8_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BOBSLED_PICK_SPEED;
-                    event.data2[0] = mBoard->ZombieGetID(this);
-                    event.data3[0].f32 = mVelX;
-                    event.data4[0].f32 = mPosX;
+                    event.u16x4_0[0] = mBoard->ZombieGetID(this);
+                    event.uni32x4_0[0].f32 = mVelX;
+                    event.uni32x4_1[0].f32 = mPosX;
                     for (int i = 0; i < NUM_BOBSLED_FOLLOWERS; i++) {
-                        event.data2[i + 1] = mFollowerZombieID[i + 1];
+                        event.u16x4_0[i + 1] = mFollowerZombieID[i + 1];
                         Zombie *aZombie = mBoard->ZombieTryToGet(mFollowerZombieID[i]);
                         if (aZombie) {
-                            event.data3[i + 1].f32 = aZombie->mVelX;
-                            event.data4[i + 1].f32 = aZombie->mPosX;
+                            event.uni32x4_0[i + 1].f32 = aZombie->mVelX;
+                            event.uni32x4_1[i + 1].f32 = aZombie->mPosX;
                         }
                     }
                     netplay::PutEvent(event);
@@ -7656,8 +7656,8 @@ void Zombie::DropHead(unsigned int theDamageFlags) {
     if (IsRemoteServer()) {
         U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_DROP_HEAD;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = uint16_t(theDamageFlags);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = uint16_t(theDamageFlags);
         netplay::PutEvent(event);
     }
 
@@ -8659,9 +8659,9 @@ void Zombie::TakeDamage(int theDamage, unsigned int theDamageFlags) {
     if (IsRemoteServer()) {
         U16U16U8_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_TAKE_DAMAGE;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = uint16_t(theDamage);
-        event.data3 = uint8_t(theDamageFlags);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = uint16_t(theDamage);
+        event.u8_0 = uint8_t(theDamageFlags);
         netplay::PutEvent(event);
     }
 
@@ -9393,10 +9393,10 @@ void Zombie::BungeeDropZombie(Zombie *theDroppedZombie, int theGridX, int theGri
     if (IsRemoteServer()) {
         U8U8U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE;
-        event.data1 = uint8_t(theGridX);
-        event.data2 = uint8_t(theGridY);
-        event.data3 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data4 = uint16_t(mBoard->mZombies.DataArrayGetID(theDroppedZombie));
+        event.u8_0 = uint8_t(theGridX);
+        event.u8_1 = uint8_t(theGridY);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(theDroppedZombie));
         netplay::PutEvent(event);
     }
 }
@@ -9479,10 +9479,10 @@ void Zombie::PickRandomSpeed() {
     if (IsRemoteServer()) {
         U16U16U16UNI32UNI32_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = uint16_t(mAnimTicksPerFrame);
-        event.data4.f32 = mVelX;
-        event.data5.f32 = mPosX;
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = uint16_t(mAnimTicksPerFrame);
+        event.uni32_0.f32 = mVelX;
+        event.uni32_1.f32 = mPosX;
         netplay::PutEvent(event);
     }
 }
@@ -9764,8 +9764,8 @@ void Zombie::HitIceTrap() {
     if (IsRemoteServer()) {
         U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_ICE_TRAP;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2 = aIceTrapCounter;
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.u16_1 = aIceTrapCounter;
         netplay::PutEvent(event);
     }
 }
@@ -10170,13 +10170,13 @@ void Zombie::SummonBackupDancers() {
     if (IsRemoteServer()) {
         U16x5UNI32x5_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SUMMON_BACKUP_DANCERS;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.data2.f32 = mPosX;
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+        event.uni32_0.f32 = mPosX;
         for (int i = 0; i < NUM_BACKUP_DANCERS; i++) {
-            event.data3[i] = uint16_t(mFollowerZombieID[i]);
+            event.u16x4_0[i] = uint16_t(mFollowerZombieID[i]);
             Zombie *aZombie = mBoard->ZombieTryToGet(mFollowerZombieID[i]);
             if (aZombie) {
-                event.data4[i].f32 = aZombie->mVelX;
+                event.uni32x4_0[i].f32 = aZombie->mVelX;
             }
         }
         netplay::PutEvent(event);
@@ -10690,8 +10690,8 @@ void Zombie::UpdateZombieBungee() {
                     if (IsRemoteServer()) {
                         U16U16_Event event{};
                         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_LIFT_TARGET;
-                        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                        event.data2 = mTargetPlantID == PLANTID_NULL ? NETPLAY_PLANT_ID_NULL : uint16_t(mTargetPlantID);
+                        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                        event.u16_1 = mTargetPlantID == PLANTID_NULL ? NETPLAY_PLANT_ID_NULL : uint16_t(mTargetPlantID);
                         netplay::PutEvent(event);
                     }
                 }
@@ -10753,8 +10753,8 @@ void Zombie::UpdateZombieCatapult() {
             if (IsRemoteServer()) {
                 U16U16_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_CATAPLUT_FIRE;
-                event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                event.data2 = thePlant == nullptr ? NETPLAY_PLANT_ID_NULL : uint16_t(mBoard->mPlants.DataArrayGetID(thePlant));
+                event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                event.u16_1 = thePlant == nullptr ? NETPLAY_PLANT_ID_NULL : uint16_t(mBoard->mPlants.DataArrayGetID(thePlant));
                 netplay::PutEvent(event);
             }
             ZombieCatapultFire(thePlant);
@@ -10834,8 +10834,8 @@ void Zombie::UpdateLadder() {
                 if (IsRemoteServer()) {
                     U16U16_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_LADDER_PLACED;
-                    event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-                    event.data2 = plant2->mPlantCol;
+                    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+                    event.u16_1 = plant2->mPlantCol;
                     netplay::PutEvent(event);
                 }
 
@@ -11599,16 +11599,16 @@ void Zombie::BossSpawnContact() {
         if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
             U8x4U16UNI32x2_Event event{};
             event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
-            event.data1[0] = uint8_t(aZombieType);
-            event.data1[1] = uint8_t(mTargetRow);
-            event.data1[2] = 0;
-            event.data1[3] = 1;
+            event.u8x4_0[0] = uint8_t(aZombieType);
+            event.u8x4_0[1] = uint8_t(mTargetRow);
+            event.u8x4_0[2] = 0;
+            event.u8x4_0[3] = 1;
             if (aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                event.data1[3] |= uint8_t(aZombie->mBloated) << 1;
+                event.u8x4_0[3] |= uint8_t(aZombie->mBloated) << 1;
             }
-            event.data2 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
-            event.data3[0].f32 = aZombie->mVelX;
-            event.data3[1].f32 = aZombie->mPosX;
+            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
+            event.uni32x2_0[0].f32 = aZombie->mVelX;
+            event.uni32x2_0[1].f32 = aZombie->mPosX;
             netplay::PutEvent(event);
             netplay::MetricsRecordZombieUsed(int(aZombieType));
         }
@@ -11622,26 +11622,26 @@ void Zombie::BossBungeeSpawn() {
     mZombiePhase = ZombiePhase::PHASE_BOSS_BUNGEES_DROP;
     U16x4_Event followerEvent{};
     followerEvent.type = EVENT_SERVER_BOARD_ZOMBIE_BOSS_BUNGEE_SPAWN;
-    followerEvent.data[0] = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+    followerEvent.u16x4_0[0] = uint16_t(mBoard->mZombies.DataArrayGetID(this));
     for (int i = 0; i < NUM_BOSS_BUNGEES; ++i) {
         Zombie *aZombie = mBoard->AddZombieInRow_Origin(ZombieType::ZOMBIE_BUNGEE, 0, 0, true);
         aZombie->PickBungeeZombieTarget(mTargetCol + i);
         if (aZombie->mDead) {
             mFollowerZombieID[i] = ZombieID::ZOMBIEID_NULL;
-            followerEvent.data[i + 1] = NETPLAY_ZOMBIE_ID_NULL;
+            followerEvent.u16x4_0[i + 1] = NETPLAY_ZOMBIE_ID_NULL;
             continue;
         }
 
         aZombie->mAltitude = aZombie->mPosY - 50.0f;
         mFollowerZombieID[i] = ZombieID(mBoard->mZombies.DataArrayGetID(aZombie));
-        followerEvent.data[i + 1] = uint16_t(mFollowerZombieID[i]);
+        followerEvent.u16x4_0[i + 1] = uint16_t(mFollowerZombieID[i]);
         if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
             U16UNI32UNI32_Event event{};
             event.type = EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID;
-            event.data1 = followerEvent.data[i + 1];
-            event.data2.u8x4.u8_1 = uint8_t(aZombie->mTargetCol);
-            event.data2.u8x4.u8_2 = uint8_t(aZombie->mRow);
-            event.data3.f32 = aZombie->mAltitude;
+            event.u16_0 = followerEvent.u16x4_0[i + 1];
+            event.uni32_0.u8x4.u8_1 = uint8_t(aZombie->mTargetCol);
+            event.uni32_0.u8x4.u8_2 = uint8_t(aZombie->mRow);
+            event.uni32_1.f32 = aZombie->mAltitude;
             netplay::PutEvent(event);
             netplay::MetricsRecordZombieUsed(int(ZombieType::ZOMBIE_BUNGEE));
         }

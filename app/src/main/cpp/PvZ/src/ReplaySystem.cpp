@@ -487,7 +487,7 @@ void replay::UpdateHistoryTransfer() {
     if (source->failed) {
         U16UNI32_Event abort{};
         abort.type = EVENT_SERVER_REPLAY_HISTORY_ABORT;
-        abort.data2.u32 = source->epoch;
+        abort.uni32_0.u32 = source->epoch;
         netplay::PutEvent(abort);
         source->queued = false;
         gHistoryQueue.pop_front();
@@ -496,8 +496,8 @@ void replay::UpdateHistoryTransfer() {
     if (!source->begun) {
         U16UNI32_Event begin{};
         begin.type = EVENT_SERVER_REPLAY_HISTORY_BEGIN;
-        begin.data1 = 1;
-        begin.data2.u32 = source->epoch;
+        begin.u16_0 = 1;
+        begin.uni32_0.u32 = source->epoch;
         netplay::PutEvent(begin);
         source->begun = true;
     }
@@ -505,22 +505,22 @@ void replay::UpdateHistoryTransfer() {
     while (source->offset < end) {
         U16UNI32x2U8x232_Event chunk{};
         chunk.type = EVENT_SERVER_REPLAY_HISTORY_CHUNK;
-        chunk.data2[0].u32 = source->epoch;
-        chunk.data2[1].u32 = uint32_t(source->offset);
-        chunk.data1 = uint16_t(std::min(sizeof(chunk.data3), end - source->offset));
-        std::memcpy(chunk.data3, source->bytes.data() + source->offset, chunk.data1);
+        chunk.uni32x2_0[0].u32 = source->epoch;
+        chunk.uni32x2_0[1].u32 = uint32_t(source->offset);
+        chunk.u16_0 = uint16_t(std::min(sizeof(chunk.u8x232_0), end - source->offset));
+        std::memcpy(chunk.u8x232_0, source->bytes.data() + source->offset, chunk.u16_0);
         netplay::PutEvent(chunk);
-        source->offset += chunk.data1;
+        source->offset += chunk.u16_0;
     }
     if (source->offset != source->bytes.size())
         return;
     if (source->checkpoint != source->offset || source->sealed) {
         U16UNI32x3_Event checkpoint{};
         checkpoint.type = EVENT_SERVER_REPLAY_HISTORY_CHECKPOINT;
-        checkpoint.data2[0].u32 = source->epoch;
-        checkpoint.data2[1].u32 = uint32_t(source->offset);
-        checkpoint.data2[2].u32 = source->hash;
-        checkpoint.data1 = source->sealed;
+        checkpoint.uni32x3_0[0].u32 = source->epoch;
+        checkpoint.uni32x3_0[1].u32 = uint32_t(source->offset);
+        checkpoint.uni32x3_0[2].u32 = source->hash;
+        checkpoint.u16_0 = source->sealed;
         netplay::PutEvent(checkpoint);
         source->checkpoint = source->offset;
     }
@@ -553,7 +553,7 @@ bool replay::HandleHistoryEvent(const BaseEvent *event, bool fromHost) {
     if (receiver.failed || receiver.complete)
         return true;
     if (event->type == EVENT_SERVER_REPLAY_HISTORY_BEGIN) {
-        receiver.begun = event->size == sizeof(U16UNI32_Event) && static_cast<const U16UNI32_Event *>(event)->data1 == 1;
+        receiver.begun = event->size == sizeof(U16UNI32_Event) && static_cast<const U16UNI32_Event *>(event)->u16_0 == 1;
         if (!receiver.begun)
             receiver.failed = true;
     } else if (event->type == EVENT_SERVER_REPLAY_HISTORY_ABORT) {
@@ -565,17 +565,17 @@ bool replay::HandleHistoryEvent(const BaseEvent *event, bool fromHost) {
             receiver.failed = true;
         } else {
             const auto *chunk = static_cast<const U16UNI32x2U8x232_Event *>(event);
-            if (chunk->data1 == 0 || chunk->data1 > sizeof(chunk->data3))
+            if (chunk->u16_0 == 0 || chunk->u16_0 > sizeof(chunk->u8x232_0))
                 receiver.failed = true;
             else
-                receiver.Receive(chunk->data2[1].u32, reinterpret_cast<const std::byte *>(chunk->data3), chunk->data1);
+                receiver.Receive(chunk->uni32x2_0[1].u32, reinterpret_cast<const std::byte *>(chunk->u8x232_0), chunk->u16_0);
         }
     } else if (event->type == EVENT_SERVER_REPLAY_HISTORY_CHECKPOINT) {
         if (event->size != sizeof(U16UNI32x3_Event)) {
             receiver.failed = true;
         } else {
             const auto *checkpoint = static_cast<const U16UNI32x3_Event *>(event);
-            receiver.Checkpoint(checkpoint->data2[1].u32, checkpoint->data2[2].u32, checkpoint->data1 != 0);
+            receiver.Checkpoint(checkpoint->uni32x3_0[1].u32, checkpoint->uni32x3_0[2].u32, checkpoint->u16_0 != 0);
         }
     }
     if (receiver.failed) {

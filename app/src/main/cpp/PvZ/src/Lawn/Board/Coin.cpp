@@ -76,8 +76,8 @@ void Coin::Collect(int thePlayerIndex) {
     if (aIsCoopSun && IsRemoteServer() && mIsBeingCollected) {
         U8U16_Event aEvent{};
         aEvent.type = EventType::EVENT_SERVER_BOARD_COIN_COLLECT;
-        aEvent.data2 = uint16_t(mBoard->mCoins.DataArrayGetID(this));
-        aEvent.data1 = uint8_t(mCollectedByPlayerIndex);
+        aEvent.u16_0 = uint16_t(mBoard->mCoins.DataArrayGetID(this));
+        aEvent.u8_0 = uint8_t(mCollectedByPlayerIndex);
         netplay::PutEvent(aEvent);
     }
 }

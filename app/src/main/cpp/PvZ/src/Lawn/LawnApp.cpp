@@ -598,12 +598,12 @@ bool LawnApp::HandleTcpClientMessage(const std::byte *buf, size_t bufSize) {
 
         if (event->type == EVENT_PING) {
             auto *eventPing = static_cast<const U16_Event *>(event);
-            U16_Event eventPong = {{EVENT_PONG}, eventPing->data};
+            U16_Event eventPong = {{EVENT_PONG}, eventPing->u16_0};
             netplay::PutEvent(eventPong);
         } else if (event->type == EVENT_PONG) {
             auto *eventPong = static_cast<const U16_Event *>(event);
-            if (gNetPingAwaitingPong && eventPong->data == gNetPingLatestSentTick) {
-                const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->data);
+            if (gNetPingAwaitingPong && eventPong->u16_0 == gNetPingLatestSentTick) {
+                const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->u16_0);
                 if (rttTicks <= static_cast<uint16_t>(kNetPingTimeoutTicks)) {
                     gNetDelayNow = static_cast<int>(rttTicks);
                     gNetPingHasValidDelay = true;
@@ -701,24 +701,24 @@ bool LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
             auto *eventPing = static_cast<const U16_Event *>(event);
             if (gIsServerModeSpectator) {
                 gSpectatePeerPingValid = true;
-                gSpectatePeerPingToken = eventPing->data;
+                gSpectatePeerPingToken = eventPing->u16_0;
                 gSpectatePeerPingRecvTick = gNetPingNowTick;
             } else {
-                U16_Event eventPong = {{EVENT_PONG}, eventPing->data};
+                U16_Event eventPong = {{EVENT_PONG}, eventPing->u16_0};
                 netplay::PutEvent(eventPong);
             }
         } else if (event->type == EVENT_PONG) {
             auto *eventPong = static_cast<const U16_Event *>(event);
             if (gIsServerModeSpectator) {
-                if (gNetPingAwaitingPong && eventPong->data == gNetPingLatestSentTick) {
-                    const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->data);
+                if (gNetPingAwaitingPong && eventPong->u16_0 == gNetPingLatestSentTick) {
+                    const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->u16_0);
                     if (rttTicks <= static_cast<uint16_t>(kNetPingTimeoutTicks)) {
                         gNetDelayNow = static_cast<int>(rttTicks);
                         gNetPingHasValidDelay = true;
                         gNetPingLastPongTick = gNetPingNowTick;
                         gNetPingAwaitingPong = false;
                     }
-                } else if (gSpectatePeerPingValid && eventPong->data == gSpectatePeerPingToken) {
+                } else if (gSpectatePeerPingValid && eventPong->u16_0 == gSpectatePeerPingToken) {
                     const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - gSpectatePeerPingRecvTick);
                     if (rttTicks <= static_cast<uint16_t>(kNetPingTimeoutTicks)) {
                         gNetDelayNow = std::max<int>(1, static_cast<int>(rttTicks));
@@ -727,8 +727,8 @@ bool LawnApp::HandleTcpServerMessage(const std::byte *buf, size_t bufSize) {
                     }
                     gSpectatePeerPingValid = false;
                 }
-            } else if (gNetPingAwaitingPong && eventPong->data == gNetPingLatestSentTick) {
-                const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->data);
+            } else if (gNetPingAwaitingPong && eventPong->u16_0 == gNetPingLatestSentTick) {
+                const auto rttTicks = static_cast<uint16_t>(gNetPingNowTick - eventPong->u16_0);
                 if (rttTicks <= static_cast<uint16_t>(kNetPingTimeoutTicks)) {
                     gNetDelayNow = static_cast<int>(rttTicks);
                     gNetPingHasValidDelay = true;

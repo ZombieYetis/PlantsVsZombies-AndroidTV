@@ -906,12 +906,12 @@ void Challenge::IZombiePlaceZombie(ZombieType theZombieType, int theGridX, int t
     if (IsRemoteServer()) {
         U16UNI32UNI32_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_ADD_BY_CHEAT;
-        event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
-        event.data2.u8x4.u8_1 = uint8_t(theGridX);
-        event.data2.u8x4.u8_2 = uint8_t(theGridY);
-        //            event.data3.u16x2.u16_2 = uint16_t(theZombieType);
+        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
+        event.uni32_0.u8x4.u8_1 = uint8_t(theGridX);
+        event.uni32_0.u8x4.u8_2 = uint8_t(theGridY);
+        //            event.uni32_1.u16x2.u16_2 = uint16_t(theZombieType);
         if (theZombieType == ZOMBIE_BUNGEE) {
-            event.data3.f32 = aZombie->mAltitude;
+            event.uni32_1.f32 = aZombie->mAltitude;
         }
         netplay::PutEvent(event);
     }

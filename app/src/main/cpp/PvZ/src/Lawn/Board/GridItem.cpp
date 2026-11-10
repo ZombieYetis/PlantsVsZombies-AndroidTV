@@ -1024,9 +1024,9 @@ void GridItem::TakeDamage(int theDamage, unsigned int theDamageFlags) {
     if (IsRemoteServer()) {
         U16U16U8_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_GRIDITEM_TAKE_DAMAGE;
-        event.data1 = uint16_t(mBoard->mGridItems.DataArrayGetID(this));
-        event.data2 = uint16_t(theDamage);
-        event.data3 = uint8_t(theDamageFlags);
+        event.u16_0 = uint16_t(mBoard->mGridItems.DataArrayGetID(this));
+        event.u16_1 = uint16_t(theDamage);
+        event.u8_0 = uint8_t(theDamageFlags);
         netplay::PutEvent(event);
     }
 

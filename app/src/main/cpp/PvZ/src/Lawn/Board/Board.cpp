@@ -530,8 +530,8 @@ bool Board::TeleportPlant(Plant *thePlant, int theDestGridX, int theDestGridY) {
     if (IsRemoteServer()) {
         U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_PLANT_TELEPORT;
-        event.data1 = uint16_t(mPlants.DataArrayGetID(thePlant));
-        event.data2 = aDestGridX == -1 ? UINT16_MAX : uint16_t(aDestGridX);
+        event.u16_0 = uint16_t(mPlants.DataArrayGetID(thePlant));
+        event.u16_1 = aDestGridX == -1 ? UINT16_MAX : uint16_t(aDestGridX);
         netplay::PutEvent(event);
     }
 
@@ -1276,13 +1276,13 @@ Plant *Board::AddPlant(int theGridX, int theGridY, SeedType theSeedType, SeedTyp
         if (IsRemoteServer()) {
             U16U16U16UNI32UNI32_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_PLANT_ADD;
-            event.data1 = uint16_t(theGridX);
-            event.data2 = uint16_t(theGridY);
-            event.data3 = uint16_t(aPlant->mLaunchCounter);
-            event.data4.u16x2.u16_1 = uint16_t(theSeedType);
-            event.data4.u16x2.u16_2 = uint16_t(theImitaterType);
-            event.data5.u16x2.u16_1 = uint16_t(mPlants.DataArrayGetID(aPlant));
-            event.data5.u16x2.u16_2 = theIsDoEffect;
+            event.u16_0 = uint16_t(theGridX);
+            event.u16_1 = uint16_t(theGridY);
+            event.u16_2 = uint16_t(aPlant->mLaunchCounter);
+            event.uni32_0.u16x2.u16_1 = uint16_t(theSeedType);
+            event.uni32_0.u16x2.u16_2 = uint16_t(theImitaterType);
+            event.uni32_1.u16x2.u16_1 = uint16_t(mPlants.DataArrayGetID(aPlant));
+            event.uni32_1.u16x2.u16_2 = theIsDoEffect;
             netplay::PutEvent(event);
 
             //            aPlant->SyncPingPongAnimationToClient();
@@ -1574,12 +1574,12 @@ Coin *Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoi
         // 除创建参数和收集所需的 ID 外，只同步主机随机生成的落点。
         U16I16I16U8U8I16_Event aEvent{};
         aEvent.type = EventType::EVENT_SERVER_BOARD_COIN_ADD_SUN;
-        aEvent.data1 = uint16_t(mCoins.DataArrayGetID(aCoin));
-        aEvent.data2 = int16_t(theX);
-        aEvent.data3 = int16_t(theY);
-        aEvent.data4 = uint8_t(aCoin->mType);
-        aEvent.data5 = uint8_t(theCoinMotion);
-        aEvent.data6 = int16_t(aCoin->mGroundY);
+        aEvent.u16_0 = uint16_t(mCoins.DataArrayGetID(aCoin));
+        aEvent.i16_0 = int16_t(theX);
+        aEvent.i16_1 = int16_t(theY);
+        aEvent.u8_0 = uint8_t(aCoin->mType);
+        aEvent.u8_1 = uint8_t(theCoinMotion);
+        aEvent.i16_2 = int16_t(aCoin->mGroundY);
         netplay::PutEvent(aEvent);
         return aCoin;
     }
@@ -2132,13 +2132,13 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
     //
     //            U8x2U16x4UNI32x8_Event event{};
     //            event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD;
-    //            event.data1[0] = uint8_t(theRow);
-    //            event.data1[1] = int8_t(theFromWave);
+    //            event.u8x2_0[0] = uint8_t(theRow);
+    //            event.u8x2_0[1] = int8_t(theFromWave);
     //
     //            for (int i = 0; i < 4; ++i) {
-    //                event.data3[i] = mZombies.DataArrayGetID(bobsledZombies[i]);
-    //                event.data3[i].f32 = bobsledZombies[i]->mVelX;
-    //                event.data5[i].f32 = bobsledZombies[i]->mPosX;
+    //                event.u16x4_0[i] = mZombies.DataArrayGetID(bobsledZombies[i]);
+    //                event.uni32x4_0[i].f32 = bobsledZombies[i]->mVelX;
+    //                event.uni32x4_1[i].f32 = bobsledZombies[i]->mPosX;
     //            }
     //            netplay::PutEvent(event);
     //        }
@@ -2160,10 +2160,10 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
                     int aTargetCol = PixelToGridXKeepOnBoard(aGamepad->mCursorPositionX, aGamepad->mCursorPositionY);
                     U16UNI32UNI32_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID;
-                    event.data1 = uint16_t(mZombies.DataArrayGetID(aZombie));
-                    event.data2.u8x4.u8_1 = uint8_t(aTargetCol);
-                    event.data2.u8x4.u8_2 = uint8_t(theRow);
-                    event.data3.f32 = aZombie->mAltitude;
+                    event.u16_0 = uint16_t(mZombies.DataArrayGetID(aZombie));
+                    event.uni32_0.u8x4.u8_1 = uint8_t(aTargetCol);
+                    event.uni32_0.u8x4.u8_2 = uint8_t(theRow);
+                    event.uni32_1.f32 = aZombie->mAltitude;
                     netplay::PutEvent(event);
                 } else {
                     // theFromWave == -5代表是放僵尸的蹦极，在屋顶模式专属。
@@ -2172,17 +2172,17 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
             } else if (theZombieType == ZombieType::ZOMBIE_BOBSLED) {
                 U8x2U16x4UNI32x8_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD;
-                event.data1[0] = uint8_t(theRow);
-                event.data1[1] = int8_t(theFromWave);
-                event.data2[0] = mZombies.DataArrayGetID(aZombie);
-                event.data3[0].f32 = aZombie->mVelX;
-                event.data4[0].f32 = aZombie->mPosX;
+                event.u8x2_0[0] = uint8_t(theRow);
+                event.u8x2_0[1] = int8_t(theFromWave);
+                event.u16x4_0[0] = mZombies.DataArrayGetID(aZombie);
+                event.uni32x4_0[0].f32 = aZombie->mVelX;
+                event.uni32x4_1[0].f32 = aZombie->mPosX;
 
                 for (int i = 0; i < 3; ++i) {
                     Zombie *aFollowerZombie = mZombies.DataArrayGet(aZombie->mFollowerZombieID[i]);
-                    event.data2[i + 1] = aZombie->mFollowerZombieID[i];
-                    event.data3[i + 1].f32 = aFollowerZombie->mVelX;
-                    event.data4[i + 1].f32 = aFollowerZombie->mPosX;
+                    event.u16x4_0[i + 1] = aZombie->mFollowerZombieID[i];
+                    event.uni32x4_0[i + 1].f32 = aFollowerZombie->mVelX;
+                    event.uni32x4_1[i + 1].f32 = aFollowerZombie->mPosX;
                 }
                 netplay::PutEvent(event);
             } else if (theZombieType == ZombieType::ZOMBIE_DOGWALKER) {
@@ -2190,32 +2190,32 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
                 if (aZombieDog != nullptr) {
                     U8x2U16x4UNI32x8_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_DOGWALKER_ADD;
-                    event.data1[0] = uint8_t(theRow);
-                    event.data1[1] = int8_t(theFromWave);
-                    event.data2[0] = uint16_t(mZombies.DataArrayGetID(aZombie));
-                    event.data2[1] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
-                    event.data2[2] = uint16_t(theIsRustle);
-                    event.data3[0].f32 = aZombie->mVelX;
-                    event.data3[1].f32 = aZombieDog->mVelX;
-                    event.data4[0].f32 = aZombie->mPosX;
-                    event.data4[1].f32 = aZombieDog->mPosX;
+                    event.u8x2_0[0] = uint8_t(theRow);
+                    event.u8x2_0[1] = int8_t(theFromWave);
+                    event.u16x4_0[0] = uint16_t(mZombies.DataArrayGetID(aZombie));
+                    event.u16x4_0[1] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
+                    event.u16x4_0[2] = uint16_t(theIsRustle);
+                    event.uni32x4_0[0].f32 = aZombie->mVelX;
+                    event.uni32x4_0[1].f32 = aZombieDog->mVelX;
+                    event.uni32x4_1[0].f32 = aZombie->mPosX;
+                    event.uni32x4_1[1].f32 = aZombieDog->mPosX;
                     netplay::PutEvent(event);
                 }
             } else {
                 U8x4U16UNI32x2_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_ADD;
-                event.data1[0] = uint8_t(theZombieType);
-                event.data1[1] = uint8_t(theRow);
-                event.data1[2] = int8_t(theFromWave);
+                event.u8x4_0[0] = uint8_t(theZombieType);
+                event.u8x4_0[1] = uint8_t(theRow);
+                event.u8x4_0[2] = int8_t(theFromWave);
                 // 标志位：bit 0 为 theIsRustle，bit 1 为非水路普僵的 mBloated。
-                event.data1[3] = uint8_t(theIsRustle);
+                event.u8x4_0[3] = uint8_t(theIsRustle);
                 if (theZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                    event.data1[3] |= uint8_t(aZombie->mBloated) << 1;
+                    event.u8x4_0[3] |= uint8_t(aZombie->mBloated) << 1;
                 }
 
-                event.data2 = uint16_t(mZombies.DataArrayGetID(aZombie));
-                event.data3[0].f32 = aZombie->mVelX;
-                event.data3[1].f32 = aZombie->mPosX;
+                event.u16_0 = uint16_t(mZombies.DataArrayGetID(aZombie));
+                event.uni32x2_0[0].f32 = aZombie->mVelX;
+                event.uni32x2_0[1].f32 = aZombie->mPosX;
                 netplay::PutEvent(event);
             }
             // 僵尸放置数量
@@ -2284,11 +2284,11 @@ void Board::processClientEvent(const BaseEvent *event) {
             if (gIsServerModeSpectator || gIsReplayMode) {
                 GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
                 SeedBank *clientSeedBank = clientGamepadControls ? clientGamepadControls->GetSeedBank() : nullptr;
-                bool inClientSeedBank = clientSeedBank != nullptr && clientSeedBank->ContainsPoint(event1->data1, event1->data2);
-                ClientMouseDownLocal(event1->data1, event1->data2, inClientSeedBank);
+                bool inClientSeedBank = clientSeedBank != nullptr && clientSeedBank->ContainsPoint(event1->i16_0, event1->i16_1);
+                ClientMouseDownLocal(event1->i16_0, event1->i16_1, inClientSeedBank);
                 break;
             }
-            MouseDownSecond(event1->data1, event1->data2, 0);
+            MouseDownSecond(event1->i16_0, event1->i16_1, 0);
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
             U8U8I16I16_Event eventReply = {{EventType::EVENT_BOARD_TOUCH_DOWN_REPLY},
                                            uint8_t(clientGamepadControls->mSelectedSeedIndex),
@@ -2300,10 +2300,10 @@ void Board::processClientEvent(const BaseEvent *event) {
         case EVENT_CLIENT_BOARD_TOUCH_DRAG: {
             auto *event1 = static_cast<const I16I16_Event *>(event);
             if (gIsServerModeSpectator || gIsReplayMode) {
-                ClientMouseDragLocal(event1->data1, event1->data2);
+                ClientMouseDragLocal(event1->i16_0, event1->i16_1);
                 break;
             }
-            MouseDragSecond(event1->data1, event1->data2);
+            MouseDragSecond(event1->i16_0, event1->i16_1);
             //            GamepadControls *clientGamepadControls = mGamepadControls[1]->mGamepadIndex == 1 ? mGamepadControls[1] : mGamepadControls[0];
             //            I16I16_Event eventReply = {{EventType::EVENT_BOARD_TOUCH_DRAG_REPLY}, int16_t(clientGamepadControls->mCursorPositionX), int16_t(clientGamepadControls->mCursorPositionY)};
             //            netplay::PutEvent(gTcpClientSocket, eventReply);
@@ -2311,10 +2311,10 @@ void Board::processClientEvent(const BaseEvent *event) {
         case EVENT_CLIENT_BOARD_TOUCH_UP: {
             auto *event1 = static_cast<const I16I16_Event *>(event);
             if (gIsServerModeSpectator || gIsReplayMode) {
-                ClientMouseUpLocal(event1->data1, event1->data2);
+                ClientMouseUpLocal(event1->i16_0, event1->i16_1);
                 break;
             }
-            MouseUpSecond(event1->data1, event1->data2, 0);
+            MouseUpSecond(event1->i16_0, event1->i16_1, 0);
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
             CursorObject *clientCursorObject = mGamepadControls[1]->mGamepadIndex == 1 ? mCursorObject[1] : mCursorObject[0];
             U8U8_Event eventReply = {{EventType::EVENT_BOARD_TOUCH_UP_REPLY}, uint8_t(clientGamepadControls->mGamepadState), uint8_t(clientCursorObject->mCursorType)};
@@ -2323,7 +2323,7 @@ void Board::processClientEvent(const BaseEvent *event) {
         case EVENT_CLIENT_BOARD_PAUSE: {
             auto *event1 = static_cast<const U8_Event *>(event);
             if (mApp->mGameScene == SCENE_PLAYING) { // 在对局结束后，不接收对方暂停的信息
-                PauseFromSecondPlayer(event1->data);
+                PauseFromSecondPlayer(event1->u8_0);
             }
         } break;
         case EVENT_CLIENT_BOARD_RETRY: {
@@ -2362,9 +2362,9 @@ void Board::processClientEvent(const BaseEvent *event) {
         } break;
         case EVENT_CLIENT_BOARD_ZOMBIE_CHECK_EATING: {
             auto *request = static_cast<const U16_Event *>(event);
-            Zombie *aZombie = mZombies.DataArrayGet(request->data);
+            Zombie *aZombie = mZombies.DataArrayGet(request->u16_0);
             if (!aZombie->mIsEating && !aZombie->IsDeadOrDying()) {
-                U16UNI32_Event reply = {{EVENT_SERVER_BOARD_ZOMBIE_START_EATING}, request->data, {.f32 = aZombie->mPosX}};
+                U16UNI32_Event reply = {{EVENT_SERVER_BOARD_ZOMBIE_START_EATING}, request->u16_0, {.f32 = aZombie->mPosX}};
                 netplay::PutEvent(reply);
             }
         } break;
@@ -2384,57 +2384,57 @@ void Board::processServerEvent(const BaseEvent *event) {
             auto *event1 = static_cast<const U8U8I16I16_Event *>(event);
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
             SeedBank *clientSeedBank = mGamepadControls[1]->mGamepadIndex == 1 ? mSeedBank[1] : mSeedBank[0];
-            const int selectedSeedIndex = DecodeSelectedSeedIndex(event1->data1, clientSeedBank);
+            const int selectedSeedIndex = DecodeSelectedSeedIndex(event1->u8_0, clientSeedBank);
             if (clientGamepadControls->mSelectedSeedIndex != selectedSeedIndex) {
                 clientGamepadControls->mSelectedSeedIndex = selectedSeedIndex;
                 if (selectedSeedIndex >= 0) {
                     clientSeedBank->mSeedPackets[selectedSeedIndex].mLastSelectedTime = 0.0f; // 动画效果专用
                 }
             }
-            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data2);
-            //            clientGamepadControls->mCursorPositionX = event1->data5;
-            //            clientGamepadControls->mCursorPositionY = event1->data5;
+            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_1);
+            //            clientGamepadControls->mCursorPositionX = event1->i16_0;
+            //            clientGamepadControls->mCursorPositionY = event1->i16_1;
         } break;
         case EVENT_BOARD_TOUCH_DRAG_REPLY: {
             //  auto *event1 = static_cast<const U16U16_Event *>(event);
             // GamepadControls *clientGamepadControls = mGamepadControls[1]->mGamepadIndex == 1 ? mGamepadControls[1] : mGamepadControls[0];
-            //            clientGamepadControls->mCursorPositionX = event1->data1;
-            //            clientGamepadControls->mCursorPositionY = event1->data3;
+            //            clientGamepadControls->mCursorPositionX = event1->u16_0;
+            //            clientGamepadControls->mCursorPositionY = event1->u16_1;
         } break;
         case EVENT_BOARD_TOUCH_UP_REPLY: {
             auto *event1 = static_cast<const U8U8_Event *>(event);
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
             CursorObject *clientCursorObject = mGamepadControls[1]->mGamepadIndex == 1 ? mCursorObject[1] : mCursorObject[0];
-            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data1);
-            clientCursorObject->mCursorType = (CursorType)event1->data2;
+            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_0);
+            clientCursorObject->mCursorType = (CursorType)event1->u8_1;
         } break;
         case EVENT_SERVER_BOARD_TOUCH_DOWN: {
             auto *event1 = static_cast<const U8U8I16I16_Event *>(event);
             GamepadControls *serverGamepadControls = mGamepadControls[0]->mGamepadIndex == 0 ? mGamepadControls[0] : mGamepadControls[1];
             SeedBank *serverSeedBank = mGamepadControls[0]->mGamepadIndex == 0 ? mSeedBank[0] : mSeedBank[1];
-            const int selectedSeedIndex = DecodeSelectedSeedIndex(event1->data1, serverSeedBank);
+            const int selectedSeedIndex = DecodeSelectedSeedIndex(event1->u8_0, serverSeedBank);
             if (serverGamepadControls->mSelectedSeedIndex != selectedSeedIndex) {
                 serverGamepadControls->mSelectedSeedIndex = selectedSeedIndex;
                 if (selectedSeedIndex >= 0) {
                     serverSeedBank->mSeedPackets[selectedSeedIndex].mLastSelectedTime = 0.0f; // 动画效果专用
                 }
             }
-            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data2);
-            serverGamepadControls->mCursorPositionX = event1->data3;
-            serverGamepadControls->mCursorPositionY = event1->data4;
+            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_1);
+            serverGamepadControls->mCursorPositionX = event1->i16_0;
+            serverGamepadControls->mCursorPositionY = event1->i16_1;
         } break;
         case EVENT_SERVER_BOARD_TOUCH_DRAG: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
             GamepadControls *serverGamepadControls = mGamepadControls[0]->mGamepadIndex == 0 ? mGamepadControls[0] : mGamepadControls[1];
-            serverGamepadControls->mCursorPositionX = event1->data1;
-            serverGamepadControls->mCursorPositionY = event1->data2;
+            serverGamepadControls->mCursorPositionX = event1->u16_0;
+            serverGamepadControls->mCursorPositionY = event1->u16_1;
         } break;
         case EVENT_SERVER_BOARD_TOUCH_UP: {
             auto *event1 = static_cast<const U8U8_Event *>(event);
             GamepadControls *serverGamepadControls = mGamepadControls[0]->mGamepadIndex == 0 ? mGamepadControls[0] : mGamepadControls[1];
             CursorObject *serverCursorObject = mGamepadControls[0]->mGamepadIndex == 0 ? mCursorObject[0] : mCursorObject[1];
-            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data1);
-            serverCursorObject->mCursorType = (CursorType)event1->data2;
+            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_0);
+            serverCursorObject->mCursorType = (CursorType)event1->u8_1;
         } break;
         case EVENT_SERVER_BOARD_TOUCH_CLEAR_CURSOR: {
             GamepadControls *serverGamepadControls = mGamepadControls[0]->mGamepadIndex == 0 ? mGamepadControls[0] : mGamepadControls[1];
@@ -2449,20 +2449,20 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_CLIENT_BOARD_GAMEPAD_SET_STATE: {
             GamepadControls *clientGamepadControls = mGamepadControls[(mGamepadControls[1]->mGamepadIndex == 1) ? 1 : 0];
             auto *event1 = static_cast<const U8_Event *>(event);
-            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data);
+            clientGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_0);
         } break;
         case EVENT_SERVER_BOARD_GAMEPAD_SET_STATE: {
             auto *event1 = static_cast<const U8_Event *>(event);
             GamepadControls *serverGamepadControls = mGamepadControls[0]->mGamepadIndex == 0 ? mGamepadControls[0] : mGamepadControls[1];
-            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->data);
+            serverGamepadControls->mGamepadState = BaseGamepadControls::MovementState(event1->u8_0);
         } break;
         case EVENT_SERVER_BOARD_GAMEPAD_PICKUP_COB_CANNON: {
             const auto *selectionEvent = static_cast<const U8U8U16_Event *>(event);
-            GamepadControls *controls = mGamepadControls[selectionEvent->data1];
+            GamepadControls *controls = mGamepadControls[selectionEvent->u8_0];
             Plant *cobCannon = nullptr;
-            if (selectionEvent->data2) {
+            if (selectionEvent->u8_1) {
                 uint16_t clientPlantID = 0;
-                if (!homura::FindInMap(serverPlantIDMap, selectionEvent->data3, clientPlantID)) {
+                if (!homura::FindInMap(serverPlantIDMap, selectionEvent->u16_0, clientPlantID)) {
                     break;
                 }
                 cobCannon = mPlants.DataArrayGet(clientPlantID);
@@ -2470,7 +2470,7 @@ void Board::processServerEvent(const BaseEvent *event) {
                     break;
                 }
             }
-            ClearCursor(selectionEvent->data1);
+            ClearCursor(selectionEvent->u8_0);
             controls->mIsCobCannonSelected = cobCannon != nullptr;
             controls->mCobCannonPlantIndexInList = cobCannon != nullptr ? int(mPlants.DataArrayGetID(cobCannon)) : 0;
             controls->mCobCannonAnimCounter = 0;
@@ -2481,23 +2481,23 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_GAMEPAD_PICKUP_SHOVEL: {
             auto *event1 = static_cast<const U8_Event *>(event);
-            if (!requestDrawShovelInCursor && event1->data) {
+            if (!requestDrawShovelInCursor && event1->u8_0) {
                 mApp->PlayFoley(FOLEY_SHOVEL);
             }
-            requestDrawShovelInCursor = event1->data;
+            requestDrawShovelInCursor = event1->u8_0;
         } break;
         case EVENT_SERVER_BOARD_GAMEPAD_SET_TOOL: {
             auto *toolEvent = static_cast<const U8U8_Event *>(event);
-            SetCoopTool(toolEvent->data1, GameObjectType(toolEvent->data2));
+            SetCoopTool(toolEvent->u8_0, GameObjectType(toolEvent->u8_1));
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD_BUTTER: {
             auto *butterEvent = static_cast<const U8U16_Event *>(event);
             // 只启动实际使用者的冷却，本地按钮不受另一人的使用影响。
             if (mApp->mGameMode == GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD) {
-                mButterGloveCooldownCounter[butterEvent->data1] = kButterGloveCooldown;
+                mButterGloveCooldownCounter[butterEvent->u8_0] = kButterGloveCooldown;
             }
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, butterEvent->data2, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, butterEvent->u16_0, clientZombieID)) {
                 Zombie *zombie = mZombies.DataArrayGet(clientZombieID);
                 if (zombie != nullptr) {
                     if (zombie->mButteredCounter == 0) {
@@ -2512,25 +2512,25 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PAUSE: {
             auto *event1 = static_cast<const U8_Event *>(event);
-            PauseFromSecondPlayer(event1->data);
+            PauseFromSecondPlayer(event1->u8_0);
         } break;
         case EVENT_SERVER_BOARD_COIN_ADD_SUN: {
             const auto *aEvent = static_cast<const U16I16I16U8U8I16_Event *>(event);
-            Coin *aCoin = old_Board_AddCoin(this, aEvent->data2, aEvent->data3, CoinType(aEvent->data4), CoinMotion(aEvent->data5));
-            aCoin->mGroundY = aEvent->data6;
+            Coin *aCoin = old_Board_AddCoin(this, aEvent->i16_0, aEvent->i16_1, CoinType(aEvent->u8_0), CoinMotion(aEvent->u8_1));
+            aCoin->mGroundY = aEvent->i16_2;
 
             if (!mApp->IsCoopMode()) {
                 break;
             }
 
-            serverCoinIDMap[aEvent->data1] = uint16_t(mCoins.DataArrayGetID(aCoin));
+            serverCoinIDMap[aEvent->u16_0] = uint16_t(mCoins.DataArrayGetID(aCoin));
         } break;
         case EVENT_SERVER_BOARD_COIN_COLLECT: {
             if (!mApp->IsCoopMode()) {
                 break;
             }
             const auto *aEvent = static_cast<const U8U16_Event *>(event);
-            const auto aIt = serverCoinIDMap.find(aEvent->data2);
+            const auto aIt = serverCoinIDMap.find(aEvent->u16_0);
             if (aIt == serverCoinIDMap.end()) {
                 break;
             }
@@ -2539,23 +2539,23 @@ void Board::processServerEvent(const BaseEvent *event) {
             if (aCoin == nullptr || aCoin->mDead || aCoin->mIsBeingCollected || (!aCoin->IsSun() && aCoin->mType != CoinType::COIN_COOP_DOUBLE_SUN)) {
                 break;
             }
-            old_Coin_Collect(aCoin, aEvent->data1);
+            old_Coin_Collect(aCoin, aEvent->u8_0);
         } break;
         case EVENT_SERVER_BOARD_COIN_ADD: {
             auto *event1 = static_cast<const U8U8U16U16_Event *>(event);
-            old_Board_AddCoin(this, event1->data3, event1->data4, CoinType(event1->data1), CoinMotion(event1->data2));
+            old_Board_AddCoin(this, event1->u16_0, event1->u16_1, CoinType(event1->u8_0), CoinMotion(event1->u8_1));
         } break;
         case EVENT_SERVER_BOARD_PLANT_LAUNCHCOUNTER: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, event1->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, event1->u16_0, clientPlantID)) {
                 Plant *plant = mPlants.DataArrayGet(clientPlantID);
-                plant->mLaunchCounter = event1->data2;
+                plant->mLaunchCounter = event1->u16_1;
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_DIE: {
             auto *eventGridItemDie = static_cast<const U16_Event *>(event);
-            uint16_t serverGridItemID = eventGridItemDie->data;
+            uint16_t serverGridItemID = eventGridItemDie->u16_0;
             uint16_t clientGridItemID = 0;
             if (homura::FindInMap(serverGridItemIDMap, serverGridItemID, clientGridItemID)) {
                 GridItem *aGridItem = mGridItems.DataArrayGet(clientGridItemID);
@@ -2566,99 +2566,99 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_GRIDITEM_TAKE_DAMAGE: {
             auto *eventGridItemDamage = static_cast<const U16U16U8_Event *>(event);
             uint16_t clientGridItemID = 0;
-            if (homura::FindInMap(serverGridItemIDMap, eventGridItemDamage->data1, clientGridItemID)) {
+            if (homura::FindInMap(serverGridItemIDMap, eventGridItemDamage->u16_0, clientGridItemID)) {
                 GridItem *aGridItem = mGridItems.DataArrayGet(clientGridItemID);
-                aGridItem->TakeDamage_Origin(eventGridItemDamage->data2, eventGridItemDamage->data3);
+                aGridItem->TakeDamage_Origin(eventGridItemDamage->u16_1, eventGridItemDamage->u8_0);
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_LAUNCHCOUNTER: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
             uint16_t clientGridItemID = 0;
-            if (homura::FindInMap(serverGridItemIDMap, event1->data1, clientGridItemID)) {
+            if (homura::FindInMap(serverGridItemIDMap, event1->u16_0, clientGridItemID)) {
                 GridItem *gridItem = mGridItems.DataArrayGet(clientGridItemID);
-                gridItem->mLaunchCounter = event1->data2;
+                gridItem->mLaunchCounter = event1->u16_1;
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_SUMMONCOUNTER: {
             auto *eventSummonCounter = static_cast<const U16U16_Event *>(event);
             uint16_t clientGridItemID = 0;
-            if (homura::FindInMap(serverGridItemIDMap, eventSummonCounter->data1, clientGridItemID)) {
+            if (homura::FindInMap(serverGridItemIDMap, eventSummonCounter->u16_0, clientGridItemID)) {
                 GridItem *gridItem = mGridItems.DataArrayGet(clientGridItemID);
-                gridItem->mSummonCounter = eventSummonCounter->data2;
+                gridItem->mSummonCounter = eventSummonCounter->u16_1;
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDLADDER: {
             auto *event1 = static_cast<const U8U8U16_Event *>(event);
-            GridItem *ladder = AddALadder_Origin(event1->data1, event1->data2);
-            serverGridItemIDMap[event1->data3] = uint16_t(mGridItems.DataArrayGetID(ladder));
+            GridItem *ladder = AddALadder_Origin(event1->u8_0, event1->u8_1);
+            serverGridItemIDMap[event1->u16_0] = uint16_t(mGridItems.DataArrayGetID(ladder));
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDCRATER: {
             auto *event1 = static_cast<const U8U8U16_Event *>(event);
-            GridItem *crater = AddACrater_Origin(event1->data1, event1->data2);
-            serverGridItemIDMap[event1->data3] = uint16_t(mGridItems.DataArrayGetID(crater));
+            GridItem *crater = AddACrater_Origin(event1->u8_0, event1->u8_1);
+            serverGridItemIDMap[event1->u16_0] = uint16_t(mGridItems.DataArrayGetID(crater));
             crater->mGridItemCounter = 18000;
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDGRAVE: {
             auto *event1 = static_cast<const U8U8U16U16_Event *>(event);
-            GridItem *aGraveStone = AddAGraveStone_Origin(event1->data1, event1->data2);
-            aGraveStone->mLaunchCounter = event1->data4;
-            serverGridItemIDMap[event1->data3] = uint16_t(mGridItems.DataArrayGetID(aGraveStone));
+            GridItem *aGraveStone = AddAGraveStone_Origin(event1->u8_0, event1->u8_1);
+            aGraveStone->mLaunchCounter = event1->u16_1;
+            serverGridItemIDMap[event1->u16_0] = uint16_t(mGridItems.DataArrayGetID(aGraveStone));
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDRAKE: {
             auto *eventRake = static_cast<const U8U8U16_Event *>(event);
-            GridItem *aRake = PlaceRake_Origin(eventRake->data1, eventRake->data2);
-            serverGridItemIDMap[eventRake->data3] = uint16_t(mGridItems.DataArrayGetID(aRake));
+            GridItem *aRake = PlaceRake_Origin(eventRake->u8_0, eventRake->u8_1);
+            serverGridItemIDMap[eventRake->u16_0] = uint16_t(mGridItems.DataArrayGetID(aRake));
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDMOUND: {
             auto *eventAddMound = static_cast<const U8x3U16x3_Event *>(event);
-            int gridX = eventAddMound->data1[0];
-            int gridY = eventAddMound->data1[1];
-            int moundLevel = eventAddMound->data1[2];
+            int gridX = eventAddMound->u8x3_0[0];
+            int gridY = eventAddMound->u8x3_0[1];
+            int moundLevel = eventAddMound->u8x3_0[2];
             GridItem *mound = AddAMound(gridX, gridY, moundLevel);
-            serverGridItemIDMap[eventAddMound->data2[0]] = uint16_t(mGridItems.DataArrayGetID(mound));
-            mound->mLaunchCounter = eventAddMound->data2[1];
-            mound->mSummonCounter = eventAddMound->data2[2];
+            serverGridItemIDMap[eventAddMound->u16x3_0[0]] = uint16_t(mGridItems.DataArrayGetID(mound));
+            mound->mLaunchCounter = eventAddMound->u16x3_0[1];
+            mound->mSummonCounter = eventAddMound->u16x3_0[2];
             mound->mIsSpecialGrave = true;
             mound->mVSGraveStoneHealth = 350 + 70 * (moundLevel + 1);
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_ADDPOLE: {
             auto *eventAddPole = static_cast<const U16x4_Event *>(event);
-            GridItem *pole = AddAPole_Origin(eventAddPole->data[0], eventAddPole->data[1], eventAddPole->data[2]);
-            serverGridItemIDMap[eventAddPole->data[3]] = uint16_t(mGridItems.DataArrayGetID(pole));
+            GridItem *pole = AddAPole_Origin(eventAddPole->u16x4_0[0], eventAddPole->u16x4_0[1], eventAddPole->u16x4_0[2]);
+            serverGridItemIDMap[eventAddPole->u16x4_0[3]] = uint16_t(mGridItems.DataArrayGetID(pole));
         } break;
         case EVENT_SERVER_BOARD_PLANT_PINGPONG_ANIMATION: {
             auto *event1 = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, event1->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, event1->u16_0, clientPlantID)) {
                 Plant *plant = mPlants.DataArrayGet(clientPlantID);
-                plant->mFrameLength = event1->data2;
-                plant->mAnimPing = event1->data3;
-                plant->mFrame = int(event1->data4.u32);
-                plant->mAnimCounter = int(event1->data5.u32);
+                plant->mFrameLength = event1->u16_1;
+                plant->mAnimPing = event1->u16_2;
+                plant->mFrame = int(event1->uni32_0.u32);
+                plant->mAnimCounter = int(event1->uni32_1.u32);
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_OTHER_ANIMATION: {
             auto *event1 = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, event1->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, event1->u16_0, clientPlantID)) {
                 Plant *plant = mPlants.DataArrayGet(clientPlantID);
-                Reanimation *reanimation = mApp->ReanimationTryToGet(plant->GetPlantReanimationIDByIndex(event1->data2));
+                Reanimation *reanimation = mApp->ReanimationTryToGet(plant->GetPlantReanimationIDByIndex(event1->u16_1));
                 if (reanimation != nullptr) {
-                    reanimation->mLoopType = ReanimLoopType(event1->data3);
-                    reanimation->mAnimTime = event1->data4.f32;
-                    reanimation->SetAnimRate(event1->data5.f32);
+                    reanimation->mLoopType = ReanimLoopType(event1->u16_2);
+                    reanimation->mAnimTime = event1->uni32_0.f32;
+                    reanimation->SetAnimRate(event1->uni32_1.f32);
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_FIRE: {
             auto *eventPlantFire = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            uint16_t serverPlantID = eventPlantFire->data1;
+            uint16_t serverPlantID = eventPlantFire->u16_0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
-                uint16_t aZombieID = eventPlantFire->data2;
-                uint16_t aGridItemID = eventPlantFire->data5.u16x2.u16_1;
-                uint16_t aRow = eventPlantFire->data4.u16x2.u16_1;
-                auto aPlantWeapon = PlantWeapon(eventPlantFire->data4.u16x2.u16_2);
+                uint16_t aZombieID = eventPlantFire->u16_1;
+                uint16_t aGridItemID = eventPlantFire->uni32_1.u16x2.u16_1;
+                uint16_t aRow = eventPlantFire->uni32_0.u16x2.u16_1;
+                auto aPlantWeapon = PlantWeapon(eventPlantFire->uni32_0.u16x2.u16_2);
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
 
                 Zombie *aZombie = nullptr;
@@ -2685,51 +2685,51 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_PLANT_COB_CANNON_FIRE: {
             const auto *fireEvent = static_cast<const U16UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, fireEvent->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, fireEvent->u16_0, clientPlantID)) {
                 Plant *cobCannon = mPlants.DataArrayGet(clientPlantID);
                 if (!cobCannon->mDead && cobCannon->mSeedType == SEED_COBCANNON) {
-                    cobCannon->CobCannonFire_Origin(fireEvent->data2.i16x2.i16_1, fireEvent->data2.i16x2.i16_2);
+                    cobCannon->CobCannonFire_Origin(fireEvent->uni32_0.i16x2.i16_1, fireEvent->uni32_0.i16x2.i16_2);
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_ADD: {
             auto *eventPlantAdd = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            int gridX = eventPlantAdd->data1;
-            int gridY = eventPlantAdd->data2;
-            auto seedType = SeedType(eventPlantAdd->data4.u16x2.u16_1);
-            auto imitaterType = SeedType(eventPlantAdd->data4.u16x2.u16_2);
-            bool isDoEffect = eventPlantAdd->data5.u16x2.u16_2;
+            int gridX = eventPlantAdd->u16_0;
+            int gridY = eventPlantAdd->u16_1;
+            auto seedType = SeedType(eventPlantAdd->uni32_0.u16x2.u16_1);
+            auto imitaterType = SeedType(eventPlantAdd->uni32_0.u16x2.u16_2);
+            bool isDoEffect = eventPlantAdd->uni32_1.u16x2.u16_2;
             Plant *plant = AddPlant_Origin(gridX, gridY, seedType, imitaterType, 0, isDoEffect);
-            plant->mLaunchCounter = int(eventPlantAdd->data3);
-            serverPlantIDMap[eventPlantAdd->data5.u16x2.u16_1] = uint16_t(mPlants.DataArrayGetID(plant));
+            plant->mLaunchCounter = int(eventPlantAdd->u16_2);
+            serverPlantIDMap[eventPlantAdd->uni32_1.u16x2.u16_1] = uint16_t(mPlants.DataArrayGetID(plant));
         } break;
         case EVENT_SERVER_BOARD_PLANT_BOWLING_SET_ROW: {
             auto *eventBowling = static_cast<const U16U8U8I16I16UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, eventBowling->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, eventBowling->u16_0, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
                 if (!aPlant->mDead) {
-                    aPlant->mRow = eventBowling->data2;
-                    aPlant->mState = static_cast<PlantState>(eventBowling->data3);
-                    aPlant->mX = eventBowling->data4;
-                    aPlant->mY = eventBowling->data5;
-                    aPlant->mRenderOrder = eventBowling->data6.i32;
+                    aPlant->mRow = eventBowling->u8_0;
+                    aPlant->mState = static_cast<PlantState>(eventBowling->u8_1);
+                    aPlant->mX = eventBowling->i16_0;
+                    aPlant->mY = eventBowling->i16_1;
+                    aPlant->mRenderOrder = eventBowling->uni32_0.i32;
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_SLEEP_STATE: {
             const auto *sleepEvent = static_cast<const U16U16U8_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, sleepEvent->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, sleepEvent->u16_0, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                aPlant->SetSleeping(sleepEvent->data3 != 0);
-                aPlant->mWakeUpCounter = sleepEvent->data2;
+                aPlant->SetSleeping(sleepEvent->u8_0 != 0);
+                aPlant->mWakeUpCounter = sleepEvent->u16_1;
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_IMITATER_MORPH: {
             auto *eventMorph = static_cast<const U16_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, eventMorph->data, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, eventMorph->u16_0, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
                 if (aPlant != nullptr) {
                     aPlant->SetImitaterFilterEffect();
@@ -2738,7 +2738,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLAY_SOUND: {
             auto *eventSound = static_cast<const U8_Event *>(event);
-            switch (eventSound->data) {
+            switch (eventSound->u8_0) {
                 case 0:
                     mApp->PlaySample(SOUND_GULP);
                     break;
@@ -2754,22 +2754,22 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLAY_FOLEY: {
             const auto *soundEvent = static_cast<const U8_Event *>(event);
-            mApp->PlayFoley(static_cast<FoleyType>(soundEvent->data));
+            mApp->PlayFoley(static_cast<FoleyType>(soundEvent->u8_0));
         } break;
         case EVENT_SERVER_BOARD_PLAY_SOUND_SR: {
             if (!(gIsServerModeSpectator || gIsReplayMode)) {
                 break;
             }
             auto *eventSound = static_cast<const U8U8_Event *>(event);
-            if (eventSound->data1 == 0) {
-                mApp->PlaySample(eventSound->data2);
-            } else if (eventSound->data1 == 1) {
-                mApp->PlayFoley(static_cast<FoleyType>(eventSound->data2));
+            if (eventSound->u8_0 == 0) {
+                mApp->PlaySample(eventSound->u8_1);
+            } else if (eventSound->u8_0 == 1) {
+                mApp->PlayFoley(static_cast<FoleyType>(eventSound->u8_1));
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_DIE: {
             auto *eventPlantDie = static_cast<const U16_Event *>(event);
-            uint16_t serverPlantID = eventPlantDie->data;
+            uint16_t serverPlantID = eventPlantDie->u16_0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
@@ -2779,7 +2779,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLANT_DO_SPECIAL: {
             auto *eventPlantDoSpecial = static_cast<const U16_Event *>(event);
-            uint16_t serverPlantID = eventPlantDoSpecial->data;
+            uint16_t serverPlantID = eventPlantDoSpecial->u16_0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
@@ -2788,14 +2788,14 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLANT_ICE_A_ZOMBIE: {
             auto *eventIceAZombie = static_cast<const U16U16_Event *>(event);
-            uint16_t serverPlantID = eventIceAZombie->data1;
+            uint16_t serverPlantID = eventIceAZombie->u16_0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
                 Zombie *aZombie = nullptr;
-                if (eventIceAZombie->data2 != NETPLAY_ZOMBIE_ID_NULL) {
+                if (eventIceAZombie->u16_1 != NETPLAY_ZOMBIE_ID_NULL) {
                     uint16_t clientZombieID = 0;
-                    if (homura::FindInMap(serverZombieIDMap, eventIceAZombie->data2, clientZombieID)) {
+                    if (homura::FindInMap(serverZombieIDMap, eventIceAZombie->u16_1, clientZombieID)) {
                         aZombie = mZombies.DataArrayGet(clientZombieID);
                     }
                 }
@@ -2808,7 +2808,7 @@ void Board::processServerEvent(const BaseEvent *event) {
                 break;
             }
             auto *event1 = static_cast<const U8U8U16_Event *>(event);
-            uint16_t serverPlantID = aIsShortEvent ? static_cast<const U16_Event *>(event)->data : event1->data3;
+            uint16_t serverPlantID = aIsShortEvent ? static_cast<const U16_Event *>(event)->u16_0 : event1->u16_0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
@@ -2826,12 +2826,12 @@ void Board::processServerEvent(const BaseEvent *event) {
                 } else if (aPlant->mSeedType == SeedType::SEED_RED_STINGER) {
                     aPlant->LaunchRedStinger();
                 } else {
-                    old_Plant_FindTargetAndFire(aPlant, event1->data1, PlantWeapon(event1->data2));
+                    old_Plant_FindTargetAndFire(aPlant, event1->u8_0, PlantWeapon(event1->u8_1));
                 }
                 // 扩展包在公共字段后附带玉米或黄油状态，先播放起手再校正图层。
                 if (aPlant->mSeedType == SeedType::SEED_KERNELPULT && event->size == sizeof(U8U8U16U16_Event)) {
                     const auto *kernelEvent = static_cast<const U8U8U16U16_Event *>(event);
-                    auto serverState = PlantState(kernelEvent->data4);
+                    auto serverState = PlantState(kernelEvent->u16_1);
                     if (aPlant->mState != serverState) {
                         aPlant->mState = serverState;
                         Reanimation *aReanim = mApp->ReanimationGet(aPlant->mBodyReanimID);
@@ -2860,8 +2860,8 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLANT_CHOMPER_BIT: {
             auto *eventChomperBit = static_cast<const U16U16_Event *>(event);
-            uint16_t serverPlantID = eventChomperBit->data1;
-            uint16_t serverZombieID = eventChomperBit->data2;
+            uint16_t serverPlantID = eventChomperBit->u16_0;
+            uint16_t serverZombieID = eventChomperBit->u16_1;
             uint16_t clientPlantID = 0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID) && homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
@@ -2874,15 +2874,15 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_PLANT_STATE: {
             const auto *stateEvent = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, stateEvent->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, stateEvent->u16_0, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                aPlant->SetPlantState(PlantState(stateEvent->data2), stateEvent->data3, stateEvent->data4.i32);
+                aPlant->SetPlantState(PlantState(stateEvent->u16_1), stateEvent->u16_2, stateEvent->uni32_0.i32);
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_MAGNETSHROOM_ATTACK: {
             auto *eventMagnetshroomAttack = static_cast<const U16U16_Event *>(event);
-            uint16_t serverPlantID = eventMagnetshroomAttack->data1;
-            uint16_t serverZombieID = eventMagnetshroomAttack->data2;
+            uint16_t serverPlantID = eventMagnetshroomAttack->u16_0;
+            uint16_t serverZombieID = eventMagnetshroomAttack->u16_1;
             uint16_t clientPlantID = 0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID) && homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
@@ -2893,8 +2893,8 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PLANT_MAGNETSHROOM_ATTACK_LADDER: {
             auto *eventMagnetshroomAttackLadder = static_cast<const U16U16_Event *>(event);
-            uint16_t serverPlantID = eventMagnetshroomAttackLadder->data1;
-            uint16_t serverGridItemID = eventMagnetshroomAttackLadder->data2;
+            uint16_t serverPlantID = eventMagnetshroomAttackLadder->u16_0;
+            uint16_t serverGridItemID = eventMagnetshroomAttackLadder->u16_1;
             uint16_t clientPlantID = 0;
             uint16_t clientGridItemID = 0;
             if (homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID) && homura::FindInMap(serverGridItemIDMap, serverGridItemID, clientGridItemID)) {
@@ -2928,14 +2928,14 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN: {
             const auto *burnEvent = static_cast<const U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, burnEvent->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, burnEvent->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->ApplyBurn_Origin();
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DIE: {
             auto *eventZombieDie = static_cast<const U16_Event *>(event);
-            uint16_t serverZombieID = eventZombieDie->data;
+            uint16_t serverZombieID = eventZombieDie->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -2949,7 +2949,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_MIND_CONTROLLED: {
             auto *eventZombieMindControlled = static_cast<const U16_Event *>(event);
-            uint16_t serverZombieID = eventZombieMindControlled->data;
+            uint16_t serverZombieID = eventZombieMindControlled->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -2958,7 +2958,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_CONVERT_TO_IMP: {
             auto *eventZombieConvertToImp = static_cast<const U16_Event *>(event);
-            uint16_t serverZombieID = eventZombieConvertToImp->data;
+            uint16_t serverZombieID = eventZombieConvertToImp->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -2967,41 +2967,41 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD: {
             auto *eventZombieAdd = static_cast<const U8x4U16UNI32x2_Event *>(event);
-            auto aZombieType = ZombieType(eventZombieAdd->data1[0]);
-            uint8_t aRow = eventZombieAdd->data1[1];
-            auto aFromWave = int8_t(eventZombieAdd->data1[2]);
-            const bool aIsRustle = (eventZombieAdd->data1[3] & 1) != 0;
+            auto aZombieType = ZombieType(eventZombieAdd->u8x4_0[0]);
+            uint8_t aRow = eventZombieAdd->u8x4_0[1];
+            auto aFromWave = int8_t(eventZombieAdd->u8x4_0[2]);
+            const bool aIsRustle = (eventZombieAdd->u8x4_0[3] & 1) != 0;
             if (aZombieType == ZombieType::ZOMBIE_BACKUP_DANCER) // 移除主机生成时向客机同步传递的舞伴
                 return;
             Zombie *aZombie = AddZombieInRow_Origin(aZombieType, aRow, aFromWave, aIsRustle);
-            serverZombieIDMap[eventZombieAdd->data2] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            float aVelX = eventZombieAdd->data3[0].f32;
+            serverZombieIDMap[eventZombieAdd->u16_0] = uint16_t(mZombies.DataArrayGetID(aZombie));
+            float aVelX = eventZombieAdd->uni32x2_0[0].f32;
             aZombie->ApplySyncedSpeed(aVelX, short(aZombie->mAnimTicksPerFrame));
-            aZombie->mPosX = eventZombieAdd->data3[1].f32;
+            aZombie->mPosX = eventZombieAdd->uni32x2_0[1].f32;
             if (aZombie->mZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                aZombie->mBloated = (eventZombieAdd->data1[3] & 2) != 0;
+                aZombie->mBloated = (eventZombieAdd->u8x4_0[3] & 2) != 0;
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD: {
             auto *eventZombieBobseldAdd = static_cast<const U8x2U16x4UNI32x8_Event *>(event);
-            uint8_t aRow = eventZombieBobseldAdd->data1[0];
-            auto aFromWave = int8_t(eventZombieBobseldAdd->data1[1]);
+            uint8_t aRow = eventZombieBobseldAdd->u8x2_0[0];
+            auto aFromWave = int8_t(eventZombieBobseldAdd->u8x2_0[1]);
             Zombie *aZombie = AddZombieInRow_Origin(ZOMBIE_BOBSLED, aRow, aFromWave, true);
-            serverZombieIDMap[eventZombieBobseldAdd->data2[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            aZombie->ApplySyncedSpeed(eventZombieBobseldAdd->data3[0].f32, short(aZombie->mAnimTicksPerFrame));
-            aZombie->mPosX = eventZombieBobseldAdd->data4[0].f32;
+            serverZombieIDMap[eventZombieBobseldAdd->u16x4_0[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
+            aZombie->ApplySyncedSpeed(eventZombieBobseldAdd->uni32x4_0[0].f32, short(aZombie->mAnimTicksPerFrame));
+            aZombie->mPosX = eventZombieBobseldAdd->uni32x4_1[0].f32;
             for (int i = 0; i < 3; ++i) {
                 Zombie *aFollowerZombie = mZombies.DataArrayGet(aZombie->mFollowerZombieID[i]);
-                serverZombieIDMap[eventZombieBobseldAdd->data2[i + 1]] = uint16_t(aZombie->mFollowerZombieID[i]);
-                aFollowerZombie->ApplySyncedSpeed(eventZombieBobseldAdd->data3[i + 1].f32, short(aFollowerZombie->mAnimTicksPerFrame));
-                aFollowerZombie->mPosX = eventZombieBobseldAdd->data4[i + 1].f32;
+                serverZombieIDMap[eventZombieBobseldAdd->u16x4_0[i + 1]] = uint16_t(aZombie->mFollowerZombieID[i]);
+                aFollowerZombie->ApplySyncedSpeed(eventZombieBobseldAdd->uni32x4_0[i + 1].f32, short(aFollowerZombie->mAnimTicksPerFrame));
+                aFollowerZombie->mPosX = eventZombieBobseldAdd->uni32x4_1[i + 1].f32;
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DOGWALKER_ADD: {
             auto *eventDogWalkerAdd = static_cast<const U8x2U16x4UNI32x8_Event *>(event);
-            const int aRow = eventDogWalkerAdd->data1[0];
-            const int aFromWave = int8_t(eventDogWalkerAdd->data1[1]);
-            const bool aIsRustle = eventDogWalkerAdd->data2[2] != 0;
+            const int aRow = eventDogWalkerAdd->u8x2_0[0];
+            const int aFromWave = int8_t(eventDogWalkerAdd->u8x2_0[1]);
+            const bool aIsRustle = eventDogWalkerAdd->u16x4_0[2] != 0;
 
             Zombie *aZombie = AddZombieInRow_Origin(ZombieType::ZOMBIE_DOGWALKER, aRow, aFromWave, aIsRustle);
             if (aZombie == nullptr) {
@@ -3013,26 +3013,26 @@ void Board::processServerEvent(const BaseEvent *event) {
                 break;
             }
 
-            serverZombieIDMap[eventDogWalkerAdd->data2[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            serverZombieIDMap[eventDogWalkerAdd->data2[1]] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
+            serverZombieIDMap[eventDogWalkerAdd->u16x4_0[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
+            serverZombieIDMap[eventDogWalkerAdd->u16x4_0[1]] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
 
-            aZombie->ApplySyncedSpeed(eventDogWalkerAdd->data3[0].f32, short(aZombie->mAnimTicksPerFrame));
-            aZombieDog->ApplySyncedSpeed(eventDogWalkerAdd->data3[1].f32, short(aZombieDog->mAnimTicksPerFrame));
+            aZombie->ApplySyncedSpeed(eventDogWalkerAdd->uni32x4_0[0].f32, short(aZombie->mAnimTicksPerFrame));
+            aZombieDog->ApplySyncedSpeed(eventDogWalkerAdd->uni32x4_0[1].f32, short(aZombieDog->mAnimTicksPerFrame));
 
-            aZombie->mPosX = eventDogWalkerAdd->data4[0].f32;
-            aZombieDog->mPosX = eventDogWalkerAdd->data4[1].f32;
+            aZombie->mPosX = eventDogWalkerAdd->uni32x4_1[0].f32;
+            aZombieDog->mPosX = eventDogWalkerAdd->uni32x4_1[1].f32;
             aZombie->mX = int(aZombie->mPosX);
             aZombieDog->mX = int(aZombieDog->mPosX);
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID: {
             auto *eventZombieBungeeAdd = static_cast<const U16UNI32UNI32_Event *>(event);
 
-            int aTargetCol = eventZombieBungeeAdd->data2.u8x4.u8_1;
-            int aRow = eventZombieBungeeAdd->data2.u8x4.u8_2;
+            int aTargetCol = eventZombieBungeeAdd->uni32_0.u8x4.u8_1;
+            int aRow = eventZombieBungeeAdd->uni32_0.u8x4.u8_2;
             Zombie *aZombie = AddZombieInRow_Origin(ZOMBIE_BUNGEE, aRow, 0, false);
-            serverZombieIDMap[eventZombieBungeeAdd->data1] = uint16_t(mZombies.DataArrayGetID(aZombie));
+            serverZombieIDMap[eventZombieBungeeAdd->u16_0] = uint16_t(mZombies.DataArrayGetID(aZombie));
 
-            aZombie->mAltitude = eventZombieBungeeAdd->data3.f32;
+            aZombie->mAltitude = eventZombieBungeeAdd->uni32_1.f32;
             aZombie->mTargetCol = aTargetCol;
             aZombie->SetRow(aRow);
             aZombie->mPosX = float(GridToPixelX(aTargetCol, aRow));
@@ -3041,8 +3041,8 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_LIFT_TARGET: {
             auto *eventBungeeLiftTarget = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = eventBungeeLiftTarget->data1;
-            uint16_t serverPlantID = eventBungeeLiftTarget->data2;
+            uint16_t serverZombieID = eventBungeeLiftTarget->u16_0;
+            uint16_t serverPlantID = eventBungeeLiftTarget->u16_1;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -3062,10 +3062,10 @@ void Board::processServerEvent(const BaseEvent *event) {
 
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE: {
             auto *eventBungeeDropZombie = static_cast<const U8U8U16U16_Event *>(event);
-            int gridX = eventBungeeDropZombie->data1;
-            int gridY = eventBungeeDropZombie->data2;
-            uint16_t serverBungeeZombieID = eventBungeeDropZombie->data3;
-            uint16_t serverDroppedZombieID = eventBungeeDropZombie->data4;
+            int gridX = eventBungeeDropZombie->u8_0;
+            int gridY = eventBungeeDropZombie->u8_1;
+            uint16_t serverBungeeZombieID = eventBungeeDropZombie->u16_0;
+            uint16_t serverDroppedZombieID = eventBungeeDropZombie->u16_1;
             uint16_t clientDroppedZombieID = 0;
 
             Zombie *aBungeeZombie = AddZombie_Origin(ZombieType::ZOMBIE_BUNGEE, Zombie::ZOMBIE_WAVE_VS, false);
@@ -3078,8 +3078,8 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_HIT_UMBRELLA: {
             auto *eventBungeeHitUmbrella = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = eventBungeeHitUmbrella->data1;
-            uint16_t serverPlantID = eventBungeeHitUmbrella->data2;
+            uint16_t serverZombieID = eventBungeeHitUmbrella->u16_0;
+            uint16_t serverPlantID = eventBungeeHitUmbrella->u16_1;
             uint16_t clientZombieID = 0;
             uint16_t clientPlantID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID) && homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
@@ -3095,14 +3095,14 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD_BY_CHEAT: {
             auto *eventZombieAddByCheat = static_cast<const U16UNI32UNI32_Event *>(event);
-            int theGridX = eventZombieAddByCheat->data2.u8x4.u8_1;
-            int theGridY = eventZombieAddByCheat->data2.u8x4.u8_2;
-            uint16_t serverZombieID = eventZombieAddByCheat->data1;
+            int theGridX = eventZombieAddByCheat->uni32_0.u8x4.u8_1;
+            int theGridY = eventZombieAddByCheat->uni32_0.u8x4.u8_2;
+            uint16_t serverZombieID = eventZombieAddByCheat->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 if (aZombie->mZombieType == ZOMBIE_BUNGEE) {
-                    aZombie->mAltitude = eventZombieAddByCheat->data3.f32;
+                    aZombie->mAltitude = eventZombieAddByCheat->uni32_1.f32;
                     aZombie->mTargetCol = theGridX;
                     aZombie->SetRow(theGridY);
                     aZombie->mPosX = float(GridToPixelX(theGridX, theGridY));
@@ -3116,25 +3116,25 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_RIZE_FORM_GRAVE: {
             auto *event1 = static_cast<const U8U8U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, event1->data3, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, event1->u16_0, clientZombieID)) {
                 Zombie *zombie = mZombies.DataArrayGet(clientZombieID);
-                zombie->RiseFromGrave(event1->data1, event1->data2);
+                zombie->RiseFromGrave(event1->u8_0, event1->u8_1);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SUMMON_BACKUP_DANCERS: {
             auto *eventSummonBackupDancers = static_cast<const U16x5UNI32x5_Event *>(event);
-            uint16_t serverZombieID = eventSummonBackupDancers->data1;
+            uint16_t serverZombieID = eventSummonBackupDancers->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = eventSummonBackupDancers->data2.f32;
+                aZombie->mPosX = eventSummonBackupDancers->uni32_0.f32;
                 aZombie->SummonBackupDancers_Origin();
 
                 for (int i = 0; i < NUM_BACKUP_DANCERS; ++i) {
                     Zombie *backupZombie = ZombieTryToGet(aZombie->mFollowerZombieID[i]);
                     if (backupZombie) {
-                        serverZombieIDMap[uint16_t(eventSummonBackupDancers->data3[i])] = uint16_t(aZombie->mFollowerZombieID[i]);
-                        float aVelX = eventSummonBackupDancers->data4[i].f32;
+                        serverZombieIDMap[uint16_t(eventSummonBackupDancers->u16x4_0[i])] = uint16_t(aZombie->mFollowerZombieID[i]);
+                        float aVelX = eventSummonBackupDancers->uni32x4_0[i].f32;
                         backupZombie->ApplySyncedSpeed(aVelX, short(aZombie->mAnimTicksPerFrame));
                     }
                 }
@@ -3142,13 +3142,13 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD: {
             auto *eventRaiseDead = static_cast<const U16UNI32U8x16U16x15UNI32x15_Event *>(event);
-            uint16_t serverZombieID = eventRaiseDead->data1;
+            uint16_t serverZombieID = eventRaiseDead->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = eventRaiseDead->data2.f32;
+                aZombie->mPosX = eventRaiseDead->uni32_0.f32;
 
-                int count = std::min<int>(15, eventRaiseDead->data3[0]);
+                int count = std::min<int>(15, eventRaiseDead->u8x16_0[0]);
                 for (int i = 0; i < count; ++i) {
                     int aRow = 0, aCol = 0;
                     if (i < 5) {
@@ -3162,12 +3162,12 @@ void Board::processServerEvent(const BaseEvent *event) {
                         aCol = aZombie->mMindControlled ? 2 : 8;
                     }
 
-                    ZombieID revivedClientID = aZombie->RaiseDeadZombie(ZombieType(eventRaiseDead->data3[i + 1]), aRow, aCol);
+                    ZombieID revivedClientID = aZombie->RaiseDeadZombie(ZombieType(eventRaiseDead->u8x16_0[i + 1]), aRow, aCol);
                     if (revivedClientID != ZombieID::ZOMBIEID_NULL) {
-                        serverZombieIDMap[eventRaiseDead->data4[i]] = uint16_t(revivedClientID);
+                        serverZombieIDMap[eventRaiseDead->u16x15_0[i]] = uint16_t(revivedClientID);
                         Zombie *revivedZombie = ZombieTryToGet(revivedClientID);
                         if (revivedZombie) {
-                            revivedZombie->ApplySyncedSpeed(eventRaiseDead->data5[i].f32, short(revivedZombie->mAnimTicksPerFrame));
+                            revivedZombie->ApplySyncedSpeed(eventRaiseDead->uni32x15_0[i].f32, short(revivedZombie->mAnimTicksPerFrame));
                         }
                     }
                 }
@@ -3175,14 +3175,14 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED: {
             auto *eventPickSpeed = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            uint16_t serverZombieID = eventPickSpeed->data1;
+            uint16_t serverZombieID = eventPickSpeed->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
-                float aVelX = eventPickSpeed->data4.f32;
-                uint16_t anAnimTicks = eventPickSpeed->data2;
+                float aVelX = eventPickSpeed->uni32_0.f32;
+                uint16_t anAnimTicks = eventPickSpeed->u16_1;
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->ApplySyncedSpeed(aVelX, short(anAnimTicks));
-                float syncedPosX = eventPickSpeed->data5.f32;
+                float syncedPosX = eventPickSpeed->uni32_1.f32;
                 if (aZombie->mZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER) {
                     LOG_DEBUG("{} {} {}", aZombie->mPosX, syncedPosX, (int)aZombie->mZombiePhase);
                 }
@@ -3198,7 +3198,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BOBSLED_PICK_SPEED: {
             auto *eventBobsledPickSpeed = static_cast<const U8x2U16x4UNI32x8_Event *>(event);
-            uint16_t serverLeaderID = eventBobsledPickSpeed->data2[0];
+            uint16_t serverLeaderID = eventBobsledPickSpeed->u16x4_0[0];
             uint16_t clientLeaderID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverLeaderID, clientLeaderID)) {
                 Zombie *leaderZombie = mZombies.DataArrayGet(clientLeaderID);
@@ -3210,37 +3210,37 @@ void Board::processServerEvent(const BaseEvent *event) {
                         }
                         aZombie->mRelatedZombieID = ZombieID::ZOMBIEID_NULL;
                         leaderZombie->mFollowerZombieID[i] = ZombieID::ZOMBIEID_NULL;
-                        aZombie->ApplySyncedSpeed(eventBobsledPickSpeed->data3[i + 1].f32, short(aZombie->mAnimTicksPerFrame));
-                        aZombie->mPosX = eventBobsledPickSpeed->data4[i + 1].f32;
+                        aZombie->ApplySyncedSpeed(eventBobsledPickSpeed->uni32x4_0[i + 1].f32, short(aZombie->mAnimTicksPerFrame));
+                        aZombie->mPosX = eventBobsledPickSpeed->uni32x4_1[i + 1].f32;
                     }
-                    leaderZombie->ApplySyncedSpeed(eventBobsledPickSpeed->data3[0].f32, short(leaderZombie->mAnimTicksPerFrame));
-                    leaderZombie->mPosX = eventBobsledPickSpeed->data4[0].f32;
+                    leaderZombie->ApplySyncedSpeed(eventBobsledPickSpeed->uni32x4_0[0].f32, short(leaderZombie->mAnimTicksPerFrame));
+                    leaderZombie->mPosX = eventBobsledPickSpeed->uni32x4_1[0].f32;
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ICE_TRAP: {
             auto *eventIceTrap = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = eventIceTrap->data1;
+            uint16_t serverZombieID = eventIceTrap->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
-                uint16_t aIceTrapCounter = eventIceTrap->data2;
+                uint16_t aIceTrapCounter = eventIceTrap->u16_1;
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->ApplySyncedIceTrap(aIceTrapCounter);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN: {
             auto *eventImpThrown = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
-            uint16_t serverGargantuarID = eventImpThrown->data1;
-            uint16_t serverImpID = eventImpThrown->data2;
+            uint16_t serverGargantuarID = eventImpThrown->u16_0;
+            uint16_t serverImpID = eventImpThrown->u16_1;
             uint16_t clientGargantuarID = 0;
             uint16_t clientImpID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverImpID, clientImpID) && homura::FindInMap(serverZombieIDMap, serverGargantuarID, clientGargantuarID)) {
                 Zombie *aGargantuar = mZombies.DataArrayGet(clientGargantuarID);
                 Zombie *aZombieImp = mZombies.DataArrayGet(clientImpID);
-                float aOffsetDistance = eventImpThrown->data4.f32;
+                float aOffsetDistance = eventImpThrown->uni32_0.f32;
                 if (aGargantuar && aZombieImp) {
                     if (aZombieImp->mZombieType == ZombieType::ZOMBIE_GIGA_IMP) {
-                        aZombieImp->mTargetCol = int(eventImpThrown->data3);
+                        aZombieImp->mTargetCol = int(eventImpThrown->u16_2);
                     }
                     aZombieImp->ZombieImpThrown(aGargantuar, aOffsetDistance);
                 }
@@ -3248,20 +3248,20 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_IMP_KICKED: {
             auto *eventImpKicked = static_cast<const U16UNI32UNI32_Event *>(event);
-            uint16_t serverImpID = eventImpKicked->data1;
+            uint16_t serverImpID = eventImpKicked->u16_0;
             uint16_t clientImpID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverImpID, clientImpID)) {
                 Zombie *aZombieImp = mZombies.DataArrayGet(clientImpID);
-                float aKickingDistance = eventImpKicked->data2.f32;
+                float aKickingDistance = eventImpKicked->uni32_0.f32;
                 if (aZombieImp) {
-                    aZombieImp->mPosX = eventImpKicked->data3.f32;
+                    aZombieImp->mPosX = eventImpKicked->uni32_1.f32;
                     aZombieImp->ZombieImpKicked(aKickingDistance);
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_IMP_POP: {
             auto *eventImpPop = static_cast<const U16_Event *>(event);
-            uint16_t serverImpID = eventImpPop->data;
+            uint16_t serverImpID = eventImpPop->u16_0;
             uint16_t clientImpID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverImpID, clientImpID)) {
                 Zombie *aZombieImp = mZombies.DataArrayGet(clientImpID);
@@ -3277,11 +3277,11 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_POST_VAULT: {
             auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosY = event1->data2.f32;
+                aZombie->mPosY = event1->uni32_0.f32;
                 aZombie->mY = int(aZombie->mPosY);
                 aZombie->mZombiePhase = PHASE_POLEVAULTER_POST_VAULT;
                 aZombie->mZombieAttackRect = Rect(50, 0, 20, 115);
@@ -3291,15 +3291,15 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_POLEVAULTER_IN_VAULT: {
             auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 if (aZombie->mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE) {
                     aZombie->FinishZombieRiseFromGrave();
                 }
-                aZombie->mX = event1->data2.i16x2.i16_1;
-                int aJumpDistance = event1->data2.i16x2.i16_2;
+                aZombie->mX = event1->uni32_0.i16x2.i16_1;
+                int aJumpDistance = event1->uni32_0.i16x2.i16_2;
                 aZombie->mZombiePhase = PHASE_POLEVAULTER_IN_VAULT;
                 aZombie->PlayZombieReanim("anim_jump", REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
                 Reanimation *aReanim = mApp->ReanimationGet(aZombie->mBodyReanimID);
@@ -3310,11 +3310,11 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_SMASH: {
             auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = event1->data2.f32;
+                aZombie->mPosX = event1->uni32_0.f32;
                 if (aZombie->mZombieType == ZombieType::ZOMBIE_SUPER_NOVA_GARGANTUAR) {
                     Plant *aTargetPlant = aZombie->FindPlantTarget(ZombieAttackType::ATTACKTYPE_CHEW);
                     if (aTargetPlant != nullptr) {
@@ -3332,11 +3332,11 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_GARGANTUAR_START_THROW: {
             auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = event1->data2.f32;
+                aZombie->mPosX = event1->uni32_0.f32;
                 aZombie->mZombiePhase = PHASE_GARGANTUAR_THROWING;
                 if (aZombie->mZombieType == ZombieType::ZOMBIE_GIGA_GARGANTUAR) {
                     aZombie->StopEating();
@@ -3354,15 +3354,15 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EventType::EVENT_SERVER_BOARD_ZOMBIE_GIGA_GARGANTUAR_START_LIGHTNING: {
             auto *event1 = static_cast<const U16UNI32UNI32_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, event1->data1, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, event1->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 if (aZombie != nullptr) {
                     aZombie->StopEating();
-                    aZombie->mPosX = event1->data2.f32;
+                    aZombie->mPosX = event1->uni32_0.f32;
                     aZombie->mX = int(aZombie->mPosX);
                     aZombie->mHasObject = false;
                     aZombie->mTargetPlantID = PlantID::PLANTID_NULL;
-                    aZombie->mTargetCol = event1->data3.i32;
+                    aZombie->mTargetCol = event1->uni32_1.i32;
                     aZombie->mVelX = 0.0f;
                     aZombie->mZombiePhase = ZombiePhase::PHASE_GIGA_GARGANTUAR_LIGHTNING_PREPARING;
                     aZombie->mApp->PlayFoley(FoleyType::FOLEY_POWER_POLE_CHARGE);
@@ -3372,9 +3372,9 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_CATAPLUT_FIRE: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
-            uint16_t serverPlantID = event1->data2;
+            uint16_t serverPlantID = event1->u16_1;
             uint16_t clientPlantID = 0;
             if (serverPlantID != NETPLAY_PLANT_ID_NULL) {
                 if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID) && homura::FindInMap(serverPlantIDMap, serverPlantID, clientPlantID)) {
@@ -3386,23 +3386,23 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_LADDER_PLACED: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->mApp->PlaySample(SOUND_LADDER_ZOMBIE);
                 aZombie->mZombieHeight = HEIGHT_UP_LADDER;
-                aZombie->mUseLadderCol = event1->data2;
+                aZombie->mUseLadderCol = event1->u16_1;
                 aZombie->DetachShield();
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_START_EATING: {
             auto *event1 = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mPosX = event1->data2.f32;
+                aZombie->mPosX = event1->uni32_0.f32;
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_HUGE_WAVE: {
@@ -3411,50 +3411,50 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SET_ROW: {
             auto *event1 = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = event1->data1;
+            uint16_t serverZombieID = event1->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->SetRow(event1->data2);
+                aZombie->SetRow(event1->u16_1);
                 aZombie->StartWalkAnim(20);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SUN_BEAN_SUN: {
             auto *sunBeanEvent = static_cast<const U16U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, sunBeanEvent->data1, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, sunBeanEvent->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mSunBeanSun = short(sunBeanEvent->data2);
+                aZombie->mSunBeanSun = short(sunBeanEvent->u16_1);
                 mApp->PlaySample(SOUND_GULP);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_TELEPORT: {
             auto *eventTeleport = static_cast<const U16UNI32_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventTeleport->data1, clientZombieID)) {
-                TeleportZombie(mZombies.DataArrayGet(clientZombieID), eventTeleport->data2.f32);
+            if (homura::FindInMap(serverZombieIDMap, eventTeleport->u16_0, clientZombieID)) {
+                TeleportZombie(mZombies.DataArrayGet(clientZombieID), eventTeleport->uni32_0.f32);
             }
         } break;
         case EVENT_SERVER_BOARD_PLANT_TELEPORT: {
             auto *eventTeleport = static_cast<const U16U16_Event *>(event);
             uint16_t clientPlantID = 0;
-            if (homura::FindInMap(serverPlantIDMap, eventTeleport->data1, clientPlantID)) {
+            if (homura::FindInMap(serverPlantIDMap, eventTeleport->u16_0, clientPlantID)) {
                 Plant *aPlant = mPlants.DataArrayGet(clientPlantID);
-                TeleportPlant(aPlant, eventTeleport->data2, aPlant->mRow);
+                TeleportPlant(aPlant, eventTeleport->u16_1, aPlant->mRow);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_CROSSING_GUARD_FIRE: {
             auto *eventFire = static_cast<const U16U16_Event *>(event);
             uint16_t clientThrowerID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventFire->data1, clientThrowerID)) {
+            if (homura::FindInMap(serverZombieIDMap, eventFire->u16_0, clientThrowerID)) {
                 Zombie *aThrower = mZombies.DataArrayGet(clientThrowerID);
-                if (eventFire->data2 == NETPLAY_ZOMBIE_ID_NULL) {
+                if (eventFire->u16_1 == NETPLAY_ZOMBIE_ID_NULL) {
                     aThrower->mZombiePhase = ZombiePhase::PHASE_ZOMBIE_NORMAL;
                     aThrower->mPhaseCounter = 500;
                     aThrower->StartWalkAnim(10);
                 } else {
                     uint16_t clientTargetID = 0;
-                    if (homura::FindInMap(serverZombieIDMap, eventFire->data2, clientTargetID)) {
+                    if (homura::FindInMap(serverZombieIDMap, eventFire->u16_1, clientTargetID)) {
                         aThrower->LaunchTrafficCone(mZombies.DataArrayGet(clientTargetID));
                     }
                 }
@@ -3463,24 +3463,24 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_APPLY_CONE: {
             auto *eventApply = static_cast<const U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventApply->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, eventApply->u16_0, clientZombieID)) {
                 mZombies.DataArrayGet(clientZombieID)->ApplyTrafficCone();
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_ADD: {
             const auto *aAdd = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t aZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, aAdd->data1, aZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, aAdd->u16_0, aZombieID)) {
                 if (Zombie *aZombie = mZombies.DataArrayGet(aZombieID)) {
-                    GridItem *aPile = AddSkeletonPile(aZombie, aAdd->data4.f32, aAdd->data5.f32);
-                    serverGridItemIDMap[aAdd->data2] = uint16_t(mGridItems.DataArrayGetID(aPile));
+                    GridItem *aPile = AddSkeletonPile(aZombie, aAdd->uni32_0.f32, aAdd->uni32_1.f32);
+                    serverGridItemIDMap[aAdd->u16_1] = uint16_t(mGridItems.DataArrayGetID(aPile));
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_REBIRTH: {
             const auto *aRebirth = static_cast<const U16_Event *>(event);
             uint16_t aGridItemID = 0;
-            if (homura::FindInMap(serverGridItemIDMap, aRebirth->data, aGridItemID)) {
+            if (homura::FindInMap(serverGridItemIDMap, aRebirth->u16_0, aGridItemID)) {
                 if (GridItem *aPile = mGridItems.DataArrayGet(aGridItemID)) {
                     aPile->StartSkeletonRebirth();
                 }
@@ -3489,7 +3489,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_GRIDITEM_SKELETON_SPAWN: {
             const auto *aSpawn = static_cast<const U16U16_Event *>(event);
             uint16_t aGridItemID = 0, aZombieID = 0;
-            if (homura::FindInMap(serverGridItemIDMap, aSpawn->data1, aGridItemID) && homura::FindInMap(serverZombieIDMap, aSpawn->data2, aZombieID)) {
+            if (homura::FindInMap(serverGridItemIDMap, aSpawn->u16_0, aGridItemID) && homura::FindInMap(serverZombieIDMap, aSpawn->u16_1, aZombieID)) {
                 GridItem *aPile = mGridItems.DataArrayGet(aGridItemID);
                 Zombie *aZombie = mZombies.DataArrayGet(aZombieID);
                 if (aPile != nullptr && aZombie != nullptr) {
@@ -3500,29 +3500,29 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_PIGEON_SUMMON: {
             const auto *aSummon = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t aZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, aSummon->data1, aZombieID)) {
-                mZombies.DataArrayGet(aZombieID)->PlaceSummonedPigeon(aSummon->data4.f32, aSummon->data2 != 0, aSummon->data3 != 0);
+            if (homura::FindInMap(serverZombieIDMap, aSummon->u16_0, aZombieID)) {
+                mZombies.DataArrayGet(aZombieID)->PlaceSummonedPigeon(aSummon->uni32_0.f32, aSummon->u16_1 != 0, aSummon->u16_2 != 0);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SCIENTIST_HEAL: {
             auto *healEvent = static_cast<const U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, healEvent->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, healEvent->u16_0, clientZombieID)) {
                 mZombies.DataArrayGet(clientZombieID)->ApplyScientistHealing();
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_PHASE: {
             const auto *aState = static_cast<const U16U16U16UNI32UNI32_Event *>(event);
             uint16_t aZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, aState->data1, aZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, aState->u16_0, aZombieID)) {
                 if (Zombie *aZombie = mZombies.DataArrayGet(aZombieID)) {
-                    aZombie->SetZombiePhase(ZombiePhase(aState->data2), aState->data4.i32, int16_t(aState->data3), aState->data5.f32);
+                    aZombie->SetZombiePhase(ZombiePhase(aState->u16_1), aState->uni32_0.i32, int16_t(aState->u16_2), aState->uni32_1.f32);
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DO_SPECIAL: {
             auto *eventZombieDoSpecial = static_cast<const U16_Event *>(event);
-            uint16_t serverZombieID = eventZombieDoSpecial->data;
+            uint16_t serverZombieID = eventZombieDoSpecial->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -3531,13 +3531,13 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_EXPLORER_BURN_PLANT: {
             auto *eventExplorerBurnPlant = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = eventExplorerBurnPlant->data1;
+            uint16_t serverZombieID = eventExplorerBurnPlant->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 Plant *aPlant = nullptr;
                 uint16_t clientPlantID = 0;
-                if (homura::FindInMap(serverPlantIDMap, eventExplorerBurnPlant->data2, clientPlantID)) {
+                if (homura::FindInMap(serverPlantIDMap, eventExplorerBurnPlant->u16_1, clientPlantID)) {
                     aPlant = mPlants.DataArrayGet(clientPlantID);
                 }
                 aZombie->ExplorerBurnPlant(aPlant);
@@ -3545,12 +3545,12 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SQUISH_ALL_IN_SQUARE: {
             auto *eventZombieSquishAllInSquare = static_cast<const U16UNI32_Event *>(event);
-            uint16_t serverZombieID = eventZombieSquishAllInSquare->data1;
+            uint16_t serverZombieID = eventZombieSquishAllInSquare->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 for (Plant *aPlant = nullptr; IteratePlants(aPlant);) {
-                    if (aPlant->mRow == eventZombieSquishAllInSquare->data2.u8x4.u8_2 && aPlant->mPlantCol == eventZombieSquishAllInSquare->data2.u8x4.u8_1) {
-                        if (eventZombieSquishAllInSquare->data2.u8x4.u8_3 == ZombieAttackType::ATTACKTYPE_DRIVE_OVER && aPlant->IsSpiky()) {
+                    if (aPlant->mRow == eventZombieSquishAllInSquare->uni32_0.u8x4.u8_2 && aPlant->mPlantCol == eventZombieSquishAllInSquare->uni32_0.u8x4.u8_1) {
+                        if (eventZombieSquishAllInSquare->uni32_0.u8x4.u8_3 == ZombieAttackType::ATTACKTYPE_DRIVE_OVER && aPlant->IsSpiky()) {
                             continue;
                         }
                         if (aPlant->mSeedType != SeedType::SEED_SPIKEROCK) {
@@ -3562,9 +3562,9 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_TAKE_DAMAGE: {
             auto *eventZombieTakeDmg = static_cast<const U16U16U8_Event *>(event);
-            int damage = eventZombieTakeDmg->data2;
-            unsigned int damageFlags = eventZombieTakeDmg->data3;
-            uint16_t serverZombieID = eventZombieTakeDmg->data1;
+            int damage = eventZombieTakeDmg->u16_1;
+            unsigned int damageFlags = eventZombieTakeDmg->u8_0;
+            uint16_t serverZombieID = eventZombieTakeDmg->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -3579,27 +3579,27 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_BOSS_HEAD_SPIT: {
             auto *bossEvent = static_cast<const U16x4_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, bossEvent->data[0], clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, bossEvent->u16x4_0[0], clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->mBossMode = bossEvent->data[1];
+                aZombie->mBossMode = bossEvent->u16x4_0[1];
                 switch (event->type) {
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_RV_ATTACK:
-                        aZombie->BossRVAttack_Origin(bossEvent->data[2], bossEvent->data[3]);
+                        aZombie->BossRVAttack_Origin(bossEvent->u16x4_0[2], bossEvent->u16x4_0[3]);
                         break;
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_SPAWN_ATTACK:
-                        aZombie->BossSpawnAttack_Origin(bossEvent->data[2]);
+                        aZombie->BossSpawnAttack_Origin(bossEvent->u16x4_0[2]);
                         break;
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_STOMP_ATTACK:
-                        aZombie->BossStompAttack_Origin(bossEvent->data[2]);
+                        aZombie->BossStompAttack_Origin(bossEvent->u16x4_0[2]);
                         break;
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_BUNGEE_ATTACK:
-                        aZombie->BossBungeeAttack_Origin(bossEvent->data[3]);
+                        aZombie->BossBungeeAttack_Origin(bossEvent->u16x4_0[3]);
                         break;
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_HEAD_ATTACK:
                         aZombie->BossHeadAttack_Origin();
                         break;
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_HEAD_SPIT:
-                        aZombie->BossHeadSpit_Origin(bossEvent->data[2], bossEvent->data[3]);
+                        aZombie->BossHeadSpit_Origin(bossEvent->u16x4_0[2], bossEvent->u16x4_0[3]);
                         break;
                     default:
                         break;
@@ -3615,7 +3615,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_BOSS_START_DEATH: {
             auto *bossEvent = static_cast<const U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, bossEvent->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, bossEvent->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 switch (event->type) {
                     case EVENT_SERVER_BOARD_ZOMBIE_BOSS_PLAY_IDLE:
@@ -3647,12 +3647,12 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_BOSS_BUNGEE_SPAWN: {
             auto *bossEvent = static_cast<const U16x4_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, bossEvent->data[0], clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, bossEvent->u16x4_0[0], clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->mZombiePhase = ZombiePhase::PHASE_BOSS_BUNGEES_DROP;
                 for (int i = 0; i < NUM_BOSS_BUNGEES; ++i) {
                     uint16_t clientFollowerID = 0;
-                    if (bossEvent->data[i + 1] != NETPLAY_ZOMBIE_ID_NULL && homura::FindInMap(serverZombieIDMap, bossEvent->data[i + 1], clientFollowerID)) {
+                    if (bossEvent->u16x4_0[i + 1] != NETPLAY_ZOMBIE_ID_NULL && homura::FindInMap(serverZombieIDMap, bossEvent->u16x4_0[i + 1], clientFollowerID)) {
                         // ZombieTryToGet 需要包含代数的完整 ID，不能直接使用网络槽位索引。
                         aZombie->mFollowerZombieID[i] = ZombieID(mZombies.DataArrayGetID(mZombies.DataArrayGet(clientFollowerID)));
                     } else {
@@ -3665,35 +3665,35 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_ZOMBIE_TAKE_SHIELD_DAMAGE: {
             auto *eventArmorDamage = static_cast<const U16U16U8_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventArmorDamage->data1, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, eventArmorDamage->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 if (event->type == EVENT_SERVER_BOARD_ZOMBIE_TAKE_HELM_DAMAGE) {
-                    aZombie->TakeHelmDamage(eventArmorDamage->data2, eventArmorDamage->data3);
+                    aZombie->TakeHelmDamage(eventArmorDamage->u16_1, eventArmorDamage->u8_0);
                 } else {
-                    aZombie->TakeShieldDamage(eventArmorDamage->data2, eventArmorDamage->data3);
+                    aZombie->TakeShieldDamage(eventArmorDamage->u16_1, eventArmorDamage->u8_0);
                 }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DROP_HEAD: {
             auto *eventZombieDropHead = static_cast<const U16U16_Event *>(event);
-            uint16_t serverZombieID = eventZombieDropHead->data1;
+            uint16_t serverZombieID = eventZombieDropHead->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->DropHead_Origin(eventZombieDropHead->data2);
+                aZombie->DropHead_Origin(eventZombieDropHead->u16_1);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_MOW_DOWN: {
             auto *eventZombieMowDown = static_cast<const U16_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, eventZombieMowDown->data, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, eventZombieMowDown->u16_0, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->MowDown_Original();
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WIN: {
             auto *zombieWinEvent = static_cast<const U16_Event *>(event);
-            uint16_t serverZombieID = zombieWinEvent->data;
+            uint16_t serverZombieID = zombieWinEvent->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
@@ -3702,7 +3702,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_LAWNMOWER_START: {
             auto *eventLawnMowerStart = static_cast<const U16_Event *>(event);
-            uint16_t aRow = eventLawnMowerStart->data;
+            uint16_t aRow = eventLawnMowerStart->u16_0;
             LawnMower *aLawnMower = nullptr;
             while (IterateLawnMowers(aLawnMower)) {
                 if (aLawnMower && aLawnMower->mRow == aRow) {
@@ -3714,7 +3714,7 @@ void Board::processServerEvent(const BaseEvent *event) {
             const auto *eventLawnMowerSquish = static_cast<const U16_Event *>(event);
             LawnMower *aLawnMower = nullptr;
             while (IterateLawnMowers(aLawnMower)) {
-                if (aLawnMower->mRow == eventLawnMowerSquish->data) {
+                if (aLawnMower->mRow == eventLawnMowerSquish->u16_0) {
                     aLawnMower->SquishMower_Origin();
                 }
             }
@@ -3722,20 +3722,20 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_TAKE_SUNMONEY: {
             if (event->size == sizeof(I16I16_Event)) {
                 const auto *eventTakeSunMoneyCoop = static_cast<const I16I16_Event *>(event);
-                mSunMoney1 = eventTakeSunMoneyCoop->data1;
-                mSunMoney2 = eventTakeSunMoneyCoop->data2;
+                mSunMoney1 = eventTakeSunMoneyCoop->i16_0;
+                mSunMoney2 = eventTakeSunMoneyCoop->i16_1;
             } else if (event->size == sizeof(I16_Event)) {
                 const auto *eventTakeSunMoney = static_cast<const I16_Event *>(event);
-                mSunMoney1 = eventTakeSunMoney->data;
+                mSunMoney1 = eventTakeSunMoney->i16_0;
             }
         } break;
         case EVENT_SERVER_BOARD_TAKE_DEATHMONEY: {
             auto *event1 = static_cast<const I16_Event *>(event);
-            mDeathMoney = event1->data;
+            mDeathMoney = event1->i16_0;
         } break;
         case EVENT_SERVER_BOARD_SEEDBANK_ADDSEED: {
             const auto *seedEvent = static_cast<const U8U8U16_Event *>(event);
-            SeedBank *aSeedBank = mSeedBank[seedEvent->data1];
+            SeedBank *aSeedBank = mSeedBank[seedEvent->u8_0];
             if (aSeedBank == nullptr) {
                 break;
             }
@@ -3743,26 +3743,26 @@ void Board::processServerEvent(const BaseEvent *event) {
             if (aSeedIndex >= aSeedBank->mNumPackets) {
                 break;
             }
-            aSeedBank->AddSeed_Origin(SeedType(seedEvent->data2), false);
-            aSeedBank->mSeedPackets[aSeedIndex].mOffsetY = seedEvent->data3;
+            aSeedBank->AddSeed_Origin(SeedType(seedEvent->u8_1), false);
+            aSeedBank->mSeedPackets[aSeedIndex].mOffsetY = seedEvent->u16_0;
         } break;
         case EVENT_SERVER_BOARD_SEEDPACKET_WASPLANTED: {
             auto *event1 = static_cast<const U8U8_Event *>(event);
-            SeedBank *theSeedBank = event1->data2 ? mSeedBank[0] : mSeedBank[1];
-            SeedPacket *seedPacket = &theSeedBank->mSeedPackets[event1->data1];
+            SeedBank *theSeedBank = event1->u8_1 ? mSeedBank[0] : mSeedBank[1];
+            SeedPacket *seedPacket = &theSeedBank->mSeedPackets[event1->u8_0];
             seedPacket->Deactivate();
             seedPacket->WasPlanted(0);
         } break;
         case EVENT_SERVER_BOARD_SYNC_ID: {
             auto *eventSync = static_cast<const U16UNI32_Event *>(event);
 
-            switch (eventSync->data2.u8x4.u8_1) {
+            switch (eventSync->uni32_0.u8x4.u8_1) {
                 case 0: // Plant
                 {
                     Plant *plant = nullptr;
                     while (IteratePlants(plant)) {
-                        if (plant->mSeedType == eventSync->data2.u8x4.u8_2 && plant->mRow == eventSync->data2.u8x4.u8_3 && plant->mPlantCol == eventSync->data2.u8x4.u8_4) {
-                            serverPlantIDMap[eventSync->data1] = uint16_t(mPlants.DataArrayGetID(plant));
+                        if (plant->mSeedType == eventSync->uni32_0.u8x4.u8_2 && plant->mRow == eventSync->uni32_0.u8x4.u8_3 && plant->mPlantCol == eventSync->uni32_0.u8x4.u8_4) {
+                            serverPlantIDMap[eventSync->u16_0] = uint16_t(mPlants.DataArrayGetID(plant));
                         }
                     }
                 }
@@ -3772,8 +3772,8 @@ void Board::processServerEvent(const BaseEvent *event) {
                 {
                     GridItem *gridItem = nullptr;
                     while (IterateGridItems(gridItem)) {
-                        if (gridItem->mGridItemType == eventSync->data2.u8x4.u8_2 && gridItem->mGridX == eventSync->data2.u8x4.u8_3 && gridItem->mGridY == eventSync->data2.u8x4.u8_4) {
-                            serverGridItemIDMap[eventSync->data1] = uint16_t(mGridItems.DataArrayGetID(gridItem));
+                        if (gridItem->mGridItemType == eventSync->uni32_0.u8x4.u8_2 && gridItem->mGridX == eventSync->uni32_0.u8x4.u8_3 && gridItem->mGridY == eventSync->uni32_0.u8x4.u8_4) {
+                            serverGridItemIDMap[eventSync->u16_0] = uint16_t(mGridItems.DataArrayGetID(gridItem));
                         }
                     }
                 } break;
@@ -3781,8 +3781,8 @@ void Board::processServerEvent(const BaseEvent *event) {
                 {
                     Zombie *aZombie = nullptr;
                     while (IterateZombies(aZombie)) {
-                        if (aZombie->mZombieType == eventSync->data2.u8x4.u8_2 && aZombie->mRow == eventSync->data2.u8x4.u8_3 && aZombie->mFromWave == int8_t(eventSync->data2.u8x4.u8_4)) {
-                            serverZombieIDMap[eventSync->data1] = uint16_t(mZombies.DataArrayGetID(aZombie));
+                        if (aZombie->mZombieType == eventSync->uni32_0.u8x4.u8_2 && aZombie->mRow == eventSync->uni32_0.u8x4.u8_3 && aZombie->mFromWave == int8_t(eventSync->uni32_0.u8x4.u8_4)) {
+                            serverZombieIDMap[eventSync->u16_0] = uint16_t(mZombies.DataArrayGetID(aZombie));
                             break;
                         }
                     }
@@ -3795,7 +3795,7 @@ void Board::processServerEvent(const BaseEvent *event) {
 
         case EVENT_SERVER_BOARD_MORE_ZOMBIES: {
             const auto *stageEvent = static_cast<const U16UNI32_Event *>(event);
-            if (!mApp->IsCoopMode() || mApp->mGameScene != SCENE_PLAYING || stageEvent->data1 != uint16_t(mApp->mGameMode) || stageEvent->data2.i32 != mChallenge->mSurvivalStage) {
+            if (!mApp->IsCoopMode() || mApp->mGameScene != SCENE_PLAYING || stageEvent->u16_0 != uint16_t(mApp->mGameMode) || stageEvent->uni32_0.i32 != mChallenge->mSurvivalStage) {
                 break;
             }
             DisplayAdvice("[ADVICE_MORE_ZOMBIES]", MESSAGE_STYLE_BIG_MIDDLE, ADVICE_NONE);
@@ -3804,8 +3804,8 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_INIT_SURVIVAL_STAGE: {
             const auto *stageEvent = static_cast<const U16UNI32_Event *>(event);
-            const int nextStage = stageEvent->data2.i32;
-            if (!mApp->IsCoopMode() || stageEvent->data1 != uint16_t(mApp->mGameMode) || nextStage <= mChallenge->mSurvivalStage) {
+            const int nextStage = stageEvent->uni32_0.i32;
+            if (!mApp->IsCoopMode() || stageEvent->u16_0 != uint16_t(mApp->mGameMode) || nextStage <= mChallenge->mSurvivalStage) {
                 break;
             }
             // 主机的 CheckForGameEnd 会在 InitSurvivalStage 前递增此值。
@@ -3815,25 +3815,25 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_PROGRESS_METER: {
             const auto *aEvent = static_cast<const U8U8U16_Event *>(event);
-            mProgressMeterWidth = aEvent->data1;
-            mCurrentWave = aEvent->data2;
-            mFlagRaiseCounter = aEvent->data3;
+            mProgressMeterWidth = aEvent->u8_0;
+            mCurrentWave = aEvent->u8_1;
+            mFlagRaiseCounter = aEvent->u16_0;
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WAVES: {
             const auto *wavesEvent = static_cast<const U8U8x100_Event *>(event);
-            mNumWaves = wavesEvent->data1;
+            mNumWaves = wavesEvent->u8_0;
             for (int type = 0; type < 100; ++type) {
-                mZombieAllowed[type] = wavesEvent->data2[type] != 0;
+                mZombieAllowed[type] = wavesEvent->u8x100_0[type] != 0;
             }
             mZombieWavesReady = mNumWaves == 0;
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_WAVE: {
             const auto *waveEvent = static_cast<const U8U8x50_Event *>(event);
             for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
-                const uint8_t type = waveEvent->data2[index];
-                mZombiesInWave[waveEvent->data1][index] = type == UINT8_MAX ? ZombieType::ZOMBIE_INVALID : ZombieType(type);
+                const uint8_t type = waveEvent->u8x50_0[index];
+                mZombiesInWave[waveEvent->u8_0][index] = type == UINT8_MAX ? ZombieType::ZOMBIE_INVALID : ZombieType(type);
             }
-            if (waveEvent->data1 + 1 == mNumWaves) {
+            if (waveEvent->u8_0 + 1 == mNumWaves) {
                 mZombieWavesReady = true;
                 if (mCutScene != nullptr && !mCutScene->mPlacedZombies) {
                     mCutScene->mPreloaded = false;
@@ -3863,7 +3863,7 @@ void Board::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_BOARD_RETRY: {
             const auto *retryEvent = static_cast<const U16_Event *>(event);
             LawnApp *aApp = mApp;
-            const GameMode aGameMode = GameMode(retryEvent->data);
+            const GameMode aGameMode = GameMode(retryEvent->u16_0);
             aApp->RetryOnlineGame(aGameMode);
             // 再次尝试会替换棋盘，此后不能继续访问当前对象。
             return;
@@ -3891,16 +3891,16 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK: {
             auto *eventRandomPick = static_cast<const U16x6_Event *>(event);
-            int isZombie = eventRandomPick->data[5];
+            int isZombie = eventRandomPick->u16x6_0[5];
             for (int i = 0; i < 5; ++i) {
-                mSeedBank[isZombie]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandomPick->data[i]), SeedType::SEED_NONE);
+                mSeedBank[isZombie]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandomPick->u16x6_0[i]), SeedType::SEED_NONE);
             }
         } break;
         case EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK_NEXT: {
             auto *eventRandomPickNext = static_cast<const U8U8U16U16_Event *>(event);
-            int isZombie = int(eventRandomPickNext->data1);
-            auto seedType = SeedType(eventRandomPickNext->data3);
-            int seedIndex = eventRandomPickNext->data4;
+            int isZombie = int(eventRandomPickNext->u8_0);
+            auto seedType = SeedType(eventRandomPickNext->u16_0);
+            int seedIndex = eventRandomPickNext->u16_1;
             mSeedBank[isZombie]->mSeedPackets[seedIndex].SetPacketType(seedType, SeedType::SEED_NONE);
         } break;
         default:
@@ -5058,14 +5058,14 @@ void Board::PickZombieWaves() {
 
         U8U8x100_Event wavesEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVES}, uint8_t(mNumWaves)};
         for (int type = 0; type < 100; ++type) {
-            wavesEvent.data2[type] = mZombieAllowed[type];
+            wavesEvent.u8x100_0[type] = mZombieAllowed[type];
         }
         netplay::PutEvent(wavesEvent);
 
         for (int wave = 0; wave < mNumWaves; ++wave) {
             U8U8x50_Event waveEvent = {{EVENT_SERVER_BOARD_ZOMBIE_WAVE}, uint8_t(wave)};
             for (int index = 0; index < MAX_ZOMBIES_IN_WAVE; ++index) {
-                waveEvent.data2[index] = uint8_t(mZombiesInWave[wave][index]);
+                waveEvent.u8x50_0[index] = uint8_t(mZombiesInWave[wave][index]);
             }
             netplay::PutEvent(waveEvent);
         }
@@ -7080,8 +7080,8 @@ void Board::InitSurvivalStage() {
         if (IsRemoteServer()) {
             U16UNI32_Event event{};
             event.type = EVENT_SERVER_BOARD_INIT_SURVIVAL_STAGE;
-            event.data1 = uint16_t(mApp->mGameMode);
-            event.data2.i32 = mChallenge->mSurvivalStage;
+            event.u16_0 = uint16_t(mApp->mGameMode);
+            event.uni32_0.i32 = mChallenge->mSurvivalStage;
             netplay::PutEvent(event);
         }
     }
@@ -7148,11 +7148,11 @@ void Board::StartLevel() {
         if (aBoss != nullptr) {
             U16UNI32_Event eventSync{};
             eventSync.type = EventType::EVENT_SERVER_BOARD_SYNC_ID;
-            eventSync.data1 = uint16_t(mZombies.DataArrayGetID(aBoss));
-            eventSync.data2.u8x4.u8_1 = 2; // Zombie
-            eventSync.data2.u8x4.u8_2 = uint8_t(aBoss->mZombieType);
-            eventSync.data2.u8x4.u8_3 = uint8_t(aBoss->mRow);
-            eventSync.data2.u8x4.u8_4 = uint8_t(aBoss->mFromWave);
+            eventSync.u16_0 = uint16_t(mZombies.DataArrayGetID(aBoss));
+            eventSync.uni32_0.u8x4.u8_1 = 2; // Zombie
+            eventSync.uni32_0.u8x4.u8_2 = uint8_t(aBoss->mZombieType);
+            eventSync.uni32_0.u8x4.u8_3 = uint8_t(aBoss->mRow);
+            eventSync.uni32_0.u8x4.u8_4 = uint8_t(aBoss->mFromWave);
             netplay::PutEvent(eventSync);
         }
         GridItem *gridItem = nullptr;
@@ -7160,11 +7160,11 @@ void Board::StartLevel() {
 
             U16UNI32_Event eventSync{};
             eventSync.type = EventType::EVENT_SERVER_BOARD_SYNC_ID;
-            eventSync.data1 = uint16_t(mGridItems.DataArrayGetID(gridItem));
-            eventSync.data2.u8x4.u8_1 = 1; // 1 --> GridItem
-            eventSync.data2.u8x4.u8_2 = uint8_t(gridItem->mGridItemType);
-            eventSync.data2.u8x4.u8_3 = uint8_t(gridItem->mGridX);
-            eventSync.data2.u8x4.u8_4 = uint8_t(gridItem->mGridY);
+            eventSync.u16_0 = uint16_t(mGridItems.DataArrayGetID(gridItem));
+            eventSync.uni32_0.u8x4.u8_1 = 1; // 1 --> GridItem
+            eventSync.uni32_0.u8x4.u8_2 = uint8_t(gridItem->mGridItemType);
+            eventSync.uni32_0.u8x4.u8_3 = uint8_t(gridItem->mGridX);
+            eventSync.uni32_0.u8x4.u8_4 = uint8_t(gridItem->mGridY);
             netplay::PutEvent(eventSync);
 
 
@@ -7177,11 +7177,11 @@ void Board::StartLevel() {
 
             U16UNI32_Event eventSync{};
             eventSync.type = EventType::EVENT_SERVER_BOARD_SYNC_ID;
-            eventSync.data1 = uint16_t(mPlants.DataArrayGetID(plant));
-            eventSync.data2.u8x4.u8_1 = 0; // 0 --> Plant
-            eventSync.data2.u8x4.u8_2 = uint8_t(plant->mSeedType);
-            eventSync.data2.u8x4.u8_3 = uint8_t(plant->mRow);
-            eventSync.data2.u8x4.u8_4 = uint8_t(plant->mPlantCol);
+            eventSync.u16_0 = uint16_t(mPlants.DataArrayGetID(plant));
+            eventSync.uni32_0.u8x4.u8_1 = 0; // 0 --> Plant
+            eventSync.uni32_0.u8x4.u8_2 = uint8_t(plant->mSeedType);
+            eventSync.uni32_0.u8x4.u8_3 = uint8_t(plant->mRow);
+            eventSync.uni32_0.u8x4.u8_4 = uint8_t(plant->mPlantCol);
             netplay::PutEvent(eventSync);
 
 
@@ -7383,8 +7383,8 @@ void Board::FadeOutLevel() {
     if (notifyMoreZombies) {
         U16UNI32_Event event{};
         event.type = EVENT_SERVER_BOARD_MORE_ZOMBIES;
-        event.data1 = uint16_t(mApp->mGameMode);
-        event.data2.i32 = mChallenge->mSurvivalStage;
+        event.u16_0 = uint16_t(mApp->mGameMode);
+        event.uni32_0.i32 = mChallenge->mSurvivalStage;
         netplay::PutEvent(event);
     }
 
@@ -8417,10 +8417,10 @@ GridItem *Board::AddSkeletonPile(Zombie *theZombie, float thePosX, float thePosY
     if (IsRemoteServer()) {
         U16U16U16UNI32UNI32_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_GRIDITEM_SKELETON_ADD;
-        event.data1 = uint16_t(ZombieGetID(theZombie));
-        event.data2 = uint16_t(mGridItems.DataArrayGetID(aPile));
-        event.data4.f32 = thePosX;
-        event.data5.f32 = thePosY;
+        event.u16_0 = uint16_t(ZombieGetID(theZombie));
+        event.u16_1 = uint16_t(mGridItems.DataArrayGetID(aPile));
+        event.uni32_0.f32 = thePosX;
+        event.uni32_1.f32 = thePosY;
         netplay::PutEvent(event);
     }
     return aPile;
@@ -8524,12 +8524,12 @@ GridItem *Board::AddAMound(int theGridX, int theGridY, int theMoundLevel) {
     if (IsRemoteServer() && mApp->mGameScene == SCENE_PLAYING) {
         U8x3U16x3_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_GRIDITEM_ADDMOUND;
-        event.data1[0] = uint8_t(theGridX);
-        event.data1[1] = uint8_t(theGridY);
-        event.data1[2] = uint8_t(aMound->mMoundLevel);
-        event.data2[0] = uint16_t(mGridItems.DataArrayGetID(aMound));
-        event.data2[1] = uint16_t(aMound->mLaunchCounter);
-        event.data2[2] = uint16_t(aMound->mSummonCounter);
+        event.u8x3_0[0] = uint8_t(theGridX);
+        event.u8x3_0[1] = uint8_t(theGridY);
+        event.u8x3_0[2] = uint8_t(aMound->mMoundLevel);
+        event.u16x3_0[0] = uint16_t(mGridItems.DataArrayGetID(aMound));
+        event.u16x3_0[1] = uint16_t(aMound->mLaunchCounter);
+        event.u16x3_0[2] = uint16_t(aMound->mSummonCounter);
         netplay::PutEvent(event);
     }
 
@@ -8643,9 +8643,9 @@ void Board::ShuffleButtonDown(SeedPacket *theSeedPacket) {
             U16x6_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK;
             for (int i = 0; i < 5; ++i) {
-                event.data[i] = aPlantSeeds[i];
+                event.u16x6_0[i] = aPlantSeeds[i];
             }
-            event.data[5] = 0;
+            event.u16x6_0[5] = 0;
             netplay::PutEvent(event);
         }
     }
@@ -8669,9 +8669,9 @@ void Board::ShuffleButtonDown(SeedPacket *theSeedPacket) {
             U16x6_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK;
             for (int i = 0; i < 5; ++i) {
-                event.data[i] = aZombieSeeds[i];
+                event.u16x6_0[i] = aZombieSeeds[i];
             }
-            event.data[5] = 1;
+            event.u16x6_0[5] = 1;
             netplay::PutEvent(event);
         }
     }

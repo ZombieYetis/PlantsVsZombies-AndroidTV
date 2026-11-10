@@ -951,12 +951,12 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         gSpectatorSourceScene = app->mGameScene;
         U16UNI32UNI32_Event begin{};
         begin.type = EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN;
-        begin.data1 = kSpectatorSnapshotVersion;
-        begin.data2.u32 = static_cast<uint32_t>(gSpectatorSnapshotOut.size());
-        begin.data3.u32 = SaveDataHash(gSpectatorSnapshotOut);
+        begin.u16_0 = kSpectatorSnapshotVersion;
+        begin.uni32_0.u32 = static_cast<uint32_t>(gSpectatorSnapshotOut.size());
+        begin.uni32_1.u32 = SaveDataHash(gSpectatorSnapshotOut);
         gSpectatorLayoutsOut.clear();
         gSpectatorLayoutsOffset = 0;
-        if (!layoutsValid || !netplay::snapshot::EncodeLayouts(layouts, begin.data3.u32, gSpectatorLayoutsOut)
+        if (!layoutsValid || !netplay::snapshot::EncodeLayouts(layouts, begin.uni32_1.u32, gSpectatorLayoutsOut)
             || (gSpectatorLayoutsOut.size() + netplay::snapshot::kLayoutTailCapacity - 1) / netplay::snapshot::kLayoutTailCapacity > gSpectatorSnapshotOut.size()) {
             // Metadata is optional. Never prevent the existing 3215 transfer
             // just because a local definition cannot be described safely.
@@ -973,10 +973,10 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
     for (size_t sent = 0; gSpectatorSnapshotOffset < gSpectatorSnapshotOut.size() && sent + sizeof(U16U8x240_Event) <= 16 * 1024; sent += sizeof(U16U8x240_Event)) {
         U16U8x240_Event chunk{};
         chunk.type = EVENT_SERVER_SPECTATE_SNAPSHOT_CHUNK;
-        chunk.count =
-            netplay::snapshot::FillSnapshotChunk(chunk.data, std::span(gSpectatorSnapshotOut).subspan(gSpectatorSnapshotOffset), gSpectatorLayoutsOut, gSpectatorLayoutsHash, gSpectatorLayoutsOffset);
+        chunk.u16_0 =
+            netplay::snapshot::FillSnapshotChunk(chunk.u8x240_0, std::span(gSpectatorSnapshotOut).subspan(gSpectatorSnapshotOffset), gSpectatorLayoutsOut, gSpectatorLayoutsHash, gSpectatorLayoutsOffset);
         PutEvent(chunk);
-        gSpectatorSnapshotOffset += chunk.count;
+        gSpectatorSnapshotOffset += chunk.u16_0;
     }
     if (gSpectatorSnapshotOffset == gSpectatorSnapshotOut.size()) {
         // Timers may have advanced while sending chunks. This final marker is
@@ -984,12 +984,12 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         U16UNI32UNI32_Event done{};
         done.type = EVENT_SERVER_SPECTATE_SNAPSHOT_END;
         if (auto *chooser = app->mSeedChooserScreen) {
-            done.data1 |= uint16_t(chooser->mTimedDraftWasActive);
-            done.data2.i32 = chooser->mTimedDraftTicksRemaining;
+            done.u16_0 |= uint16_t(chooser->mTimedDraftWasActive);
+            done.uni32_0.i32 = chooser->mTimedDraftTicksRemaining;
         }
         if (auto *chooser = app->mZombieChooserScreen) {
-            done.data1 |= uint16_t(chooser->mTimedDraftWasActive) << 1;
-            done.data3.i32 = chooser->mTimedDraftTicksRemaining;
+            done.u16_0 |= uint16_t(chooser->mTimedDraftWasActive) << 1;
+            done.uni32_1.i32 = chooser->mTimedDraftTicksRemaining;
         }
         PutEvent(done);
         gSpectatorSnapshotOut.clear();
@@ -1016,12 +1016,12 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
         }
         const auto *done = static_cast<const U16UNI32UNI32_Event *>(event);
         if (auto *chooser = app->mSeedChooserScreen) {
-            chooser->mTimedDraftTicksRemaining = done->data2.i32;
-            chooser->mTimedDraftWasActive = (done->data1 & 1) != 0;
+            chooser->mTimedDraftTicksRemaining = done->uni32_0.i32;
+            chooser->mTimedDraftWasActive = (done->u16_0 & 1) != 0;
         }
         if (auto *chooser = app->mZombieChooserScreen) {
-            chooser->mTimedDraftTicksRemaining = done->data3.i32;
-            chooser->mTimedDraftWasActive = (done->data1 & 2) != 0;
+            chooser->mTimedDraftTicksRemaining = done->uni32_1.i32;
+            chooser->mTimedDraftWasActive = (done->u16_0 & 2) != 0;
         }
         return true;
     }
@@ -1035,11 +1035,11 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
             return true;
         }
         const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
-        if (begin->data1 != kSpectatorSnapshotVersion || begin->data2.u32 < sizeof(SaveFileHeader) || begin->data2.u32 > kMaxOnlineSaveSize) {
+        if (begin->u16_0 != kSpectatorSnapshotVersion || begin->uni32_0.u32 < sizeof(SaveFileHeader) || begin->uni32_0.u32 > kMaxOnlineSaveSize) {
             LOG_ERROR("[SNAPSHOT] begin expected_version={} actual_version={} bytes={} min_bytes={} max_bytes={}",
                       kSpectatorSnapshotVersion,
-                      begin->data1,
-                      begin->data2.u32,
+                      begin->u16_0,
+                      begin->uni32_0.u32,
                       sizeof(SaveFileHeader),
                       kMaxOnlineSaveSize);
             FailSpectatorSnapshot("begin_version_or_length");
@@ -1049,11 +1049,11 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
         gSpectatorCatchup.clear();
         gSpectatorLayoutReceiver = {};
         gSpectatorLayoutsIn.clear();
-        gSpectatorSnapshotSize = begin->data2.u32;
-        gSpectatorSnapshotHash = begin->data3.u32;
+        gSpectatorSnapshotSize = begin->uni32_0.u32;
+        gSpectatorSnapshotHash = begin->uni32_1.u32;
         gReceivingSpectatorSnapshot = true;
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
-        LOG_INFO("[SNAPSHOT] receive begin version={} expected_bytes={} expected_hash=0x{:08X}", begin->data1, gSpectatorSnapshotSize, gSpectatorSnapshotHash);
+        LOG_INFO("[SNAPSHOT] receive begin version={} expected_bytes={} expected_hash=0x{:08X}", begin->u16_0, gSpectatorSnapshotSize, gSpectatorSnapshotHash);
         return true;
     }
     if (!gReceivingSpectatorSnapshot) {
@@ -1068,16 +1068,16 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
             return true;
         }
         const auto *chunk = static_cast<const U16U8x240_Event *>(event);
-        if (!chunk->count || chunk->count > sizeof(chunk->data) || gSpectatorSnapshotIn.size() + chunk->count > gSpectatorSnapshotSize) {
-            LOG_ERROR("[SNAPSHOT] chunk offset_bytes={} payload_bytes={} max_payload_bytes={}", gSpectatorSnapshotIn.size(), chunk->count, sizeof(chunk->data));
+        if (!chunk->u16_0 || chunk->u16_0 > sizeof(chunk->u8x240_0) || gSpectatorSnapshotIn.size() + chunk->u16_0 > gSpectatorSnapshotSize) {
+            LOG_ERROR("[SNAPSHOT] chunk offset_bytes={} payload_bytes={} max_payload_bytes={}", gSpectatorSnapshotIn.size(), chunk->u16_0, sizeof(chunk->u8x240_0));
             FailSpectatorSnapshot("chunk_count_or_overflow");
             return true;
         }
-        if (!gSpectatorLayoutReceiver.Add(chunk->data, chunk->count)) {
+        if (!gSpectatorLayoutReceiver.Add(chunk->u8x240_0, chunk->u16_0)) {
             FailSpectatorSnapshot("animation_layout_fragment");
             return true;
         }
-        gSpectatorSnapshotIn.insert(gSpectatorSnapshotIn.end(), chunk->data, chunk->data + chunk->count);
+        gSpectatorSnapshotIn.insert(gSpectatorSnapshotIn.end(), chunk->u8x240_0, chunk->u8x240_0 + chunk->u16_0);
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
     } else if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_END) {
         // Same checks and short-circuit order; distinguish transport rejection
@@ -1186,9 +1186,9 @@ bool netplay::StartCoopEndlessLoad(LawnApp *app) {
     gOnlineLoadState = OnlineLoadState::Sending;
     U16UNI32UNI32_Event begin{};
     begin.type = EVENT_SERVER_SAVEGAME_BEGIN;
-    begin.data1 = uint16_t(app->mGameMode);
-    begin.data2.u32 = gOnlineSaveSize;
-    begin.data3.u32 = gOnlineSaveHash;
+    begin.u16_0 = uint16_t(app->mGameMode);
+    begin.uni32_0.u32 = gOnlineSaveSize;
+    begin.uni32_1.u32 = gOnlineSaveHash;
     PutEvent(begin);
     LOG_INFO("[NETPLAY] sending coop save: {} bytes", gOnlineSaveSize);
     return true;
@@ -1220,10 +1220,10 @@ void netplay::UpdateSaveGameTransfer(LawnApp *app) {
     while (gOnlineSaveOffset < batchEnd) {
         U16U8x240_Event chunk{};
         chunk.type = EVENT_SERVER_SAVEGAME_CHUNK;
-        chunk.count = static_cast<uint16_t>(std::min(sizeof(chunk.data), gOnlineSaveData.size() - gOnlineSaveOffset));
-        std::memcpy(chunk.data, gOnlineSaveData.data() + gOnlineSaveOffset, chunk.count);
+        chunk.u16_0 = static_cast<uint16_t>(std::min(sizeof(chunk.u8x240_0), gOnlineSaveData.size() - gOnlineSaveOffset));
+        std::memcpy(chunk.u8x240_0, gOnlineSaveData.data() + gOnlineSaveOffset, chunk.u16_0);
         PutEvent(chunk);
-        gOnlineSaveOffset += chunk.count;
+        gOnlineSaveOffset += chunk.u16_0;
     }
     gOnlineSaveProgress = std::chrono::steady_clock::now();
     if (gOnlineSaveOffset == gOnlineSaveData.size()) {
@@ -1243,7 +1243,7 @@ bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fro
     }
     if (!fromHost) {
         if (event->type == EVENT_CLIENT_SAVEGAME_READY && IsRemoteServer() && (gOnlineLoadState == OnlineLoadState::Sending || gOnlineLoadState == OnlineLoadState::AwaitingReady)) {
-            if (static_cast<const U8_Event *>(event)->data == 0) {
+            if (static_cast<const U8_Event *>(event)->u8_0 == 0) {
                 AbortOnlineSave(app, true);
             } else if (gOnlineLoadState == OnlineLoadState::AwaitingReady) {
                 BaseEvent resume = {EVENT_SERVER_SAVEGAME_RESUME};
@@ -1264,7 +1264,7 @@ bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fro
             break;
         case EVENT_SERVER_SAVEGAME_BEGIN: {
             const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
-            if (begin->data1 != uint16_t(GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) || begin->data2.u32 < sizeof(SaveFileHeader) || begin->data2.u32 > kMaxOnlineSaveSize) {
+            if (begin->u16_0 != uint16_t(GameMode::GAMEMODE_TWO_PLAYER_COOP_ENDLESS) || begin->uni32_0.u32 < sizeof(SaveFileHeader) || begin->uni32_0.u32 > kMaxOnlineSaveSize) {
                 U8_Event ready = {{EVENT_CLIENT_SAVEGAME_READY}, 0};
                 if (!gIsReplayMode && !gIsServerModeSpectator)
                     PutEvent(ready);
@@ -1272,8 +1272,8 @@ bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fro
             }
             ResetSaveGameTransfer();
             gOnlineLoadState = OnlineLoadState::Receiving;
-            gOnlineSaveSize = begin->data2.u32;
-            gOnlineSaveHash = begin->data3.u32;
+            gOnlineSaveSize = begin->uni32_0.u32;
+            gOnlineSaveHash = begin->uni32_1.u32;
             gOnlineSaveData.reserve(gOnlineSaveSize);
             gOnlineSaveProgress = std::chrono::steady_clock::now();
             break;
@@ -1282,14 +1282,14 @@ bool netplay::HandleSaveGameEvent(LawnApp *app, const BaseEvent *event, bool fro
             if (gOnlineLoadState != OnlineLoadState::Receiving)
                 break;
             const auto *chunk = static_cast<const U16U8x240_Event *>(event);
-            if (chunk->count > sizeof(chunk->data) || gOnlineSaveData.size() + chunk->count > gOnlineSaveSize) {
+            if (chunk->u16_0 > sizeof(chunk->u8x240_0) || gOnlineSaveData.size() + chunk->u16_0 > gOnlineSaveSize) {
                 gOnlineLoadState = OnlineLoadState::AwaitingResume;
                 U8_Event ready = {{EVENT_CLIENT_SAVEGAME_READY}, 0};
                 if (!gIsReplayMode && !gIsServerModeSpectator)
                     PutEvent(ready);
                 break;
             }
-            gOnlineSaveData.insert(gOnlineSaveData.end(), chunk->data, chunk->data + chunk->count);
+            gOnlineSaveData.insert(gOnlineSaveData.end(), chunk->u8x240_0, chunk->u8x240_0 + chunk->u16_0);
             gOnlineSaveProgress = std::chrono::steady_clock::now();
             break;
         }

@@ -295,13 +295,13 @@ struct BaseEvent {
 
 
 struct U8U8x100_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2[100];
+    uint8_t u8_0;
+    uint8_t u8x100_0[100];
 };
 
 struct U8U8x50_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2[50];
+    uint8_t u8_0;
+    uint8_t u8x50_0[50];
 };
 
 union Union32Bit {
@@ -336,97 +336,96 @@ union Union32Bit {
 static_assert(sizeof(Union32Bit) == 4);
 
 struct U8_Event : BaseEvent {
-    uint8_t data;
+    uint8_t u8_0;
 };
 
 struct U16_Event : BaseEvent {
-    uint16_t data;
+    uint16_t u16_0;
 };
 
 struct U8U16_Event : BaseEvent {
-    uint8_t data1;
-    uint16_t data2;
+    uint8_t u8_0;
+    uint16_t u16_0;
 };
 
 struct U16I16I16U8U8I16_Event : BaseEvent {
-    uint16_t data1;
-    int16_t data2;
-    int16_t data3;
-    uint8_t data4;
-    uint8_t data5;
-    int16_t data6;
+    uint16_t u16_0;
+    int16_t i16_0;
+    int16_t i16_1;
+    uint8_t u8_0;
+    uint8_t u8_1;
+    int16_t i16_2;
 };
 
 struct I16_Event : BaseEvent {
-    int16_t data;
+    int16_t i16_0;
 };
 
 struct U8U8_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2;
+    uint8_t u8_0;
+    uint8_t u8_1;
 };
 
-// 使用固定大小的传输分块，让存档文件沿用现有的事件封装格式。
 struct U16U8x240_Event : BaseEvent {
-    uint16_t count;
-    uint8_t data[240];
+    uint16_t u16_0;
+    uint8_t u8x240_0[240];
 };
 
 struct U8x3_Event : BaseEvent {
-    uint8_t data[3];
+    uint8_t u8x3_0[3];
 };
 
 struct U8U8U16_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2;
-    uint16_t data3;
+    uint8_t u8_0;
+    uint8_t u8_1;
+    uint16_t u16_0;
 };
 
 struct U16U16_Event : BaseEvent {
-    uint16_t data1;
-    uint16_t data2;
+    uint16_t u16_0;
+    uint16_t u16_1;
 };
 
 struct U16U16I16I16_Event : BaseEvent {
-    uint16_t data1;
-    uint16_t data2;
-    int16_t data3;
-    int16_t data4;
+    uint16_t u16_0;
+    uint16_t u16_1;
+    int16_t i16_0;
+    int16_t i16_1;
 };
 
 struct I16I16_Event : BaseEvent {
-    int16_t data1;
-    int16_t data2;
+    int16_t i16_0;
+    int16_t i16_1;
 };
 
 struct U8U8U16U16_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2;
-    uint16_t data3;
-    uint16_t data4;
+    uint8_t u8_0;
+    uint8_t u8_1;
+    uint16_t u16_0;
+    uint16_t u16_1;
 };
 
 struct U8x3U16x3_Event : BaseEvent {
-    uint8_t data1[3];
-    uint16_t data2[3];
+    uint8_t u8x3_0[3];
+    uint16_t u16x3_0[3];
 };
 
 struct U8U8I16I16_Event : BaseEvent {
-    uint8_t data1;
-    uint8_t data2;
-    int16_t data3;
-    int16_t data4;
+    uint8_t u8_0;
+    uint8_t u8_1;
+    int16_t i16_0;
+    int16_t i16_1;
 };
 
 struct B1x8_Event : BaseEvent {
-    uint8_t data1 : 1;
-    uint8_t data2 : 1;
-    uint8_t data3 : 1;
-    uint8_t data4 : 1;
-    uint8_t data5 : 1;
-    uint8_t data6 : 1;
-    uint8_t data7 : 1;
-    uint8_t data8 : 1;
+    uint8_t b1_0 : 1;
+    uint8_t b1_1 : 1;
+    uint8_t b1_2 : 1;
+    uint8_t b1_3 : 1;
+    uint8_t b1_4 : 1;
+    uint8_t b1_5 : 1;
+    uint8_t b1_6 : 1;
+    uint8_t b1_7 : 1;
 };
 
 struct VSSetupGlobalBpSyncEvent : BaseEvent {
@@ -437,98 +436,98 @@ struct VSSetupGlobalBpSyncEvent : BaseEvent {
 };
 
 struct U16UNI32_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2;
+    uint16_t u16_0;
+    Union32Bit uni32_0;
 };
 
 struct U16UNI32UNI32_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2;
-    Union32Bit data3;
+    uint16_t u16_0;
+    Union32Bit uni32_0;
+    Union32Bit uni32_1;
 };
 
 struct U16UNI32x3_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2[3];
+    uint16_t u16_0;
+    Union32Bit uni32x3_0[3];
 };
 
 struct U16UNI32x2U8x232_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2[2];
-    uint8_t data3[232];
+    uint16_t u16_0;
+    Union32Bit uni32x2_0[2];
+    uint8_t u8x232_0[232];
 };
 
 struct U16U16U8_Event : BaseEvent {
-    uint16_t data1;
-    uint16_t data2;
-    uint8_t data3;
+    uint16_t u16_0;
+    uint16_t u16_1;
+    uint8_t u8_0;
 };
 
 struct U16x4_Event : BaseEvent {
-    uint16_t data[4];
+    uint16_t u16x4_0[4];
 };
 
 struct U16U8U8I16I16UNI32_Event : BaseEvent {
-    uint16_t data1;
-    uint8_t data2;
-    uint8_t data3;
-    int16_t data4;
-    int16_t data5;
-    Union32Bit data6;
+    uint16_t u16_0;
+    uint8_t u8_0;
+    uint8_t u8_1;
+    int16_t i16_0;
+    int16_t i16_1;
+    Union32Bit uni32_0;
 };
 
 struct U16x6_Event : BaseEvent {
-    uint16_t data[6];
+    uint16_t u16x6_0[6];
 };
 
 struct U16x9_Event : BaseEvent {
-    uint16_t data[9];
+    uint16_t u16x9_0[9];
 };
 
 
 struct U16x12_Event : BaseEvent {
-    uint16_t data[12];
+    uint16_t u16x12_0[12];
 };
 
 
 struct U16U16U16UNI32UNI32_Event : BaseEvent {
-    uint16_t data1;
-    uint16_t data2;
-    uint16_t data3;
-    Union32Bit data4;
-    Union32Bit data5;
+    uint16_t u16_0;
+    uint16_t u16_1;
+    uint16_t u16_2;
+    Union32Bit uni32_0;
+    Union32Bit uni32_1;
 };
 
 struct U8x4U16UNI32x2_Event : BaseEvent {
-    uint8_t data1[4];
-    uint16_t data2;
-    Union32Bit data3[2];
+    uint8_t u8x4_0[4];
+    uint16_t u16_0;
+    Union32Bit uni32x2_0[2];
 };
 
 struct U16x5UNI32x5_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2;
-    uint16_t data3[4];
-    Union32Bit data4[4];
+    uint16_t u16_0;
+    Union32Bit uni32_0;
+    uint16_t u16x4_0[4];
+    Union32Bit uni32x4_0[4];
 };
 
 struct U16UNI32U8x16U16x15UNI32x15_Event : BaseEvent {
-    uint16_t data1;
-    Union32Bit data2;
-    uint8_t data3[16];
-    uint16_t data4[15];
-    Union32Bit data5[15];
+    uint16_t u16_0;
+    Union32Bit uni32_0;
+    uint8_t u8x16_0[16];
+    uint16_t u16x15_0[15];
+    Union32Bit uni32x15_0[15];
 };
 
 struct CHARx32_Event : BaseEvent {
-    char chars[32];
+    char charx32_0[32];
 };
 
 struct U8x2U16x4UNI32x8_Event : BaseEvent {
-    uint8_t data1[2];
-    uint16_t data2[4];
-    Union32Bit data3[4];
-    Union32Bit data4[4];
+    uint8_t u8x2_0[2];
+    uint16_t u16x4_0[4];
+    Union32Bit uni32x4_0[4];
+    Union32Bit uni32x4_1[4];
 };
 
 // 双方都需要

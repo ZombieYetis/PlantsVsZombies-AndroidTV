@@ -736,7 +736,7 @@ void Plant::UpdateBowling() {
     if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING && !mDead && (mRow != aOldRow || mState != aOldState)) {
         U16U8U8I16I16UNI32_Event event = {
             {EventType::EVENT_SERVER_BOARD_PLANT_BOWLING_SET_ROW}, uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint8_t(mRow), uint8_t(mState), int16_t(mX), int16_t(mY), {}};
-        event.data6.i32 = mRenderOrder;
+        event.uni32_0.i32 = mRenderOrder;
         netplay::PutEvent(event);
     }
 }
@@ -1628,9 +1628,9 @@ void Plant::CobCannonFire(int theTargetX, int theTargetY) {
     if (IsRemoteServer()) {
         U16UNI32_Event aEvent{};
         aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_COB_CANNON_FIRE;
-        aEvent.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
-        aEvent.data2.i16x2.i16_1 = int16_t(theTargetX);
-        aEvent.data2.i16x2.i16_2 = int16_t(theTargetY);
+        aEvent.u16_0 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
+        aEvent.uni32_0.i16x2.i16_1 = int16_t(theTargetX);
+        aEvent.uni32_0.i16x2.i16_2 = int16_t(theTargetY);
         netplay::PutEvent(aEvent);
     }
     CobCannonFire_Origin(theTargetX, theTargetY);
@@ -1687,14 +1687,14 @@ void Plant::SyncPlantState() {
 
     U16U16U16UNI32UNI32_Event aEvent{};
     aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_STATE;
-    aEvent.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
-    aEvent.data2 = uint16_t(mState);
-    aEvent.data3 = uint16_t(mStateCountdown);
+    aEvent.u16_0 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
+    aEvent.u16_1 = uint16_t(mState);
+    aEvent.u16_2 = uint16_t(mStateCountdown);
     // 附加数据按植物类型解释，沿用通用事件结构。
     if (mSeedType == SeedType::SEED_SQUASH) {
-        aEvent.data4.i32 = mTargetX;
+        aEvent.uni32_0.i32 = mTargetX;
     } else if (mSeedType == SeedType::SEED_COBCANNON) {
-        aEvent.data4.i32 = mShootingCounter;
+        aEvent.uni32_0.i32 = mShootingCounter;
     }
     netplay::PutEvent(aEvent);
 }
@@ -1766,15 +1766,15 @@ void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon
         U16U16U16UNI32UNI32_Event event{};
 
         event.type = EventType::EVENT_SERVER_BOARD_PLANT_FIRE;
-        event.data1 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
-        event.data2 = theTargetZombie == nullptr ? NETPLAY_ZOMBIE_ID_NULL : uint16_t(mBoard->mZombies.DataArrayGetID(theTargetZombie));
-        event.data4.u16x2.u16_1 = uint16_t(theRow);
-        event.data4.u16x2.u16_2 = uint16_t(thePlantWeapon);
+        event.u16_0 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
+        event.u16_1 = theTargetZombie == nullptr ? NETPLAY_ZOMBIE_ID_NULL : uint16_t(mBoard->mZombies.DataArrayGetID(theTargetZombie));
+        event.uni32_0.u16x2.u16_1 = uint16_t(theRow);
+        event.uni32_0.u16x2.u16_2 = uint16_t(thePlantWeapon);
         // 如果同时传入有效的 theTargetZombie 和 theTargetGridItem 会导致投手弹道计算错误
         if (theTargetZombie) { // 存在僵尸目标时传入空的场地物 ID
-            event.data5.u16x2.u16_1 = NETPLAY_GRIDITEM_ID_NULL;
+            event.uni32_1.u16x2.u16_1 = NETPLAY_GRIDITEM_ID_NULL;
         } else {
-            event.data5.u16x2.u16_1 = theTargetGridItem == nullptr ? NETPLAY_GRIDITEM_ID_NULL : uint16_t(mBoard->mGridItems.DataArrayGetID(theTargetGridItem));
+            event.uni32_1.u16x2.u16_1 = theTargetGridItem == nullptr ? NETPLAY_GRIDITEM_ID_NULL : uint16_t(mBoard->mGridItems.DataArrayGetID(theTargetGridItem));
         }
         netplay::PutEvent(event);
         //            SyncPingPongAnimationToClient();
@@ -4310,11 +4310,11 @@ void Plant::SyncPingPongAnimationToClient() {
 
     U16U16U16UNI32UNI32_Event event{};
     event.type = EventType::EVENT_SERVER_BOARD_PLANT_PINGPONG_ANIMATION;
-    event.data1 = id;
-    event.data2 = mFrameLength;
-    event.data3 = mAnimPing;
-    event.data4.u32 = mFrame;
-    event.data5.u32 = mAnimCounter;
+    event.u16_0 = id;
+    event.u16_1 = mFrameLength;
+    event.u16_2 = mAnimPing;
+    event.uni32_0.u32 = mFrame;
+    event.uni32_1.u32 = mAnimCounter;
 
     netplay::PutEvent(event);
 }
@@ -4332,11 +4332,11 @@ void Plant::SyncAnimationToClient() {
 
         U16U16U16UNI32UNI32_Event event2{};
         event2.type = EventType::EVENT_SERVER_BOARD_PLANT_OTHER_ANIMATION;
-        event2.data1 = id;
-        event2.data2 = i;
-        event2.data3 = theReanim->mLoopType;
-        event2.data4.f32 = theReanim->mAnimTime;
-        event2.data5.f32 = theReanim->mAnimRate;
+        event2.u16_0 = id;
+        event2.u16_1 = i;
+        event2.u16_2 = theReanim->mLoopType;
+        event2.uni32_0.f32 = theReanim->mAnimTime;
+        event2.uni32_1.f32 = theReanim->mAnimRate;
         netplay::PutEvent(event2);
     }
 }

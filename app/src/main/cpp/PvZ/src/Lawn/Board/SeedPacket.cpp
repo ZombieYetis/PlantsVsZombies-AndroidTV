@@ -256,9 +256,9 @@ void SeedPacket::SetNextRandomSeed() {
     if (IsRemoteServer()) {
         U8U8U16U16_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_SHUFFLE_RANDOM_PICK_NEXT;
-        event.data1 = mSeedBank->mIsZombie;
-        event.data3 = seedType;
-        event.data4 = mIndex;
+        event.u8_0 = mSeedBank->mIsZombie;
+        event.u16_0 = seedType;
+        event.u16_1 = mIndex;
         netplay::PutEvent(event);
     }
 }

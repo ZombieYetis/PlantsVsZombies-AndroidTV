@@ -735,36 +735,36 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_CLIENT_VSSETUPMENU_BUTTON_DEPRESS: {
             auto *eventBtnDepress = static_cast<const U8_Event *>(event);
-            gVSSetupRequestState = eventBtnDepress->data;
+            gVSSetupRequestState = eventBtnDepress->u8_0;
         } break;
         case EVENT_CLIENT_VSSETUP_ADDON_CHECKBOX_CHECKED: {
             auto *eventCheckbox = static_cast<const U8_Event *>(event);
-            if (VSSetupAddonWidget::IsLocalAIOption(eventCheckbox->data)) {
+            if (VSSetupAddonWidget::IsLocalAIOption(eventCheckbox->u8_0)) {
                 break;
             }
-            gVSSetupRequestState = eventCheckbox->data;
+            gVSSetupRequestState = eventCheckbox->u8_0;
         } break;
         case EVENT_CLIENT_VSSETUP_SEND_NAME_STATE: {
             auto *eventState = static_cast<const U8_Event *>(event);
-            gMetricsHostSendNameAllowed = eventState->data;
+            gMetricsHostSendNameAllowed = eventState->u8_0;
         } break;
         case EVENT_CLIENT_SEEDCHOOSER_BUTTON_DEPRESS: {
             if (gIsServerModeSpectator || (gIsReplayMode && replay::GetPlaybackNetplayVersion() >= 3214)) {
                 break; // Only the ordered host acknowledgement changes the UI.
             }
             auto *eventBtnDepress = static_cast<const U8U8_Event *>(event);
-            SeedChooserScreen *seedChooser = eventBtnDepress->data2 != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
+            SeedChooserScreen *seedChooser = eventBtnDepress->u8_1 != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
             if (seedChooser != nullptr) {
                 if (seedChooser->mSeedsInFlight > 0 || seedChooser->mChooseState == SeedChooserState::CHOOSE_VIEW_LAWN || !seedChooser->mMouseVisible)
                     break;
                 if (IsRemoteServer()) {
-                    uint8_t flags = eventBtnDepress->data2 & 1;
-                    if (eventBtnDepress->data1 == SeedChooserScreen::SeedChooserScreen_Page)
+                    uint8_t flags = eventBtnDepress->u8_1 & 1;
+                    if (eventBtnDepress->u8_0 == SeedChooserScreen::SeedChooserScreen_Page)
                         flags |= uint8_t(seedChooser->mPageIndex == 0) << 1;
-                    U8U8_Event syncEvent = {{EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, eventBtnDepress->data1, flags};
+                    U8U8_Event syncEvent = {{EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS}, eventBtnDepress->u8_0, flags};
                     netplay::PutEvent(syncEvent);
                 }
-                seedChooser->ButtonDepress_Origin(eventBtnDepress->data1);
+                seedChooser->ButtonDepress_Origin(eventBtnDepress->u8_0);
             }
         } break;
         case EVENT_CLIENT_SEEDCHOOSER_SELECT_SEED:
@@ -772,9 +772,9 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
             if (gIsServerModeSpectator || (gIsReplayMode && replay::GetPlaybackNetplayVersion() >= 3214))
                 break; // Even cursor/page updates follow the host's stream boundary.
             auto *event1 = static_cast<const U8x3_Event *>(event);
-            auto seedType = SeedType(event1->data[0]);
-            bool isZombieChooser = event1->data[1] != 0;
-            const uint8_t cursorFlags = event1->data[2];
+            auto seedType = SeedType(event1->u8x3_0[0]);
+            bool isZombieChooser = event1->u8x3_0[1] != 0;
+            const uint8_t cursorFlags = event1->u8x3_0[2];
             if ((cursorFlags & SeedChooserScreen::kBanTimeoutSkipEventFlag) != 0) {
                 break;
             }
@@ -833,7 +833,7 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
 
             if (IsRemoteServer()) {
                 EventType syncType = event->type == EVENT_CLIENT_SEEDCHOOSER_BAN_SEED ? EventType::EVENT_SERVER_SEEDCHOOSER_BAN_SEED : EventType::EVENT_SERVER_SEEDCHOOSER_SELECT_SEED;
-                U8x3_Event syncEvent = {{syncType}, {event1->data[0], event1->data[1], event1->data[2]}};
+                U8x3_Event syncEvent = {{syncType}, {event1->u8x3_0[0], event1->u8x3_0[1], event1->u8x3_0[2]}};
                 netplay::PutEvent(syncEvent);
             }
 
@@ -865,13 +865,13 @@ void VSSetupMenu::processClientEvent(const BaseEvent *event) {
             auto *event1 = static_cast<const U16_Event *>(event);
             Sexy::Widget *theController2Widget = FindWidget(CONTROLLER_1);
             if (theController2Widget != nullptr) {
-                theController2Widget->Move(event1->data, theController2Widget->mY);
+                theController2Widget->Move(event1->u16_0, theController2Widget->mY);
                 is2PControllerMoving = true;
             }
         } break;
         case EVENT_CLIENT_VSSETUPMENU_REQUEST_SIDE: {
             auto *event1 = static_cast<const U8_Event *>(event);
-            VSSide requestedSide = event1->data == 2 ? VS_SIDE_NONE : VSSide(event1->data);
+            VSSide requestedSide = event1->u8_0 == 2 ? VS_SIDE_NONE : VSSide(event1->u8_0);
             if (requestedSide < VS_SIDE_NONE || requestedSide > VS_SIDE_ZOMBIE) {
                 break;
             }
@@ -912,7 +912,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_SERVER_VSSETUPMENU_BUTTON_DEPRESS: {
             auto *eventBtnDepress = static_cast<const U8_Event *>(event);
-            int theId = eventBtnDepress->data;
+            int theId = eventBtnDepress->u8_0;
             LOG_DEBUG("theId={}", theId);
             if (gVSSetupRequestState == theId) {
                 gVSSetupRequestState = 0;
@@ -924,28 +924,28 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS: {
             auto *eventBtnDepress = static_cast<const U8U8_Event *>(event);
-            SeedChooserScreen *seedChooser = (eventBtnDepress->data2 & 1) != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
+            SeedChooserScreen *seedChooser = (eventBtnDepress->u8_1 & 1) != 0 ? mApp->mZombieChooserScreen : mApp->mSeedChooserScreen;
             if (seedChooser != nullptr) {
-                if (eventBtnDepress->data1 == SeedChooserScreen::SeedChooserScreen_Page && (!gIsReplayMode || replay::GetPlaybackNetplayVersion() >= 3214)) {
+                if (eventBtnDepress->u8_0 == SeedChooserScreen::SeedChooserScreen_Page && (!gIsReplayMode || replay::GetPlaybackNetplayVersion() >= 3214)) {
                     // Absolute page, not a toggle: buffered picks may still be
                     // animating locally when the host accepts the page change.
-                    seedChooser->SetPageIndex((eventBtnDepress->data2 >> 1) & 1);
+                    seedChooser->SetPageIndex((eventBtnDepress->u8_1 >> 1) & 1);
                 } else {
-                    seedChooser->ButtonDepress_Origin(eventBtnDepress->data1);
+                    seedChooser->ButtonDepress_Origin(eventBtnDepress->u8_0);
                 }
             }
         } break;
         case EVENT_VSSETUPMENU_ENTER_STATE: {
-            [[maybe_unused]] int aState = static_cast<const U8_Event *>(event)->data;
+            [[maybe_unused]] int aState = static_cast<const U8_Event *>(event)->u8_0;
             LOG_DEBUG("theState={}", aState);
             // GoToState(aState);
         } break;
         case EVENT_SERVER_SEEDCHOOSER_SELECT_SEED:
         case EVENT_SERVER_SEEDCHOOSER_BAN_SEED: {
             auto *event1 = static_cast<const U8x3_Event *>(event);
-            auto seedType = SeedType(event1->data[0]);
-            bool isZombieChooser = event1->data[1] != 0;
-            const uint8_t cursorFlags = event1->data[2];
+            auto seedType = SeedType(event1->u8x3_0[0]);
+            bool isZombieChooser = event1->u8x3_0[1] != 0;
+            const uint8_t cursorFlags = event1->u8x3_0[2];
             const bool banTimeoutSkip = (cursorFlags & SeedChooserScreen::kBanTimeoutSkipEventFlag) != 0;
             bool moveOnly = (cursorFlags & SeedChooserScreen::kCursorMoveOnlyEventFlag) != 0;
             int syncedPageIndex = (cursorFlags & SeedChooserScreen::kCursorPageOneEventFlag) != 0 ? 1 : 0;
@@ -1026,8 +1026,8 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
             ButtonDepress_Origin(VSSetupMenu::VSSetupMenu_Random_Battle);
 
             for (int i = 0; i < mApp->mBoard->GetNumSeedsInBank(false); ++i) {
-                mApp->mBoard->mSeedBank[0]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->data[i]), SeedType::SEED_NONE);
-                mApp->mBoard->mSeedBank[1]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->data[i + 6]), SeedType::SEED_NONE);
+                mApp->mBoard->mSeedBank[0]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->u16x12_0[i]), SeedType::SEED_NONE);
+                mApp->mBoard->mSeedBank[1]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->u16x12_0[i + 6]), SeedType::SEED_NONE);
             }
             if (Challenge::msVSShuffleMode) {
                 mApp->mBoard->mSeedBank[0]->mSeedPackets[6].SetPacketType(SEED_BEGHOULED_BUTTON_SHUFFLE, SeedType::SEED_NONE);
@@ -1038,14 +1038,14 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
             auto *event1 = static_cast<const U16_Event *>(event);
             Sexy::Widget *theController1Widget = FindWidget(CONTROLLER_0);
             if (theController1Widget != nullptr) {
-                theController1Widget->Move(event1->data, theController1Widget->mY);
+                theController1Widget->Move(event1->u16_0, theController1Widget->mY);
                 is1PControllerMoving = true;
             }
         } break;
         case EVENT_SERVER_VSSETUPMENU_SET_SIDE: {
             auto *event1 = static_cast<const U8U8_Event *>(event);
-            int sideSlot = event1->data1;
-            VSSide aSide = event1->data2 == 2 ? VS_SIDE_NONE : VSSide(event1->data2);
+            int sideSlot = event1->u8_0;
+            VSSide aSide = event1->u8_1 == 2 ? VS_SIDE_NONE : VSSide(event1->u8_1);
             if (sideSlot < 0 || sideSlot > 1) {
                 break;
             }
@@ -1071,9 +1071,9 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_VSSETUP_ADDON_BUTTON_INIT: {
             auto *eventButtonInit = static_cast<const B1x8_Event *>(event);
-            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtraPacket, eventButtonInit->data1, false);
-            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BanMode, eventButtonInit->data3, false);
-            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft, eventButtonInit->data5, false);
+            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_ExtraPacket, eventButtonInit->b1_0, false);
+            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_BanMode, eventButtonInit->b1_2, false);
+            mAddonWidget->SetAddonMode(VSSetupAddonWidget::VSSetupAddonWidget_TimedDraft, eventButtonInit->b1_4, false);
             U8_Event eventState = {{EventType::EVENT_CLIENT_VSSETUP_SEND_NAME_STATE}, mApp->mPlayerInfo->mVSResultsSendPlayerName};
             netplay::PutEvent(eventState);
         } break;
@@ -1094,8 +1094,8 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_VSSETUP_ADDON_CHECKBOX_CHECKED: {
             auto *eventCheckbox = static_cast<const U8U8_Event *>(event);
-            int id = eventCheckbox->data1;
-            bool checked = eventCheckbox->data2 != 0;
+            int id = eventCheckbox->u8_0;
+            bool checked = eventCheckbox->u8_1 != 0;
             if (VSSetupAddonWidget::IsLocalAIOption(id)) {
                 break;
             }
@@ -1107,7 +1107,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_ENCOUNTER_PICK: {
             auto *eventEncounterPick = static_cast<const U16_Event *>(event);
             if (gOpeningEncounter) {
-                gOpeningEncounter->mType = EncounterType(eventEncounterPick->data);
+                gOpeningEncounter->mType = EncounterType(eventEncounterPick->u16_0);
                 gOpeningEncounter->OpeningEncounterInitialize(gOpeningEncounter->mType);
             }
         } break;
@@ -1377,8 +1377,8 @@ void VSSetupMenu::ButtonDepress_Origin(int theId) {
                 if (IsRemoteServer()) {
                     U16x12_Event event{};
                     event.type = EventType::EVENT_VSSETUPMENU_RANDOM_PICK;
-                    std::ranges::copy(aPlantSeeds, event.data);
-                    std::ranges::copy(aZombieSeeds, event.data + 6);
+                    std::ranges::copy(aPlantSeeds, event.u16x12_0);
+                    std::ranges::copy(aZombieSeeds, event.u16x12_0 + 6);
                     netplay::PutEvent(event);
                 }
             } break;

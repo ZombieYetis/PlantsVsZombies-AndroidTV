@@ -853,7 +853,7 @@ void Projectile::UpdateLobMotion() {
                 if (IsRemoteServer()) {
                     U16_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_APPLY_CONE;
-                    event.data = uint16_t(mBoard->ZombieGetID(aZombie));
+                    event.u16_0 = uint16_t(mBoard->ZombieGetID(aZombie));
                     netplay::PutEvent(event);
                 }
             }
@@ -905,10 +905,10 @@ void Projectile::UpdateLobMotion() {
                 if (IsRemoteServer()) {
                     U16U16U16UNI32UNI32_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED;
-                    event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
-                    event.data2 = uint16_t(aZombie->mAnimTicksPerFrame);
-                    event.data4.f32 = aZombie->mVelX;
-                    event.data5.f32 = aZombie->mPosX;
+                    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
+                    event.u16_1 = uint16_t(aZombie->mAnimTicksPerFrame);
+                    event.uni32_0.f32 = aZombie->mVelX;
+                    event.uni32_1.f32 = aZombie->mPosX;
                     netplay::PutEvent(event);
                 }
 
@@ -1681,8 +1681,8 @@ void Projectile::CheckForCollision() {
                 if (IsRemoteServer()) {
                     U16UNI32_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_TELEPORT;
-                    event.data1 = uint16_t(mBoard->mZombies.DataArrayGetID(aBestZombie));
-                    event.data2.f32 = aDestX;
+                    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aBestZombie));
+                    event.uni32_0.f32 = aDestX;
                     netplay::PutEvent(event);
                 }
             }

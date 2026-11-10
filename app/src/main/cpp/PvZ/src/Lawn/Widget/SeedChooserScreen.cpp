@@ -2711,13 +2711,13 @@ bool SeedChooserScreen::ApplyCoopSeedEvent(const U8x3_Event &event, int thePlaye
         return false;
     }
 
-    const SeedType seedType = SeedType(event.data[0]);
+    const SeedType seedType = SeedType(event.u8x3_0[0]);
     const int seedIndex = GetSeedPacketIndex(seedType);
     if (seedType < SeedType::SEED_PEASHOOTER || seedIndex < 0 || seedIndex >= GetSeedStorageCount()) {
         return false;
     }
     const bool isImitater = seedType == SEED_IMITATER;
-    if (!isImitater && event.data[1] != 0) {
+    if (!isImitater && event.u8x3_0[1] != 0) {
         return false;
     }
 
@@ -2734,7 +2734,7 @@ bool SeedChooserScreen::ApplyCoopSeedEvent(const U8x3_Event &event, int thePlaye
     cursorSeed = seedIndex;
 
     ChosenSeed &chosenSeed = GetChosenSeed(seedIndex);
-    if ((event.data[2] & kCoopRemoveSeedEventFlag) != 0) {
+    if ((event.u8x3_0[2] & kCoopRemoveSeedEventFlag) != 0) {
         if (chosenSeed.mSeedState != ChosenSeedState::SEED_IN_BANK || chosenSeed.mChosenPlayerIndex != thePlayerIndex || chosenSeed.mCrazyDavePicked) {
             return false;
         }
@@ -2749,7 +2749,7 @@ bool SeedChooserScreen::ApplyCoopSeedEvent(const U8x3_Event &event, int thePlaye
 
     const ChosenSeed previousSeed = chosenSeed;
     if (isImitater) {
-        const SeedType imitaterType = SeedType(int(event.data[1]) - 1);
+        const SeedType imitaterType = SeedType(int(event.u8x3_0[1]) - 1);
         const int targetIndex = GetSeedPacketIndex(imitaterType);
         if (imitaterType < SEED_PEASHOOTER || imitaterType == SEED_IMITATER || targetIndex < 0 || targetIndex >= GetSeedStorageCount() || GetPlantSeedType(targetIndex) != imitaterType
             || !HasPacket(imitaterType, false) || Plant::IsUpgrade(imitaterType) || SeedNotAllowedToPick(imitaterType) || SeedNotAllowedDuringTrial(imitaterType)) {
@@ -2779,7 +2779,7 @@ void SeedChooserScreen::ProcessCoopClientEvent(const BaseEvent *event) {
 
     if (event->type == EventType::EVENT_CLIENT_SEEDCHOOSER_BUTTON_DEPRESS) {
         const auto &buttonEvent = *static_cast<const U8U8_Event *>(event);
-        if (buttonEvent.data1 == SeedChooserScreen_BackToModeSelect && buttonEvent.data2 == 0) {
+        if (buttonEvent.u8_0 == SeedChooserScreen_BackToModeSelect && buttonEvent.u8_1 == 0) {
             mBackToModeSelectRequested = true;
         }
         return;
@@ -2791,7 +2791,7 @@ void SeedChooserScreen::ProcessCoopClientEvent(const BaseEvent *event) {
             return;
         }
 
-        U8x3_Event syncEvent = {{EventType::EVENT_SERVER_SEEDCHOOSER_SELECT_SEED}, {seedEvent.data[0], seedEvent.data[1], uint8_t(seedEvent.data[2] | kCoopPlayerTwoEventFlag)}};
+        U8x3_Event syncEvent = {{EventType::EVENT_SERVER_SEEDCHOOSER_SELECT_SEED}, {seedEvent.u8x3_0[0], seedEvent.u8x3_0[1], uint8_t(seedEvent.u8x3_0[2] | kCoopPlayerTwoEventFlag)}};
         netplay::PutEvent(syncEvent);
     }
 }
@@ -2799,21 +2799,21 @@ void SeedChooserScreen::ProcessCoopClientEvent(const BaseEvent *event) {
 void SeedChooserScreen::ProcessCoopServerEvent(const BaseEvent *event) {
     if (event->type == EventType::EVENT_SERVER_SEEDCHOOSER_SELECT_SEED) {
         const auto &seedEvent = *static_cast<const U8x3_Event *>(event);
-        const int ownerPlayerIndex = (seedEvent.data[2] & kCoopPlayerTwoEventFlag) != 0 ? 1 : 0;
+        const int ownerPlayerIndex = (seedEvent.u8x3_0[2] & kCoopPlayerTwoEventFlag) != 0 ? 1 : 0;
         ApplyCoopSeedEvent(seedEvent, ownerPlayerIndex);
         return;
     }
 
     if (event->type == EventType::EVENT_SERVER_SEEDCHOOSER_BUTTON_DEPRESS) {
         const auto &buttonEvent = *static_cast<const U8U8_Event *>(event);
-        if (buttonEvent.data1 == SeedChooserScreen_Start && buttonEvent.data2 == 0) {
+        if (buttonEvent.u8_0 == SeedChooserScreen_Start && buttonEvent.u8_1 == 0) {
             // 主机已经完成卡片校验，客户端不能再弹出本地模态警告。
             for (int index = 0; index < GetSeedStorageCount(); ++index) {
                 LandFlyingSeed(GetChosenSeed(index));
             }
             CloseSeedChooser();
-        } else if (buttonEvent.data1 == SeedChooserScreen_BackToModeSelect && buttonEvent.data2 == 0) {
-            ButtonDepress_Origin(buttonEvent.data1);
+        } else if (buttonEvent.u8_0 == SeedChooserScreen_BackToModeSelect && buttonEvent.u8_1 == 0) {
+            ButtonDepress_Origin(buttonEvent.u8_0);
         }
     }
 }
@@ -4496,7 +4496,7 @@ void SeedChooserScreen::MouseDrag(int x, int y) {
                 return;
             }
 
-            // data3 flags: bit0 = moveOnly(sync cursor without picking), bit1 = sender page index for zombie chooser
+            // u8x3_0[2] flags: bit0 = moveOnly(sync cursor without picking), bit1 = sender page index for zombie chooser
             const uint8_t cursorFlags = kCursorMoveOnlyEventFlag | ((mPageIndex == 1) ? kCursorPageOneEventFlag : 0);
             if (IsRemoteClient()) {
                 U8x3_Event event = {{EventType::EVENT_CLIENT_SEEDCHOOSER_SELECT_SEED}, {uint8_t(hoverSeedType), uint8_t(mIsZombieChooser), cursorFlags}};

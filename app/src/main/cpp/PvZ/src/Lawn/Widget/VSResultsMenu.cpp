@@ -193,7 +193,7 @@ void VSResultsMenu::processClientEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_CLIENT_VSRESULT_BUTTON_DEPRESS: {
             auto *event1 = static_cast<const U8_Event *>(event);
-            int anId = event1->data;
+            int anId = event1->u8_0;
             gVSResultRequestState = anId;
         } break;
         default:
@@ -207,7 +207,7 @@ void VSResultsMenu::processServerEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_SERVER_VSRESULT_BUTTON_DEPRESS: {
             auto *event1 = static_cast<const U8_Event *>(event);
-            int anId = event1->data;
+            int anId = event1->u8_0;
             mResultsButtonId = anId;
             OnExit();
         } break;

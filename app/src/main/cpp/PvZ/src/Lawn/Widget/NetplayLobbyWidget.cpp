@@ -3717,12 +3717,12 @@ void NetplayLobbyWidget::ProcessClientEvent(const BaseEvent *event) {
             const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
             std::strncpy(gServerHostName, localName, sizeof(gServerHostName) - 1);
             gServerHostName[sizeof(gServerHostName) - 1] = '\0';
-            std::strncpy(gSecondPlayerName, nameEvent->chars, sizeof(gSecondPlayerName) - 1);
+            std::strncpy(gSecondPlayerName, nameEvent->charx32_0, sizeof(gSecondPlayerName) - 1);
             gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
 
             CHARx32_Event nameEventReply{};
             nameEventReply.type = EVENT_SERVER_WAITFORSECONDPALYER_PLAYER_NAME;
-            strncpy(nameEventReply.chars, this->mApp->mPlayerInfo->mName, sizeof(nameEventReply.chars) - 1);
+            strncpy(nameEventReply.charx32_0, this->mApp->mPlayerInfo->mName, sizeof(nameEventReply.charx32_0) - 1);
             netplay::PutEvent(nameEventReply);
         } break;
         default:
@@ -3736,24 +3736,24 @@ void NetplayLobbyWidget::ProcessServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_WAITFORSECONDPALYER_VERSION_CHECK: {
             auto *event1 = static_cast<const U16_Event *>(event);
             const uint16_t expectedProtocol = GetLanRoomProtocol(this->mIsCoopLobby);
-            if (event1->data != expectedProtocol) {
+            if (event1->u16_0 != expectedProtocol) {
                 LOG_ERROR("Room Version Mismatch!");
                 // 弹出提示并断开连接
                 LeaveRoom();
                 InitUdpScanSocket();
                 this->mApp->LawnMessageBox(
-                    Dialogs::DIALOG_MESSAGE, "[VERSION_ERROR_TITLE]", event1->data > expectedProtocol ? "[VERSION_ERROR_HIGN_DESC]" : "[VERSION_ERROR_LOW_DESC]", "[DIALOG_BUTTON_OK]", "", 3);
+                    Dialogs::DIALOG_MESSAGE, "[VERSION_ERROR_TITLE]", event1->u16_0 > expectedProtocol ? "[VERSION_ERROR_HIGN_DESC]" : "[VERSION_ERROR_LOW_DESC]", "[DIALOG_BUTTON_OK]", "", 3);
             } else {
                 CHARx32_Event nameEvent{};
                 nameEvent.type = EVENT_CLIENT_WAITFORSECONDPALYER_PLAYER_NAME;
-                strncpy(nameEvent.chars, this->mApp->mPlayerInfo->mName, sizeof(nameEvent.chars) - 1);
+                strncpy(nameEvent.charx32_0, this->mApp->mPlayerInfo->mName, sizeof(nameEvent.charx32_0) - 1);
                 netplay::PutEvent(nameEvent);
             }
         } break;
         case EVENT_SERVER_WAITFORSECONDPALYER_PLAYER_NAME: {
             auto *nameEvent = static_cast<const CHARx32_Event *>(event);
             const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
-            std::strncpy(gServerHostName, nameEvent->chars, sizeof(gServerHostName) - 1);
+            std::strncpy(gServerHostName, nameEvent->charx32_0, sizeof(gServerHostName) - 1);
             gServerHostName[sizeof(gServerHostName) - 1] = '\0';
             std::strncpy(gSecondPlayerName, localName, sizeof(gSecondPlayerName) - 1);
             gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
@@ -3766,9 +3766,9 @@ void NetplayLobbyWidget::ProcessServerEvent(const BaseEvent *event) {
         case EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE: {
             if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive) {
                 auto *syncEvent = static_cast<const U8U8_Event *>(event);
-                Challenge::msVSShuffleMode = syncEvent->data1 == 1;
-                Challenge::msVSClassicMode = syncEvent->data1 == 2;
-                gVSBackground = BackgroundType(syncEvent->data2);
+                Challenge::msVSShuffleMode = syncEvent->u8_0 == 1;
+                Challenge::msVSClassicMode = syncEvent->u8_0 == 2;
+                gVSBackground = BackgroundType(syncEvent->u8_1);
                 this->mServerJoinedRoomGaming = false;
                 this->mServerSpectateReservationActive = false;
                 this->mServerSpectateReserveTick = 0;
