@@ -2314,7 +2314,7 @@ Sexy::Rect &LawnApp::FULLSCREEN_RECT = *GetLibGameMain().GetSymbol<Sexy::Rect>("
 int (&VSResultsMenu::msPlayerRecords)[2][5] = *GetLibGameMain().GetSymbol<int[2][5]>("_ZN13VSResultsMenu15msPlayerRecordsE");
 int &VSSetupMenu::msNextFirstPick = *GetLibGameMain().GetSymbol<int>("_ZN11VSSetupMenu15msNextFirstPickE");
 
-DISABLE_WARNING_BEGIN("-Wextra-qualification") // warning: extra qualification on member 'xxx'
+DISABLE_GNU_LIKE_WARNING_BEGIN("-Wextra-qualification") // warning: extra qualification on member 'xxx'
 EffectSystem *& ::gEffectSystem = *GetLibGameMain().GetSymbol<EffectSystem *>("gEffectSystem");
 FoleyParams (&::gLawnFoleyParamArray)[FoleyType::NUM_FOLEY] = *GetLibGameMain().GetSymbol<FoleyParams[FoleyType::NUM_FOLEY]>("gLawnFoleyParamArray");
 FoleyParams *& ::gFoleyParamArray = *GetLibGameMain().GetSymbol<FoleyParams *>("gFoleyParamArray");
@@ -2327,7 +2327,7 @@ ReanimatorDefinition *& ::gReanimatorDefArray = *GetLibGameMain().GetSymbol<Rean
 TodParticleDefinition *& ::gParticleDefArray = *GetLibGameMain().GetSymbol<TodParticleDefinition *>("gParticleDefArray");
 int & ::gParticleDefCount = *GetLibGameMain().GetSymbol<int>("gParticleDefCount");
 char *& ::ReanimTrackId_anim_head1 = *GetLibGameMain().GetSymbol<char *>("ReanimTrackId_anim_head1");
-DISABLE_WARNING_END
+DISABLE_GNU_LIKE_WARNING_END
 
 bool LoadNativeCode() {
     static homura::SharedObjLoader libnative_code{"libnative_code.so"};

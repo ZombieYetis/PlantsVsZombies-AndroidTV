@@ -43,12 +43,12 @@ public:
     }
 
     template <typename T = void>
-    T *GetSymbol([[gnu::nonnull]] const char *name) const {
+    [[nodiscard]] T *GetSymbol([[gnu::nonnull]] const char *name) const {
         return reinterpret_cast<T *>(GetSymbolImpl(name));
     }
 
 protected:
-    void *GetSymbolImpl(const char *name) const;
+    [[nodiscard]] void *GetSymbolImpl(const char *name) const;
 
     void *handle_ = nullptr;
 };

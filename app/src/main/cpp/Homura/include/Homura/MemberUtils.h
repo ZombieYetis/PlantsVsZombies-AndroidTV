@@ -160,7 +160,7 @@ namespace detail {
 
 template <typename T>
     requires(std::is_member_function_pointer_v<T> && std::is_same_v<T, std::remove_cv_t<T>>)
-ExtractMemFuncPtrType<T> ExtractMemFuncPtr(T memFuncPtr) {
+[[nodiscard]] ExtractMemFuncPtrType<T> ExtractMemFuncPtr(T memFuncPtr) {
 #ifdef PVZ_DEBUG
     detail::CheckPmfBeforeExtract(reinterpret_cast<detail::CppMemFuncPtr *>(&memFuncPtr));
 #endif

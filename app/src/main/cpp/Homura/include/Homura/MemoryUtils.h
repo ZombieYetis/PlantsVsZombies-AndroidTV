@@ -40,9 +40,9 @@ namespace homura {
  */
 bool SetProtection(std::uintptr_t address, std::size_t length, int prot);
 
-bool GetProtection(std::uintptr_t address, int &prot);
+[[nodiscard]] bool GetProtection(std::uintptr_t address, int &prot);
 
-bool InSamePage(std::uintptr_t addr1, std::uintptr_t addr2);
+[[nodiscard]] bool InSamePage(std::uintptr_t addr1, std::uintptr_t addr2);
 
 bool WriteMemory(std::uintptr_t address, std::span<const std::uint8_t> buffer);
 

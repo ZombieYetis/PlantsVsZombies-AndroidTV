@@ -26,7 +26,7 @@
 
 namespace homura {
 
-inline std::string JStringToString(JNIEnv *env, jstring jstr) {
+[[nodiscard]] inline std::string JStringToString(JNIEnv *env, jstring jstr) {
     const char *s = env->GetStringUTFChars(jstr, nullptr);
     std::string result = s;
     env->ReleaseStringUTFChars(jstr, s);
@@ -34,7 +34,7 @@ inline std::string JStringToString(JNIEnv *env, jstring jstr) {
 }
 
 namespace detail {
-    inline std::string GetLocaleField(JNIEnv *env, const char *methodName) {
+    [[nodiscard]] inline std::string GetLocaleField(JNIEnv *env, const char *methodName) {
         jclass localeClass = env->FindClass("java/util/Locale");
 
         jmethodID getDefault = env->GetStaticMethodID(localeClass, "getDefault", "()Ljava/util/Locale;");
@@ -49,15 +49,15 @@ namespace detail {
     }
 } // namespace detail
 
-inline std::string GetLocaleLanguage(JNIEnv *env) {
+[[nodiscard]] inline std::string GetLocaleLanguage(JNIEnv *env) {
     return detail::GetLocaleField(env, "getLanguage");
 }
 
-inline std::string GetLocaleScript(JNIEnv *env) {
+[[nodiscard]] inline std::string GetLocaleScript(JNIEnv *env) {
     return detail::GetLocaleField(env, "getScript");
 }
 
-inline std::string GetLocaleCountry(JNIEnv *env) {
+[[nodiscard]] inline std::string GetLocaleCountry(JNIEnv *env) {
     return detail::GetLocaleField(env, "getCountry");
 }
 
