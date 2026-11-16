@@ -85,7 +85,7 @@ struct CosmeticSnapshotState {
     std::vector<uint32_t> eyeBodies;
     std::map<uint32_t, LocalCosmeticAnimation> localAnimations;
     bool DiscardsAnimation(uint32_t id) const {
-        return std::find(animations.begin(), animations.end(), id) != animations.end();
+        return std::ranges::contains(animations, id);
     }
     LocalCosmeticAnimation LocalAnimation(uint32_t id) const {
         const auto entry = localAnimations.find(id);
@@ -117,7 +117,7 @@ bool StripCosmeticEffects(Attachment &attachment, Predicate isCosmetic) {
 }
 template <typename Track>
 void ClearDiscardedAttachment(Track &track, std::span<const uint32_t> discarded) {
-    if (std::find(discarded.begin(), discarded.end(), static_cast<uint32_t>(track.mAttachmentID)) != discarded.end())
+    if (std::ranges::contains(discarded, static_cast<uint32_t>(track.mAttachmentID)))
         track.mAttachmentID = {};
 }
 

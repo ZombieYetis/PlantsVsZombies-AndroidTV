@@ -63,7 +63,7 @@ inline bool EncodeLayouts(const AnimationLayouts &layouts, uint32_t snapshotHash
         WriteU32(out, static_cast<uint32_t>(layout.tracks.size()));
         for (const auto &track : layout.tracks) {
             WriteU32(out, static_cast<uint32_t>(track.name.size()));
-            out.insert(out.end(), track.name.begin(), track.name.end());
+            out.append_range(track.name);
             WriteU32(out, track.frames);
             WriteU32(out, track.start);
             WriteU32(out, track.count);
@@ -101,7 +101,7 @@ constexpr size_t kLayoutTailHeader = 24; // magic, total, offset, hash, fragment
 constexpr size_t kLayoutTailCapacity = 240 - kLayoutTailHeader - 1;
 
 inline uint16_t FillSnapshotChunk(std::span<unsigned char, 240> chunk, std::span<const unsigned char> snapshot, std::span<const unsigned char> metadata, uint32_t hash, size_t &offset) {
-    std::fill(chunk.begin(), chunk.end(), static_cast<unsigned char>(0));
+    std::ranges::fill(chunk, static_cast<unsigned char>(0));
     if (snapshot.empty())
         return 0;
     const size_t amount = offset < metadata.size() ? std::min(metadata.size() - offset, kLayoutTailCapacity) : 0;
@@ -113,7 +113,7 @@ inline uint16_t FillSnapshotChunk(std::span<unsigned char, 240> chunk, std::span
         WriteU32(header, static_cast<uint32_t>(offset));
         WriteU32(header, hash);
         WriteU32(header, static_cast<uint32_t>(amount));
-        std::copy(header.begin(), header.end(), chunk.begin() + count);
+        std::ranges::copy(header, chunk.begin() + count);
         std::copy_n(metadata.begin() + offset, amount, chunk.begin() + count + header.size());
         offset += amount;
     }

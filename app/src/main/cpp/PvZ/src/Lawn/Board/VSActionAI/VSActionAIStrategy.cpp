@@ -76,7 +76,7 @@ std::uint32_t DeckSignature(const VSGameState &state, VSSide side) {
         }
         seeds.push_back(card.seedType);
     }
-    std::ranges::sort(seeds, std::less{});
+    std::ranges::sort(seeds);
 
     // FNV-1a over sorted 16-bit seed ids. Keep this byte-for-byte aligned
     // with the external replay extractor: deck order is UI noise, whereas
@@ -412,7 +412,7 @@ class StrategyDatabase {
         }
 
         const auto &data = buffer.mData;
-        if (data.size() < kStrategyDatabaseHeaderSize || !std::equal(kStrategyDatabaseMagic.begin(), kStrategyDatabaseMagic.end(), data.begin())) {
+        if (data.size() < kStrategyDatabaseHeaderSize || !std::ranges::starts_with(data, kStrategyDatabaseMagic)) {
             mLoadState = StrategyDatabaseLoadState::Invalid;
             return;
         }

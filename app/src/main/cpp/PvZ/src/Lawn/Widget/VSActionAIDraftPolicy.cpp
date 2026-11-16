@@ -78,7 +78,7 @@ namespace {
             }
 
             const std::vector<unsigned char> &data = buffer.mData;
-            if (data.size() < kBanDatabaseHeaderSize || !std::equal(kBanDatabaseMagic.begin(), kBanDatabaseMagic.end(), data.begin()) || ReadBanU16(data, 8) != kBanDatabaseVersion) {
+            if (data.size() < kBanDatabaseHeaderSize || !std::ranges::starts_with(data, kBanDatabaseMagic) || ReadBanU16(data, 8) != kBanDatabaseVersion) {
                 mLoadState = BanDatabaseLoadState::Invalid;
                 return;
             }

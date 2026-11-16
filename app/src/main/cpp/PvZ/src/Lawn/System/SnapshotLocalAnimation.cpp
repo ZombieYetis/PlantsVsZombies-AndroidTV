@@ -263,7 +263,7 @@ void FinishSnapshotCosmetics(Board &board, const CosmeticSnapshotState &state) {
     // Animation tracks have already been filtered by SyncReanimation. Other
     // entity owners can also point at an attachment emptied by cosmetic pruning.
     const auto clearAttachment = [&](AttachmentID &id) {
-        if (std::find(state.attachments.begin(), state.attachments.end(), static_cast<uint32_t>(id)) != state.attachments.end())
+        if (std::ranges::contains(state.attachments, static_cast<uint32_t>(id)))
             id = ATTACHMENTID_NULL;
     };
     Coin *coin = nullptr;
