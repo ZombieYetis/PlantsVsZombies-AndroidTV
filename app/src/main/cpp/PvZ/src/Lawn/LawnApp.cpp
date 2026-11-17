@@ -1376,6 +1376,10 @@ bool LawnApp::IsChallengeWithoutSeedBank() {
 }
 
 int LawnApp::GetSeedsAvailable(bool theIsZombieChooser) {
+    // 取消结盟模式的卡片收集进度判定，以解决新存档无法开始游戏的问题
+    if (IsCoopMode()) {
+        return NUM_SEEDS_IN_CHOOSER;
+    }
     // 解锁僵尸方拓展卡片
     if (theIsZombieChooser && IsVSMode() && !Challenge::msVSClassicMode) {
         return EXTENDED_NUM_ZOMBIE_SEEDS_IN_CHOOSER;

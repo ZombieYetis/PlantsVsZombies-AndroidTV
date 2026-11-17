@@ -458,19 +458,8 @@ void ChallengeScreen::SetUnlockChallengeIndex(ChallengePage thePage, bool theIsI
 int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex) {
     const ChallengeDefinition &aDef = GetChallengeDefinition(theChallengeIndex);
     const GameMode aMode = aDef.mChallengeMode;
-    if (aMode == GAMEMODE_MP_VS) {
+    if (aMode == GAMEMODE_MP_VS || IsValidCoopMode(aMode)) {
         return 0;
-    }
-    if (IsValidCoopMode(aMode)) {
-        if (mApp->mPlayerInfo->GetFlag(1)) {
-            return 0;
-        }
-        if (aMode == GAMEMODE_TWO_PLAYER_COOP_ENDLESS) {
-            return 1;
-        }
-        const GameMode aUnlockMode = aMode == GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD ? GAMEMODE_TWO_PLAYER_COOP_BOSS : aMode;
-        const int aLevelsNeeded = int(aUnlockMode) - GAMEMODE_TWO_PLAYER_COOP_DAY - mApp->mPlayerInfo->mLevel / 10;
-        return aLevelsNeeded <= 0 ? 0 : aLevelsNeeded == 1 ? 1 : 2;
     }
     if (mApp->mGameMode == GAMEMODE_UPSELL && mApp->mGameScene == SCENE_LEVEL_INTRO) {
         return aMode == GAMEMODE_CHALLENGE_FINAL_BOSS ? 1 : 0;
@@ -544,11 +533,6 @@ void ChallengeScreen::UpdateToolTip() {
         aLabel = !mApp->HasFinishedAdventure() && aMode == GAMEMODE_SCARY_POTTER_4 ? "[FINISH_ADVENTURE_TOOLTIP]" : "[ONE_MORE_SCARY_POTTER_TOOLTIP]";
     } else if (mPage == CHALLENGE_PAGE_PUZZLE && IsIZombieLevel(aMode)) {
         aLabel = !mApp->HasFinishedAdventure() && aMode == GAMEMODE_PUZZLE_I_ZOMBIE_4 ? "[FINISH_ADVENTURE_TOOLTIP]" : "[ONE_MORE_IZOMBIE_TOOLTIP]";
-    } else if (mPage == CHALLENGE_PAGE_COOP) {
-        mToolTip->SetLabel(aMode == GAMEMODE_TWO_PLAYER_COOP_ENDLESS ? "[FINISH_ADVENTURE_TOOLTIP]" : "[PLAY_MORE_ADVENTURE_TOOLTIP]");
-        // TV hides the tooltip for locked coop entries.
-        mToolTip->mVisible = false;
-        return;
     } else if (!mApp->HasFinishedAdventure() || mApp->IsTrialStageLocked()) {
         aLabel = "[FINISH_ADVENTURE_TOOLTIP]";
     } else if (mApp->IsSurvivalEndless(aMode)) {
