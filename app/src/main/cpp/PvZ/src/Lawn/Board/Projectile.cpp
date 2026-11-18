@@ -52,8 +52,12 @@ constexpr int ACKEE_DAMAGE[ACKEE_MAX_HITS] = {60, 50, 40, 30};
 
 int GetProjectileImpactDamage(const Projectile *theProjectile) {
     int aDamage = theProjectile->GetProjectileDef().mDamage;
-    if (theProjectile->mProjectileType == ProjectileType::PROJECTILE_RED_STINGER && theProjectile->mMotionType == ProjectileMotion::MOTION_STRAIGHT) {
-        aDamage -= 10; // 红针花一形态的直射子弹减少 10 点伤害
+    if (theProjectile->mProjectileType == ProjectileType::PROJECTILE_RED_STINGER) {
+        if (theProjectile->mMotionType == ProjectileMotion::MOTION_STRAIGHT) {
+            aDamage -= 10; // 一形态直射
+        } else if (theProjectile->mMotionType == ProjectileMotion::MOTION_STAR) {
+            aDamage += 10; // 三形态环射
+        }
     }
     return aDamage;
 }

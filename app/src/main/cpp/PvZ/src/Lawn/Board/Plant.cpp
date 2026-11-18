@@ -119,7 +119,7 @@ PlantDefinition gExtendedPlantDefs[]{
     {SeedType::SEED_SUN_BEAN, nullptr, ReanimationType::REANIM_SUN_BEAN, 0, 50, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "SUN_BEAN"},
     {SeedType::SEED_PEANUT, nullptr, ReanimationType::REANIM_PEANUT, 0, 150, 3000, PlantSubClass::SUBCLASS_SHOOTER, 200, "PEANUT"},
     {SeedType::SEED_ENDURIAN, nullptr, ReanimationType::REANIM_ENDURIAN, 0, 75, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "ENDURIAN"},
-    {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 750, PlantSubClass::SUBCLASS_SHOOTER, 250, "RED_STINGER"},
+    {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 750, PlantSubClass::SUBCLASS_SHOOTER, 220, "RED_STINGER"},
     {SeedType::SEED_LIGHTNING_REED, nullptr, ReanimationType::REANIM_LIGHTNING_REED, 0, 125, 750, PlantSubClass::SUBCLASS_SHOOTER, 150, "LIGHTNING_REED"},
     {SeedType::SEED_IMP_PEAR, nullptr, ReanimationType::REANIM_IMP_PEAR, 0, 100, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "IMP_PEAR"},
     {SeedType::SEED_AKEE, nullptr, ReanimationType::REANIM_AKEE, 0, 175, 750, PlantSubClass::SUBCLASS_SHOOTER, 300, "AKEE"},
@@ -2957,7 +2957,6 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_BOBSLED:
         case SeedType::SEED_ZOMBIE_YETI:
         case SeedType::SEED_ZOMBIE_PEA_HEAD:
-        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_MOUND:
         case SeedType::SEED_ZOMBIE_GRAVEDIGGER:
             aCost = 50;
@@ -2971,6 +2970,7 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_SPORESHROOM:
         case SeedType::SEED_ZOMBIE_POLEVAULTER: // 100 -> 75
         case SeedType::SEED_ZOMBIE_DOLPHIN_RIDER:
+        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_EXPLORER:
         case SeedType::SEED_ZOMBIE_SKELETON:
             aCost = 75;
