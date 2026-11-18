@@ -1181,8 +1181,8 @@ void VSSetupMenu::OnStateEnter(VSSetupState theState) {
 
         // 此事件仅针对中途加入的观战者，告知观战者本局对战的模式。Guest无需处理此事件。
         if (IsRemoteServer()) {
-            // Wire modes: 0 = normal, 1 = shuffle, 2 = classic.
-            const uint8_t mode = Challenge::msVSClassicMode ? 2 : uint8_t(Challenge::msVSShuffleMode);
+            // Wire modes: 0 = normal, 1 = shuffle, 2 = legacy.
+            const uint8_t mode = Challenge::msVSLegacyMode ? 2 : uint8_t(Challenge::msVSShuffleMode);
             U8U8_Event event = {{EventType::EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE}, mode, uint8_t(mApp->mBoard->mBackground)};
             netplay::PutEvent(event);
         }

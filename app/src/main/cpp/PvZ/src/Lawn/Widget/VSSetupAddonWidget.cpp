@@ -53,7 +53,7 @@ VSSetupAddonWidget::VSSetupAddonWidget(VSSetupMenu *theVSSetupMenu) {
 
     mExtraPacketMode = mApp->mPlayerInfo->mVSExtraPacketMode;
     mBanMode = mApp->mPlayerInfo->mVSBanMode;
-    if (Challenge::msVSClassicMode) {
+    if (Challenge::msVSLegacyMode) {
         ResetGlobalBpState();
     }
     mPlantAIMode = mApp->mPlayerInfo->mVSPlantAIMode;
@@ -168,7 +168,7 @@ void VSSetupAddonWidget::UpdateGlobalBpButtonState() const {
         return;
     }
 
-    const bool enabled = mBanModeCheckbox->mVisible && mBanMode && !Challenge::msVSClassicMode;
+    const bool enabled = mBanModeCheckbox->mVisible && mBanMode && !Challenge::msVSLegacyMode;
     mGlobalBpButton->SetVisible(enabled);
     mGlobalBpButton->mDisabled = !enabled || gIsReplayMode;
     switch (msGlobalBpMode) {

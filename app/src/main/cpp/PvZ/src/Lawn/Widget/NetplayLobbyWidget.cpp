@@ -3767,7 +3767,7 @@ void NetplayLobbyWidget::ProcessServerEvent(const BaseEvent *event) {
             if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive) {
                 auto *syncEvent = static_cast<const U8U8_Event *>(event);
                 Challenge::msVSShuffleMode = syncEvent->u8_0 == 1;
-                Challenge::msVSClassicMode = syncEvent->u8_0 == 2;
+                Challenge::msVSLegacyMode = syncEvent->u8_0 == 2;
                 gVSBackground = BackgroundType(syncEvent->u8_1);
                 this->mServerJoinedRoomGaming = false;
                 this->mServerSpectateReservationActive = false;

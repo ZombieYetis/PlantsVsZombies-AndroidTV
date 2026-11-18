@@ -101,7 +101,7 @@ bool IsExtendedSeedsModeEnabled(const SeedChooserScreen *screen) {
         return false;
     }
 
-    return !Challenge::msVSClassicMode;
+    return !Challenge::msVSLegacyMode;
 }
 
 int GetZombieFirstPageSeedCount(const SeedChooserScreen *screen) {
@@ -1553,7 +1553,7 @@ void SeedChooserScreen::_constructor(bool theIsZombieChooser) {
     mToolTip1 = new ToolTipWidget();
     mToolTip2 = new ToolTipWidget();
 
-    if (mApp->IsVSMode() && !Challenge::msVSClassicMode) {
+    if (mApp->IsVSMode() && !Challenge::msVSLegacyMode) {
         mToolTip1->mTitleFont = mToolTip2->mTitleFont = addonFonts.JN_BOBO_HEI20;
         mToolTip1->mWarningTextFont = mToolTip2->mWarningTextFont = addonFonts.JN_BOBO_HEI20;
     }

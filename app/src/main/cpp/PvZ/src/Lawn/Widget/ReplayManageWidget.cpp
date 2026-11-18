@@ -175,7 +175,7 @@ public:
                     bgText = TodStringTranslate("[MP_VS_SHUFFLE_MODE]");
                     break;
                 case -2:
-                    bgText = TodStringTranslate("[MP_VS_CLASSIC_MODE]");
+                    bgText = TodStringTranslate("[MP_VS_LEGACY_MODE]");
                     break;
                 default:
                     bgText = "Unknown";
@@ -459,7 +459,7 @@ void ReplayManageWidget::StartReplayByIndex(int index) const {
     }
 
     Challenge::msVSShuffleMode = false;
-    Challenge::msVSClassicMode = false;
+    Challenge::msVSLegacyMode = false;
     switch (item.vsBackground) {
         case 0:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
@@ -482,7 +482,7 @@ void ReplayManageWidget::StartReplayByIndex(int index) const {
             break;
         case -2:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
-            Challenge::msVSClassicMode = true;
+            Challenge::msVSLegacyMode = true;
             break;
         default:
             break;

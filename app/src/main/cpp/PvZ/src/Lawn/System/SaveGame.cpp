@@ -379,11 +379,11 @@ struct SpectatorScene {
     GameScenes scene = SCENE_PLAYING;
     BackgroundType background = BACKGROUND_1_DAY;
     bool setup = false, plantChooser = false, zombieChooser = false;
-    bool shuffle = false, classic = false, extraPackets = false, ban = false, timed = false;
+    bool shuffle = false, legacy = false, extraPackets = false, ban = false, timed = false;
     uint32_t historyEpoch = 0;
 
     void Sync(SaveGameContext &context) {
-        SyncSpectatorValues(context, scene, background, setup, plantChooser, zombieChooser, shuffle, classic, extraPackets, ban, timed, historyEpoch);
+        SyncSpectatorValues(context, scene, background, setup, plantChooser, zombieChooser, shuffle, legacy, extraPackets, ban, timed, historyEpoch);
     }
 };
 
@@ -403,7 +403,7 @@ SpectatorScene GetSpectatorScene(LawnApp *app) {
     scene.plantChooser = app->mSeedChooserScreen != nullptr;
     scene.zombieChooser = app->mZombieChooserScreen != nullptr;
     scene.shuffle = Challenge::msVSShuffleMode;
-    scene.classic = Challenge::msVSClassicMode;
+    scene.legacy = Challenge::msVSLegacyMode;
     scene.timed = VSSetupAddonWidget::msTimedDraftMode;
     if (scene.setup) {
         scene.extraPackets = app->mVSSetupMenu->mAddonWidget->mExtraPacketMode;
@@ -546,7 +546,7 @@ void SyncSpectatorExtras(SaveGameContext &context, Board *board) {
     syncObject(board->mCursorObject[1], "player1.cursor");
     syncObject(board->mCursorPreview[1], "player1.cursor_preview");
     context.SyncBytes(&Challenge::msVSShuffleMode, sizeof(Challenge::msVSShuffleMode));
-    context.SyncBytes(&Challenge::msVSClassicMode, sizeof(Challenge::msVSClassicMode));
+    context.SyncBytes(&Challenge::msVSLegacyMode, sizeof(Challenge::msVSLegacyMode));
     SyncSpectatorValues(context, VSSetupMenu::msNextFirstPick, VSSetupMenu::msNextSidePickPlayerIndex, gGamepad1ToPlayerIndex);
     SyncSpectatorValues(context, Challenge::gVSResourseDropMode, Challenge::gVSResourceDropCount, Challenge::gVSWinMode, Challenge::gVSSuddenDeathMode);
     context.SyncBytes(gFreeForFristShuffle, sizeof(gFreeForFristShuffle));
@@ -653,7 +653,7 @@ bool ApplyRuntimeSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMo
     app->mGameScene = scene.scene;
     app->mBoard->mBackground = gVSBackground = scene.background;
     Challenge::msVSShuffleMode = scene.shuffle;
-    Challenge::msVSClassicMode = scene.classic;
+    Challenge::msVSLegacyMode = scene.legacy;
     // Create the local widgets before restoring the effect arrays. The chooser
     // constructor skips its local clock; restore the host's clock ID below.
     if (scene.setup) {

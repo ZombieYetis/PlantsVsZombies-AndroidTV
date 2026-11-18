@@ -174,6 +174,15 @@ class Zombie;
 class GridItem;
 class TodParticleSystem;
 
+struct LightningReedTarget {
+    Zombie *mZombie{};
+    GridItem *mGridItem{};
+    Sexy::Rect mRect;
+    int mRow{};
+    int mX{};
+    int mY{};
+};
+
 class Plant : public GameObject {
 public:
     SeedType mSeedType;                        // 13
@@ -294,6 +303,7 @@ public:
     void DoSpecial();
     void DoSpecial_Origin();
     void IceAZombie(Zombie *theZombie);
+    bool CanTargetRow(int theTargetRow, int theSingleRow) const;
     Zombie *FindTargetZombie(int theRow, PlantWeapon thePlantWeapon);
     bool FindStarFruitTarget();
     GridItem *FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon);
@@ -325,6 +335,7 @@ public:
     void AnimateSweetPotato();
     void AnimatePeanut();
     void AnimateEndurian();
+    void AnimateLightningReed();
     void PlayBodyReanim(const char *theTrackName, ReanimLoopType theLoopType, int theBlendTime, float theAnimRate);
     void SpikeweedAttack();
     void SpikeRockTakeDamage();
@@ -343,6 +354,7 @@ public:
     void LaunchRedStinger();
     void UpdateRedStingerShooting();
     void RedStingerFire();
+    void LightningReedFire();
     void UpdateShooter();
     void LaunchPeanut();
     void CobCannonFire(int theTargetX, int theTargetY);
@@ -376,6 +388,7 @@ public:
     void UpdateEndurian();
     bool HasActiveBoomerang();
     void UpdateBloomerang();
+    void BloomerangFire();
     int CalcRenderOrder();
 };
 
@@ -436,7 +449,6 @@ inline void (*old_Plant_UpdateShooter)(Plant *);
 
 inline void (*old_Plant_DoRowAreaDamage)(Plant *, int, unsigned int);
 
-inline bool (*old_Plant_FindTargetAndFire)(Plant *, int, PlantWeapon);
 
 inline int (*old_Plant_CobCannonFire)(Plant *plant, int x, int y);
 int Plant_CobCannonFire(Plant *plant, int x, int y);

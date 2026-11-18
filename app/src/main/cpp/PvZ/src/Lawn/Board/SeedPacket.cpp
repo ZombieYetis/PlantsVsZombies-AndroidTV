@@ -193,7 +193,7 @@ void SeedPacket::SetPacketType(SeedType theSeedType, SeedType theImitaterType) {
         mActive = true;
     }
 
-    if (Challenge::msVSClassicMode) {
+    if (Challenge::msVSLegacyMode) {
         return;
     }
 
@@ -482,6 +482,11 @@ void DrawSeedPacket(Sexy::Graphics *g,
         case SeedType::SEED_ENDURIAN:
         case SeedType::SEED_RED_STINGER:
             offsetY = 12.0f;
+            offsetX = 8.0f;
+            theDrawScale = 0.4f;
+            break;
+        case SeedType::SEED_LIGHTNING_REED:
+            offsetY = 15.0f;
             offsetX = 8.0f;
             theDrawScale = 0.4f;
             break;

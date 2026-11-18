@@ -678,7 +678,7 @@ void Challenge::InitLevel() {
         }
     } else {
         Challenge::msVSShuffleMode = false;
-        Challenge::msVSClassicMode = false;
+        Challenge::msVSLegacyMode = false;
     }
 }
 

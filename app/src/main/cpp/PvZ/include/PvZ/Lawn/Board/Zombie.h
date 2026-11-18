@@ -492,6 +492,8 @@ public:
     void DrawBossPart(Sexy::Graphics *g, int theBossPart);
     bool IsGargantuar() const;
     static bool IsGargantuar(ZombieType theZombieType);
+    bool IsImp() const;
+    static bool IsImp(ZombieType theZombieType);
     static bool IsZombotany(ZombieType theZombieType);
     static bool IsZomblob(ZombieType theZombieType);
     static bool ZombieTypeCanGoInPool(ZombieType theZombieType);
@@ -586,8 +588,11 @@ public:
     void PickRandomSpeed();
     void ApplySyncedSpeed(float theVelX, short theAnimTicks);
     float ZombieTargetLeadX(float theTime);
+    void ApplyElectrocution();
+    void ApplyElectrocution_Origin();
     void ApplyBurn();
     void ApplyBurn_Origin();
+    void ApplyAshDeath(bool theElectrocuted);
     void ApplyButter();
     void ApplyChill(bool theIsIceTrap);
     void HitIceTrap();

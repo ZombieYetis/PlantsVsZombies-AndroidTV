@@ -46,7 +46,9 @@
 #include <cmath>
 
 #include <algorithm>
+#include <limits>
 #include <numbers>
+#include <vector>
 
 using namespace Sexy;
 
@@ -118,6 +120,7 @@ PlantDefinition gExtendedPlantDefs[]{
     {SeedType::SEED_PEANUT, nullptr, ReanimationType::REANIM_PEANUT, 0, 150, 3000, PlantSubClass::SUBCLASS_SHOOTER, 200, "PEANUT"},
     {SeedType::SEED_ENDURIAN, nullptr, ReanimationType::REANIM_ENDURIAN, 0, 75, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "ENDURIAN"},
     {SeedType::SEED_RED_STINGER, nullptr, ReanimationType::REANIM_RED_STINGER, 0, 150, 750, PlantSubClass::SUBCLASS_SHOOTER, 250, "RED_STINGER"},
+    {SeedType::SEED_LIGHTNING_REED, nullptr, ReanimationType::REANIM_LIGHTNING_REED, 0, 125, 750, PlantSubClass::SUBCLASS_SHOOTER, 150, "LIGHTNING_REED"},
     {SeedType::SEED_IMP_PEAR, nullptr, ReanimationType::REANIM_IMP_PEAR, 0, 100, 3000, PlantSubClass::SUBCLASS_NORMAL, 0, "IMP_PEAR"},
     {SeedType::SEED_AKEE, nullptr, ReanimationType::REANIM_AKEE, 0, 175, 750, PlantSubClass::SUBCLASS_SHOOTER, 300, "AKEE"},
 };
@@ -165,6 +168,9 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
             UpdateReanim();
             break;
         }
+        case SeedType::SEED_LIGHTNING_REED:
+            AnimateLightningReed();
+            break;
         default:
             break;
     }
@@ -220,6 +226,8 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon) const {
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 9 : 1; // 下方的头可攻击地面僵尸和僵尸狗
         case SeedType::SEED_RED_STINGER:
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 13 : 1;
+        case SeedType::SEED_LIGHTNING_REED:
+            return 11; // 地面、飞行目标及僵尸狗。
         case SeedType::SEED_CHERRYBOMB:
         case SeedType::SEED_JALAPENO:
         case SeedType::SEED_COBCANNON:
@@ -429,6 +437,8 @@ void Plant::Animate() {
         AnimatePeanut();
     } else if (mSeedType == SeedType::SEED_ENDURIAN) {
         AnimateEndurian();
+    } else if (mSeedType == SeedType::SEED_LIGHTNING_REED) {
+        AnimateLightningReed();
     }
 
     UpdateBlink();
@@ -532,6 +542,13 @@ void Plant::AnimateEndurian() {
         aBodyReanim->SetImageOverride("Endurian_body", nullptr);
         aBodyReanim->SetImageOverride("Endurian_stem", nullptr);
     }
+}
+
+void Plant::AnimateLightningReed() {
+    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+    // 陆地按昼夜切换小草，水路隐藏小草；移回陆地时恢复显示。
+    aBodyReanim->SetImageOverride("anim_grass", mBoard != nullptr && mBoard->StageIsNight() ? addonImages.IMAGE_REANIM_LIGHTNING_REED_GRASS_NIGHT : nullptr);
+    aBodyReanim->HideTrack("anim_grass", mBoard != nullptr && IsOnBoard() && mBoard->IsPoolSquare(mPlantCol, mRow));
 }
 
 void Plant::Update() {
@@ -829,6 +846,153 @@ bool Plant::HasActiveBoomerang() {
         }
     }
     return false;
+}
+
+void Plant::BloomerangFire() {
+    mApp->PlayFoley(FoleyType::FOLEY_BLOOMERANG);
+
+    const int aOriginX = mX + 10;
+    const int aOriginY = mY - 18 - (mBoard->GetFlowerPotAt(mPlantCol, mRow) ? 5 : 0);
+    Projectile *aProjectile = mBoard->AddProjectile(aOriginX, aOriginY, mRenderOrder - 1, mRow, ProjectileType::PROJECTILE_BOOMERANG);
+    aProjectile->mDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
+    aProjectile->mRelatedPlantID = mBoard->PlantGetID(this);
+    aProjectile->mVelX = 6.6f; // 直线子弹的两倍速
+
+    // 发射时预先锁定本行最靠前的三个目标，并在最远锁定目标的 X + 60 处停留后折返。
+    // mHitZombieIDs / mHitGridItemIDs 保存锁定名单；mHitTorchwoodGridX 保存去程命中位图；mCobTargetRow 保存回程命中位图。
+    constexpr int BOOMERANG_MAX_TARGETS = 3;
+
+    struct BoomerangLockedTarget {
+        float mTargetX;
+        ZombieID mZombieID;
+        GridItemID mGridItemID;
+    };
+
+    BoomerangLockedTarget aLockedTargets[BOOMERANG_MAX_TARGETS];
+    int aLockedTargetCount = 0;
+
+    auto AddBoomerangTarget = [&](float theTargetX, ZombieID theZombieID, GridItemID theGridItemID) {
+        if (theTargetX + 40.0f < static_cast<float>(aOriginX)) {
+            return;
+        }
+
+        int anInsertIndex = aLockedTargetCount;
+        if (aLockedTargetCount < BOOMERANG_MAX_TARGETS) {
+            ++aLockedTargetCount;
+        } else {
+            if (theTargetX >= aLockedTargets[BOOMERANG_MAX_TARGETS - 1].mTargetX) {
+                return;
+            }
+            anInsertIndex = BOOMERANG_MAX_TARGETS - 1;
+        }
+
+        while (anInsertIndex > 0 && theTargetX < aLockedTargets[anInsertIndex - 1].mTargetX) {
+            aLockedTargets[anInsertIndex] = aLockedTargets[anInsertIndex - 1];
+            --anInsertIndex;
+        }
+
+        aLockedTargets[anInsertIndex] = {theTargetX, theZombieID, theGridItemID};
+    };
+
+    Zombie *aZombie = nullptr;
+    while (mBoard->IterateZombies(aZombie)) {
+        if (aZombie->mDead) {
+            continue;
+        }
+        if (aZombie->mZombieType != ZombieType::ZOMBIE_BOSS && aZombie->mRow != mRow) {
+            continue;
+        }
+        if (!aZombie->EffectedByDamage(static_cast<unsigned int>(aProjectile->mDamageRangeFlags))) {
+            continue;
+        }
+        if (aZombie->mOnHighGround && !IsOnHighGround()) {
+            continue;
+        }
+
+        const Rect aZombieRect = aZombie->GetZombieRect();
+        if (aZombieRect.mX + aZombieRect.mWidth <= aOriginX) {
+            continue;
+        }
+
+        AddBoomerangTarget(float(aZombie->mX), mBoard->ZombieGetID(aZombie), GridItemID::GRIDITEMID_NULL);
+    }
+
+    {
+        bool aHasGravestoneInRow = false;
+        GridItem *aGridItem = nullptr;
+        while (mBoard->IterateGridItems(aGridItem)) {
+            if (!aGridItem->IsPlantAttackTarget()) {
+                continue;
+            }
+            if (aGridItem->mGridY == mRow
+                && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile())) {
+                aHasGravestoneInRow = true;
+                break;
+            }
+        }
+
+        // 墓碑只锁定本行最靠近回旋镖射手的一个。
+        GridItem *aClosestGravestone = nullptr;
+        float aClosestGravestoneX = 0.0f;
+
+        aGridItem = nullptr;
+        while (mBoard->IterateGridItems(aGridItem)) {
+            if (!aGridItem->IsPlantAttackTarget()) {
+                continue;
+            }
+            if (aGridItem->mGridY != mRow) {
+                continue;
+            }
+
+            if (aHasGravestoneInRow && aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
+                continue;
+            }
+
+            const bool aIsGravestone =
+                aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile();
+
+            const Rect aGridItemRect = aGridItem->GetItemRect();
+            if (aGridItemRect.mX + aGridItemRect.mWidth <= aOriginX) {
+                continue;
+            }
+
+            if (aIsGravestone) {
+                const float aGridItemX = float(aGridItemRect.mX);
+                if (aClosestGravestone == nullptr || aGridItemX < aClosestGravestoneX) {
+                    aClosestGravestone = aGridItem;
+                    aClosestGravestoneX = aGridItemX;
+                }
+                continue;
+            }
+
+            AddBoomerangTarget(float(aGridItemRect.mX), ZombieID::ZOMBIEID_NULL, mBoard->GridItemGetID(aGridItem));
+        }
+
+        if (aClosestGravestone != nullptr) {
+            AddBoomerangTarget(aClosestGravestoneX, ZombieID::ZOMBIEID_NULL, mBoard->GridItemGetID(aClosestGravestone));
+        }
+    }
+
+    for (int i = 0; i < BOOMERANG_MAX_TARGETS; ++i) {
+        aProjectile->mHitZombieIDs[i] = ZombieID::ZOMBIEID_NULL;
+        aProjectile->mHitGridItemIDs[i] = GridItemID::GRIDITEMID_NULL;
+    }
+
+    for (int i = 0; i < aLockedTargetCount; ++i) {
+        aProjectile->mHitZombieIDs[i] = aLockedTargets[i].mZombieID;
+        aProjectile->mHitGridItemIDs[i] = aLockedTargets[i].mGridItemID;
+    }
+
+    aProjectile->mPierceHitCount = aLockedTargetCount;
+    aProjectile->mHitTorchwoodGridX = 0;
+    aProjectile->mCobTargetRow = 0;
+
+    if (aLockedTargetCount > 0) {
+        aProjectile->mCobTargetX = aLockedTargets[aLockedTargetCount - 1].mTargetX + 60.0f;
+    } else {
+        // 动画期间目标全部消失时，保留一个安全的出界折返点。
+        aProjectile->mCobTargetX = 790.0f;
+    }
 }
 
 void Plant::UpdateBloomerang() {
@@ -1881,10 +2045,6 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags) {
 }
 
 void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon, GridItem *theTargetGridItem) {
-    if (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon != PlantWeapon::WEAPON_SECONDARY) {
-        RedStingerFire();
-        return;
-    }
     if (mSeedType == SeedType::SEED_FUMESHROOM) {
         DoRowAreaDamage(20, 2U);
         mApp->PlayFoley(FoleyType::FOLEY_FUME);
@@ -1896,6 +2056,18 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
     }
     if (mSeedType == SeedType::SEED_STARFRUIT) {
         StarFruitFire();
+        return;
+    }
+    if (mSeedType == SeedType::SEED_BLOOMERANG) {
+        BloomerangFire();
+        return;
+    }
+    if (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon != PlantWeapon::WEAPON_SECONDARY) {
+        RedStingerFire();
+        return;
+    }
+    if (mSeedType == SeedType::SEED_LIGHTNING_REED) {
+        LightningReedFire();
         return;
     }
 
@@ -1939,9 +2111,6 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
             break;
         case SeedType::SEED_SPORESHROOM:
             aProjectileType = ProjectileType::PROJECTILE_SPORE;
-            break;
-        case SeedType::SEED_BLOOMERANG:
-            aProjectileType = ProjectileType::PROJECTILE_BOOMERANG;
             break;
         case SeedType::SEED_AKEE:
             aProjectileType = ProjectileType::PROJECTILE_ACKEE;
@@ -2035,9 +2204,6 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
     } else if (mSeedType == SeedType::SEED_COBCANNON) {
         aOriginX = mX - 44;
         aOriginY = mY - 184;
-    } else if (mSeedType == SeedType::SEED_BLOOMERANG) {
-        aOriginX = mX + 10;
-        aOriginY = mY - 18;
     } else if (mSeedType == SeedType::SEED_PEANUT) {
         const bool aTopHeadIsFiring = thePlantWeapon == PlantWeapon::WEAPON_PRIMARY;
         aOriginX = mX + 30;
@@ -2066,149 +2232,6 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
 
     Projectile *aProjectile = mBoard->AddProjectile(aOriginX, aOriginY, mRenderOrder - 1, theRow, aProjectileType);
     aProjectile->mDamageRangeFlags = GetDamageRangeFlags(thePlantWeapon);
-
-    if (mSeedType == SeedType::SEED_BLOOMERANG) {
-        aProjectile->mRelatedPlantID = mBoard->PlantGetID(this);
-        aProjectile->mVelX = 6.6f; // 直线子弹的两倍速
-
-        // 发射时预先锁定本行最靠前的三个目标，并在最远锁定目标的 X + 60 处停留后折返。
-        // mHitZombieIDs / mHitGridItemIDs 保存锁定名单；mHitTorchwoodGridX 保存去程命中位图；mCobTargetRow 保存回程命中位图。
-        constexpr int BOOMERANG_MAX_TARGETS = 3;
-
-        struct BoomerangLockedTarget {
-            float mTargetX;
-            ZombieID mZombieID;
-            GridItemID mGridItemID;
-        };
-
-        BoomerangLockedTarget aLockedTargets[BOOMERANG_MAX_TARGETS];
-        int aLockedTargetCount = 0;
-
-        auto AddBoomerangTarget = [&](float theTargetX, ZombieID theZombieID, GridItemID theGridItemID) {
-            if (theTargetX + 40.0f < static_cast<float>(aOriginX)) {
-                return;
-            }
-
-            int anInsertIndex = aLockedTargetCount;
-            if (aLockedTargetCount < BOOMERANG_MAX_TARGETS) {
-                ++aLockedTargetCount;
-            } else {
-                if (theTargetX >= aLockedTargets[BOOMERANG_MAX_TARGETS - 1].mTargetX) {
-                    return;
-                }
-                anInsertIndex = BOOMERANG_MAX_TARGETS - 1;
-            }
-
-            while (anInsertIndex > 0 && theTargetX < aLockedTargets[anInsertIndex - 1].mTargetX) {
-                aLockedTargets[anInsertIndex] = aLockedTargets[anInsertIndex - 1];
-                --anInsertIndex;
-            }
-
-            aLockedTargets[anInsertIndex] = {theTargetX, theZombieID, theGridItemID};
-        };
-
-        Zombie *aZombie = nullptr;
-        while (mBoard->IterateZombies(aZombie)) {
-            if (aZombie->mDead) {
-                continue;
-            }
-            if (aZombie->mZombieType != ZombieType::ZOMBIE_BOSS && aZombie->mRow != theRow) {
-                continue;
-            }
-            if (!aZombie->EffectedByDamage(static_cast<unsigned int>(aProjectile->mDamageRangeFlags))) {
-                continue;
-            }
-            if (aZombie->mOnHighGround && !IsOnHighGround()) {
-                continue;
-            }
-
-            const Rect aZombieRect = aZombie->GetZombieRect();
-            if (aZombieRect.mX + aZombieRect.mWidth <= aOriginX) {
-                continue;
-            }
-
-            AddBoomerangTarget(float(aZombie->mX), mBoard->ZombieGetID(aZombie), GridItemID::GRIDITEMID_NULL);
-        }
-
-        {
-            bool aHasGravestoneInRow = false;
-            GridItem *aGridItem = nullptr;
-            while (mBoard->IterateGridItems(aGridItem)) {
-                if (!aGridItem->IsPlantAttackTarget()) {
-                    continue;
-                }
-                if (aGridItem->mGridY == theRow
-                    && (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile())) {
-                    aHasGravestoneInRow = true;
-                    break;
-                }
-            }
-
-            // 墓碑只锁定本行最靠近回旋镖射手的一个。
-            GridItem *aClosestGravestone = nullptr;
-            float aClosestGravestoneX = 0.0f;
-
-            aGridItem = nullptr;
-            while (mBoard->IterateGridItems(aGridItem)) {
-                if (!aGridItem->IsPlantAttackTarget()) {
-                    continue;
-                }
-                if (aGridItem->mGridY != theRow) {
-                    continue;
-                }
-
-                if (aHasGravestoneInRow && aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
-                    continue;
-                }
-
-                const bool aIsGravestone =
-                    aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile();
-
-                const Rect aGridItemRect = aGridItem->GetItemRect();
-                if (aGridItemRect.mX + aGridItemRect.mWidth <= aOriginX) {
-                    continue;
-                }
-
-                if (aIsGravestone) {
-                    const float aGridItemX = float(aGridItemRect.mX);
-                    if (aClosestGravestone == nullptr || aGridItemX < aClosestGravestoneX) {
-                        aClosestGravestone = aGridItem;
-                        aClosestGravestoneX = aGridItemX;
-                    }
-                    continue;
-                }
-
-                AddBoomerangTarget(float(aGridItemRect.mX), ZombieID::ZOMBIEID_NULL, mBoard->GridItemGetID(aGridItem));
-            }
-
-            if (aClosestGravestone != nullptr) {
-                AddBoomerangTarget(aClosestGravestoneX, ZombieID::ZOMBIEID_NULL, mBoard->GridItemGetID(aClosestGravestone));
-            }
-        }
-
-        for (int i = 0; i < BOOMERANG_MAX_TARGETS; ++i) {
-            aProjectile->mHitZombieIDs[i] = ZombieID::ZOMBIEID_NULL;
-            aProjectile->mHitGridItemIDs[i] = GridItemID::GRIDITEMID_NULL;
-        }
-
-        for (int i = 0; i < aLockedTargetCount; ++i) {
-            aProjectile->mHitZombieIDs[i] = aLockedTargets[i].mZombieID;
-            aProjectile->mHitGridItemIDs[i] = aLockedTargets[i].mGridItemID;
-        }
-
-        aProjectile->mPierceHitCount = aLockedTargetCount;
-        aProjectile->mHitTorchwoodGridX = 0;
-        aProjectile->mCobTargetRow = 0;
-
-        if (aLockedTargetCount > 0) {
-            aProjectile->mCobTargetX = aLockedTargets[aLockedTargetCount - 1].mTargetX + 60.0f;
-        } else {
-            // 动画期间目标全部消失时，保留一个安全的出界折返点。
-            aProjectile->mCobTargetX = 790.0f;
-        }
-
-        return;
-    }
 
     if (mSeedType == SeedType::SEED_CABBAGEPULT || mSeedType == SeedType::SEED_KERNELPULT || mSeedType == SeedType::SEED_MELONPULT || mSeedType == SeedType::SEED_WINTERMELON
         || mSeedType == SeedType::SEED_SPORESHROOM || mSeedType == SeedType::SEED_AKEE || (mSeedType == SeedType::SEED_RED_STINGER && thePlantWeapon == PlantWeapon::WEAPON_SECONDARY)) {
@@ -2291,6 +2314,13 @@ void Plant::Fire_Origin(Zombie *theTargetZombie, int theRow, PlantWeapon thePlan
     }
 }
 
+bool Plant::CanTargetRow(int theTargetRow, int theSingleRow) const {
+    if (mSeedType == SEED_THREEPEATER || mSeedType == SEED_LIGHTNING_REED) {
+        return theTargetRow == mRow || (std::abs(theTargetRow - mRow) == 1 && mBoard->RowCanHaveZombies(theTargetRow));
+    }
+    return theTargetRow == theSingleRow;
+}
+
 Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
     int aDamageRangeFlags = GetDamageRangeFlags(thePlantWeapon);
     Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
@@ -2303,10 +2333,7 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
             continue; // 专门判定土豆雷、大嘴花、地刺无法攻击气球僵尸，以解决对战时地刺打气球的BUG
         }
 
-        int aRowDeviation = aZombie->mRow - theRow;
-        if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS) {
-            aRowDeviation = 0;
-        }
+        const int aZombieRow = aZombie->mZombieType == ZOMBIE_BOSS ? theRow : aZombie->mRow;
 
         if (!aZombie->mHasHead || aZombie->IsTangleKelpTarget()) {
             if (mSeedType == SeedType::SEED_POTATOMINE || mSeedType == SeedType::SEED_CHOMPER || mSeedType == SeedType::SEED_TANGLEKELP || mSeedType == SeedType::SEED_ICEBERG_LETTUCE
@@ -2324,14 +2351,14 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
 
         if (mSeedType != SeedType::SEED_CATTAIL) {
             if (mSeedType == SeedType::SEED_GLOOMSHROOM) {
-                if (aRowDeviation < -1 || aRowDeviation > 1) {
+                if (std::abs(aZombieRow - theRow) > 1) {
                     continue;
                 }
             } else if (needPortalCheck) {
                 if (!mBoard->mChallenge->CanTargetZombieWithPortals(this, aZombie)) {
                     continue;
                 }
-            } else if (aRowDeviation) {
+            } else if (!CanTargetRow(aZombieRow, theRow)) {
                 continue;
             }
         }
@@ -2416,10 +2443,23 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
             ////////////////////
 
             int aWeight = -aZombieRect.mX;
-            if (mSeedType == SeedType::SEED_BONK_CHOY) {
+            auto aPosX = float(mX) + 40.0f;
+            auto aPosY = float(mY) + 40.0f;
+            auto aZombieCenterX = float(aZombieRect.mX) + float(aZombieRect.mWidth) / 2.0f;
+            auto aZombieCenterY = float(aZombieRect.mY) + float(aZombieRect.mHeight) / 2.0f;
+            if (mSeedType == SEED_CATTAIL) {
+                aWeight = -int(Distance2D(aPosX, aPosY, aZombieCenterX, aZombieCenterY));
+                if (aZombie->IsFlying()) {
+                    aWeight += 10000; // 优先攻击飞行单位
+                }
+            } else if (mSeedType == SeedType::SEED_ICEBERG_LETTUCE) {
+                if (aZombie->mZombieType == ZombieType::ZOMBIE_EXPLORER) {
+                    aWeight += 10000; // 优先攻击探险家僵尸
+                }
+            } else if (mSeedType == SeedType::SEED_BONK_CHOY) {
                 const float aPlantCenterX = static_cast<float>(mX) + 40.0f;
-                const float aZombieLeft = static_cast<float>(aZombieRect.mX);
-                const float aZombieRight = static_cast<float>(aZombieRect.mX + aZombieRect.mWidth);
+                const auto aZombieLeft = static_cast<float>(aZombieRect.mX);
+                const auto aZombieRight = static_cast<float>(aZombieRect.mX + aZombieRect.mWidth);
                 const float aNearestTargetX = std::clamp(aPlantCenterX, aZombieLeft, aZombieRight);
                 const float aDistance = std::abs(aNearestTargetX - aPlantCenterX);
                 const bool aZombieIsBehind = aZombieLeft + static_cast<float>(aZombieRect.mWidth) * 0.5f < aPlantCenterX;
@@ -2428,17 +2468,8 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
                 if (!aZombieIsBehind) {
                     ++aWeight; // 距离相同时优先右侧。
                 }
-            } else if (mSeedType == SeedType::SEED_CATTAIL) {
-                aWeight = -Distance2D(mX + 40.0f, mY + 40.0f, aZombieRect.mX + aZombieRect.mWidth / 2.0f, aZombieRect.mY + aZombieRect.mHeight / 2.0f);
-                if (aZombie->IsFlying()) {
-                    aWeight += 10000; // 优先攻击飞行单位
-                }
-            }
-
-            if (mSeedType == SeedType::SEED_ICEBERG_LETTUCE) {
-                if (aZombie->mZombieType == ZombieType::ZOMBIE_EXPLORER) {
-                    aWeight += 10000; // 优先攻击探险家僵尸
-                }
+            } else if (mSeedType == SEED_LIGHTNING_REED) {
+                aWeight = -int(Distance2D(aPosX, aPosY, aZombieCenterX, aZombieCenterY));
             }
 
             if (aBestZombie == nullptr || aWeight > aHighestWeight) {
@@ -2692,7 +2723,7 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
         return aBestGridItem;
     }
 
-    int aLastTargetX = 0;
+    int aHighestWeight = 0;
     GridItem *aBestGridItem = nullptr;
 
     GridItem *aGridItem = nullptr;
@@ -2719,19 +2750,28 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 if (abs(aGridX - mPlantCol) > 1 || abs(aGridY - mRow) > 1) {
                     continue;
                 }
-            } else if (mSeedType == SeedType::SEED_THREEPEATER ? abs(aGridY - aRow) > 1 : aGridY != aRow) {
-                // 如果是三线射手，则索敌三行; 反之，索敌一行
+            } else if (!CanTargetRow(aGridY, aRow)) {
                 continue;
             }
 
-            const int aTargetX = aGridItem->IsSkeletonPile() ? aGridItem->GetItemRect().mX : mBoard->GridToPixelX(aGridX, aGridY);
-            if (aBestGridItem == nullptr || aTargetX < aLastTargetX) {
+            int aWeight;
+            if (mSeedType == SEED_LIGHTNING_REED) {
+                const Rect aRect = aGridItem->GetItemRect();
+                if (GetRectOverlap(GetPlantAttackRect(thePlantWeapon), aRect) < 0) {
+                    continue;
+                }
+                aWeight = -int(Distance2D(float(mX) + 40.0f, float(mY) + 40.0f, float(aRect.mX) + float(aRect.mWidth) / 2.0f, float(aRect.mY) + float(aRect.mHeight) / 2.0f));
+            } else {
+                const int aTargetX = aGridItem->IsSkeletonPile() ? aGridItem->GetItemRect().mX : mBoard->GridToPixelX(aGridX, aGridY);
+                aWeight = -aTargetX;
+            }
+            if (aBestGridItem == nullptr || aWeight > aHighestWeight) {
                 if ((mSeedType == SeedType::SEED_FUMESHROOM || mSeedType == SeedType::SEED_PEANUT) && aGridX - mPlantCol > 3) {
                     // 如果是大喷菇或花生射手，则索敌三格以内的靶子或墓碑
                     continue;
                 }
                 if (mSeedType == SeedType::SEED_PUFFSHROOM || mSeedType == SeedType::SEED_SEASHROOM) {
-                    //                    if (!Challenge::msVSClassicMode && aGridX - mPlantCol > 2) {
+                    //                    if (!Challenge::msVSLegacyMode && aGridX - mPlantCol > 2) {
                     //                        continue;
                     //                    }
                     // 如果是小喷菇或水兵菇，则索敌三格以内的墓碑
@@ -2745,7 +2785,7 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 }
 
                 aBestGridItem = aGridItem;
-                aLastTargetX = aTargetX;
+                aHighestWeight = aWeight;
             }
         }
     }
@@ -2819,7 +2859,7 @@ PlantDefinition &GetPlantDefinition(SeedType theSeedType) {
     return gPlantDefs[theSeedType];
 }
 
-static int GetVSCostClassic(SeedType theSeedType) {
+static int GetVSCostLegacy(SeedType theSeedType) {
     switch (theSeedType) {
         case SeedType::SEED_INSTANT_COFFEE:
         case SeedType::SEED_ZOMBIE_NORMAL:
@@ -2867,7 +2907,7 @@ static int GetVSCostClassic(SeedType theSeedType) {
     }
 }
 
-static int GetVSRefreshTimeClassic(SeedType theSeedType) {
+static int GetVSRefreshTimeLegacy(SeedType theSeedType) {
     if (Challenge::IsMPSeedType(theSeedType)) {
         switch (theSeedType) {
             case SeedType::SEED_ZOMBIE_TRASHCAN:
@@ -2958,6 +2998,7 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_SPLITPEA: // 125 -> 100
         case SeedType::SEED_SWEET_POTATO:
         case SeedType::SEED_RED_STINGER:
+        case SeedType::SEED_LIGHTNING_REED:
         case SeedType::SEED_ZOMBIE_CATAPULT: // 200 -> 100
         case SeedType::SEED_ZOMBIE_BALLOON:
         case SeedType::SEED_ZOMBIE_WALLNUT_HEAD:
@@ -3007,7 +3048,7 @@ static int GetVSCost(SeedType theSeedType) {
             aCost = 300;
             break;
         default:
-            aCost = GetVSCostClassic(theSeedType);
+            aCost = GetVSCostLegacy(theSeedType);
             break;
     }
 
@@ -3094,7 +3135,7 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_CHILLY_PEPPER:
             return 6000;
         default:
-            return GetVSRefreshTimeClassic(theSeedType);
+            return GetVSRefreshTimeLegacy(theSeedType);
     }
 }
 
@@ -3152,7 +3193,7 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType) {
         if (Challenge::msVSShuffleMode) {
             return GetVSCostShuffle(theSeedType);
         }
-        return Challenge::msVSClassicMode ? GetVSCostClassic(theSeedType) : GetVSCost(theSeedType);
+        return Challenge::msVSLegacyMode ? GetVSCostLegacy(theSeedType) : GetVSCost(theSeedType);
     } else {
         switch (theSeedType) {
             case SeedType::SEED_SLOT_MACHINE_SUN:
@@ -3224,7 +3265,7 @@ int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType) {
     if (theSeedType == SeedType::SEED_IMITATER && theImitaterType != SeedType::SEED_NONE) {
         theSeedType = theImitaterType;
     }
-    const int aRefreshTime = Challenge::msVSClassicMode ? GetVSRefreshTimeClassic(theSeedType) : GetVSRefreshTime(theSeedType);
+    const int aRefreshTime = Challenge::msVSLegacyMode ? GetVSRefreshTimeLegacy(theSeedType) : GetVSRefreshTime(theSeedType);
     if (!gLawnApp->mBoard->mChallenge->IsMPSuddenDeath() || Challenge::gVSSuddenDeathMode != 1) {
         return aRefreshTime;
     }
@@ -3232,7 +3273,7 @@ int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType) {
     if (IsDefender(theSeedType) || theSeedType == SeedType::SEED_ZOMBIE_TRASHCAN || theSeedType == SeedType::SEED_ZOMBIE_SCREEN_DOOR) {
         return aRefreshTime;
     }
-    if (Challenge::msVSClassicMode) {
+    if (Challenge::msVSLegacyMode) {
         return aRefreshTime / 3;
     }
 
@@ -3399,7 +3440,7 @@ pvzstl::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterTy
 }
 
 pvzstl::string Plant::GetToolTip(SeedType theSeedType) {
-    if (theSeedType == SeedType::SEED_CACTUS && gLawnApp->IsVSMode() && !Challenge::msVSClassicMode) {
+    if (theSeedType == SeedType::SEED_CACTUS && gLawnApp->IsVSMode() && !Challenge::msVSLegacyMode) {
         return TodStringTranslate("[CACTUS_TOOLTIP_VS]");
     }
 
@@ -3904,6 +3945,123 @@ void Plant::UpdateRedStingerShooting() {
     }
 }
 
+namespace {
+
+std::vector<LightningReedTarget> GetLightningReedChain(Plant *thePlant) {
+    Zombie *aPrimaryZombie = thePlant->FindTargetZombie(thePlant->mRow, WEAPON_PRIMARY);
+    GridItem *aPrimaryItem = thePlant->FindTargetGridItem(thePlant->mRow, WEAPON_PRIMARY);
+    if (!aPrimaryZombie && !aPrimaryItem) {
+        return {};
+    }
+
+    const auto aOriginX = float(thePlant->mX) + 40.0f;
+    const auto aOriginY = float(thePlant->mY) + 40.0f;
+    const Rect aZombieRect = aPrimaryZombie ? aPrimaryZombie->GetZombieRect() : Rect{};
+    const Rect aItemRect = aPrimaryItem ? aPrimaryItem->GetItemRect() : Rect{};
+    std::vector<LightningReedTarget> aChain;
+    if (aPrimaryZombie && (!aPrimaryItem || Distance2D(aOriginX, aOriginY, aZombieRect.mX + aZombieRect.mWidth / 2.0f, aZombieRect.mY + aZombieRect.mHeight / 2.0f) <= Distance2D(aOriginX, aOriginY, aItemRect.mX + aItemRect.mWidth / 2.0f, aItemRect.mY + aItemRect.mHeight / 2.0f))) {
+        aChain.push_back({aPrimaryZombie, nullptr, aZombieRect, aPrimaryZombie->mRow, thePlant->mX + 55, thePlant->mY + 15});
+    } else {
+        aChain.push_back({nullptr, aPrimaryItem, aItemRect, aPrimaryItem->mGridY, thePlant->mX + 55, thePlant->mY + 15});
+    }
+
+    // 墓碑等场地物只能被直接命中，连锁阶段只选择僵尸。
+    std::vector<LightningReedTarget> aCandidates;
+    const int aDamageRangeFlags = thePlant->GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
+    Zombie *aZombie = nullptr;
+    while (thePlant->mBoard->IterateZombies(aZombie)) {
+        if (aZombie != aChain.front().mZombie && aZombie->EffectedByDamage(aDamageRangeFlags)) {
+            aCandidates.push_back({aZombie, nullptr, aZombie->GetZombieRect(), aZombie->mRow, 0, 0});
+        }
+    }
+    while (aChain.size() < 5) {
+        int aBestIndex = -1;
+        int aSourceX = 0;
+        int aSourceY = 0;
+        int aBestDistance = std::numeric_limits<int>::max();
+        for (int i = 0; i < static_cast<int>(aCandidates.size()); ++i) {
+            const LightningReedTarget &aTarget = aCandidates[i];
+            // 每个连锁目标必须处于一个已选目标的樱桃炸弹范围内，不能跨越空隙。
+            for (const LightningReedTarget &aPrevious : aChain) {
+                const int aPreviousX = aPrevious.mRect.mX + aPrevious.mRect.mWidth / 2;
+                const int aPreviousY = aPrevious.mRect.mY + aPrevious.mRect.mHeight / 2;
+                if (std::abs(aTarget.mRow - aPrevious.mRow) > 1 || !GetCircleRectOverlap(aPreviousX, aPreviousY, 115, aTarget.mRect)) {
+                    continue;
+                }
+                const int aDX = aTarget.mRect.mX + aTarget.mRect.mWidth / 2 - aPreviousX;
+                const int aDY = aTarget.mRect.mY + aTarget.mRect.mHeight / 2 - aPreviousY;
+                const int aDistance = aDX * aDX + aDY * aDY;
+                if (aDistance < aBestDistance) {
+                    aBestDistance = aDistance;
+                    aBestIndex = i;
+                    aSourceX = aPreviousX;
+                    aSourceY = aPreviousY;
+                }
+            }
+        }
+        if (aBestIndex < 0) {
+            break;
+        }
+        LightningReedTarget aTarget = aCandidates[aBestIndex];
+        aTarget.mX = aSourceX;
+        aTarget.mY = aSourceY;
+        aChain.push_back(aTarget);
+        aCandidates.erase(aCandidates.begin() + aBestIndex);
+    }
+    return aChain;
+}
+
+void DrawLightningReedArc(LawnApp *theApp, const LightningReedTarget &theTarget) {
+    const Rect &aRect = theTarget.mRect;
+    const float aTargetX = aRect.mX + aRect.mWidth * 0.5f;
+    const float aTargetY = aRect.mY + aRect.mHeight * 0.5f;
+    const float aDeltaX = aTargetX - theTarget.mX;
+    const float aDeltaY = aTargetY - theTarget.mY;
+    const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PROJECTILE, theTarget.mRow, 1);
+    const float aDistance = std::sqrt(aDeltaX * aDeltaX + aDeltaY * aDeltaY);
+    const float aAngle = -std::atan2(aDeltaY, aDeltaX);
+    // 相邻段的半透明边缘重叠 6 像素，末段仍收在命中点。
+    constexpr float aJoinOverlap = 6.0f;
+    for (float aEnd = 0.0f; aEnd < aDistance;) {
+        const float aStart = std::max(0.0f, aEnd - aJoinOverlap);
+        aEnd = std::min(aStart + LightningReedBeam::LENGTH, aDistance);
+        Reanimation *aBeam = theApp->AddReanimation(0.0f, 0.0f, aRenderOrder, ReanimationType::REANIM_LIGHTNING_REED_BEAM);
+        if (aBeam == nullptr) {
+            continue;
+        }
+        const bool aSecondAnimation = Sexy::Rand(2) != 0;
+        aBeam->PlayReanim(aSecondAnimation ? "anim2" : "anim1", ReanimLoopType::REANIM_PLAY_ONCE_FULL_LAST_FRAME, 0, 16.0f);
+        aBeam->mOverlayMatrix.LoadIdentity();
+        aBeam->mOverlayMatrix.Translate(0.0f, -LightningReedBeam::AXIS_Y);
+        aBeam->mOverlayMatrix.Scale((aEnd - aStart) / LightningReedBeam::LENGTH, 0.7f);
+        aBeam->mOverlayMatrix.RotateRad(aAngle);
+        aBeam->mOverlayMatrix.Translate(theTarget.mX + aDeltaX * aStart / aDistance, theTarget.mY + aDeltaY * aStart / aDistance);
+    }
+    Reanimation *aHit = theApp->AddReanimation(aTargetX - 40.0f, aTargetY - 40.0f, aRenderOrder + 1, ReanimationType::REANIM_LIGHTNING_REED_HIT);
+    if (aHit != nullptr) {
+        aHit->PlayReanim("anim_hit", ReanimLoopType::REANIM_PLAY_ONCE_FULL_LAST_FRAME, 0, 36.0f);
+    }
+}
+
+} // namespace
+
+void Plant::LightningReedFire() {
+    const auto aChain = GetLightningReedChain(this);
+    for (size_t i = 0; i < aChain.size(); ++i) {
+        const LightningReedTarget &aTarget = aChain[i];
+        DrawLightningReedArc(mApp, aTarget);
+        if (IsRemoteClientOrViewer()) {
+            continue;
+        }
+        const int aDamage = i == 0 ? 15 : 5;
+        if (aTarget.mZombie != nullptr) {
+            aTarget.mZombie->TakeDamage(aDamage, (1U << DamageFlags::DAMAGE_HITS_SHIELD_AND_BODY) | (1U << DamageFlags::DAMAGE_ELECTRIC));
+        } else {
+            aTarget.mGridItem->TakeDamage(aDamage, 0U);
+        }
+    }
+}
+
 void Plant::RedStingerFire() {
     const bool aBurst = mState == PlantState::STATE_RED_STINGER_DYING;
     const int aCount = aBurst ? 12 : 1;
@@ -3926,17 +4084,13 @@ void Plant::RedStingerFire() {
 }
 
 void Plant::LaunchThreepeater() {
-    const int aRowAbove = mRow - 1;
-    const int aRowBelow = mRow + 1;
-    const bool aCanFireAbove = mBoard->RowCanHaveZombies(aRowAbove);
-    const bool aCanFireBelow = mBoard->RowCanHaveZombies(aRowBelow);
-    if (!FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY) && !FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY)
-        && !(aCanFireAbove && (FindTargetZombie(aRowAbove, PlantWeapon::WEAPON_PRIMARY) || FindTargetGridItem(aRowAbove, PlantWeapon::WEAPON_PRIMARY)))
-        && !(aCanFireBelow && (FindTargetZombie(aRowBelow, PlantWeapon::WEAPON_PRIMARY) || FindTargetGridItem(aRowBelow, PlantWeapon::WEAPON_PRIMARY)))) {
+    if (!FindTargetZombie(mRow, WEAPON_PRIMARY) && !FindTargetGridItem(mRow, WEAPON_PRIMARY)) {
         return;
     }
 
-    const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSClassicMode;
+    const bool aCanFireAbove = mBoard->RowCanHaveZombies(mRow - 1);
+    const bool aCanFireBelow = mBoard->RowCanHaveZombies(mRow + 1);
+    const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSLegacyMode;
     const auto aStartHeadShooting = [this](ReanimationID theHeadReanimID, const char *theTrack) {
         Reanimation *aHeadReanim = mApp->ReanimationGet(theHeadReanimID);
         aHeadReanim->StartBlend(10);
@@ -4019,7 +4173,7 @@ void Plant::UpdateShooting() {
         if (mSeedType == SeedType::SEED_THREEPEATER) {
             int aRowAbove = mRow - 1;
             int aRowBelow = mRow + 1;
-            const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSClassicMode;
+            const bool aCompensateEdge = mApp->IsVSMode() && !Challenge::msVSLegacyMode;
             Reanimation *aHeadReanim2 = mApp->ReanimationTryToGet(mHeadReanimID2);
             Reanimation *aHeadReanim3 = mApp->ReanimationTryToGet(mHeadReanimID3);
             Reanimation *aHeadReanim1 = mApp->ReanimationTryToGet(mHeadReanimID);
@@ -4206,6 +4360,8 @@ void Plant::UpdateShooter() {
             }
         } else if (mSeedType == SeedType::SEED_RED_STINGER) {
             FindTargetAndFire(mRow, GetRedStingerForm() == 2 ? PlantWeapon::WEAPON_SECONDARY : PlantWeapon::WEAPON_PRIMARY);
+        } else if (mSeedType == SeedType::SEED_PEANUT) {
+            FindTargetAndFire(mRow, PlantWeapon::WEAPON_SECONDARY);
         } else {
             FindTargetAndFire(mRow, PlantWeapon::WEAPON_PRIMARY);
         }
@@ -4388,6 +4544,16 @@ bool Plant::FindTargetAndFire_Origin(int theRow, PlantWeapon thePlantWeapon) {
     } else if (mSeedType == SEED_CATTAIL) {
         PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 10, 30.0f);
         mShootingCounter = 50;
+    } else if (mSeedType == SEED_BLOOMERANG) {
+        PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
+        mShootingCounter = 65;
+    } else if (mSeedType == SEED_PEANUT) {
+        LaunchPeanut();
+    } else if (mSeedType == SEED_RED_STINGER) {
+        LaunchRedStinger();
+    } else if (mSeedType == SEED_LIGHTNING_REED) {
+        PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
+        mShootingCounter = 49;
     } else if (aBodyReanim != nullptr && aBodyReanim->TrackExists("anim_shooting")) {
         PlayBodyReanim("anim_shooting", REANIM_PLAY_ONCE_AND_HOLD, 20, 35.0f);
         switch (mSeedType) {
@@ -4435,66 +4601,21 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon) {
         return false;
     }
 
-    bool result;
-    if (mSeedType == SeedType::SEED_RED_STINGER) {
-        const int aForm = GetRedStingerForm();
-        // 每轮只启动一次动画，首发、计时补发和收招期间都不能重新启动。
-        if (aForm == 3 || mShootingCounter != 0 || mState == PlantState::STATE_RED_STINGER_DYING) {
-            return false;
-        }
-        // 索敌和联机攻击事件使用当前形态对应的武器。
-        thePlantWeapon = aForm == 2 ? PlantWeapon::WEAPON_SECONDARY : PlantWeapon::WEAPON_PRIMARY;
-        if (FindTargetZombie(theRow, thePlantWeapon) == nullptr && FindTargetGridItem(theRow, thePlantWeapon) == nullptr) {
-            return false;
-        }
-        LaunchRedStinger();
-        result = true;
-    } else if (mSeedType == SeedType::SEED_PEANUT) {
-        Zombie *aZombie = FindTargetZombie(theRow, PlantWeapon::WEAPON_SECONDARY);
-        GridItem *aGridItem = FindTargetGridItem(theRow, PlantWeapon::WEAPON_SECONDARY);
-        if (aZombie == nullptr && aGridItem == nullptr) {
-            return false;
-        }
-
-        LaunchPeanut();
-        result = true;
-    } else if (mSeedType == SeedType::SEED_BLOOMERANG) {
-        if (HasActiveBoomerang() || mState == PlantState::STATE_BLOOMERANG_CATCHING || mState == PlantState::STATE_UMBRELLA_TRIGGERED || mState == PlantState::STATE_UMBRELLA_REFLECTING) {
-            return false;
-        }
-
-        Zombie *aZombie = FindTargetZombie(theRow, thePlantWeapon);
-        GridItem *aGridItem = FindTargetGridItem(theRow, thePlantWeapon);
-        if (aZombie == nullptr && aGridItem == nullptr) {
-            return false;
-        }
-
-        mApp->PlayFoley(FoleyType::FOLEY_BLOOMERANG);
-        PlayBodyReanim("anim_shooting", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
-        mShootingCounter = 65;
-        result = true;
-    } else {
-        result = old_Plant_FindTargetAndFire(this, theRow, thePlantWeapon);
-        if (!result && !mApp->IsVSMode()) {
-            result = FindTargetAndFire_Origin(theRow, thePlantWeapon);
-        }
+    if (!FindTargetAndFire_Origin(theRow, thePlantWeapon)) {
+        return false;
     }
 
-    if (result) {
-        if (IsRemoteServer()) {
-            if (mSeedType == SEED_KERNELPULT) {
-                U8U8U16U16_Event event = {
-                    {EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
-                netplay::PutEvent(event);
-            } else {
-                U8U8U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this))};
-                netplay::PutEvent(event);
-            }
+    if (IsRemoteServer()) {
+        if (mSeedType == SEED_KERNELPULT) {
+            U8U8U16U16_Event event = {
+                {EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this)), uint16_t(mState)};
+            netplay::PutEvent(event);
+        } else {
+            U8U8U16_Event event = {{EventType::EVENT_SERVER_BOARD_PLANT_FINDTARGETANDFIRE}, uint8_t(theRow), uint8_t(thePlantWeapon), uint16_t(mBoard->mPlants.DataArrayGetID(this))};
+            netplay::PutEvent(event);
         }
     }
-
-
-    return result;
+    return true;
 }
 
 void Plant::UpdateGraveBuster() {

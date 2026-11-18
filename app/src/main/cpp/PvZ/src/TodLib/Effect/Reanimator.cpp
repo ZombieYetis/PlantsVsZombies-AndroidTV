@@ -19,13 +19,35 @@
 
 #include "PvZ/TodLib/Effect/Reanimator.h"
 #include "PvZ/Lawn/Common/ConstEnums.h"
+#include "PvZ/Lawn/System/ReanimationLawn.h"
 #include "PvZ/Lawn/Widget/ZombatarWidget.h"
 #include "PvZ/SexyAppFramework/Graphics/Graphics.h"
 
 #include <format>
 #include <regex>
+#include <algorithm>
+#include <cmath>
 
 bool Reanimation::DrawTrack(Sexy::Graphics *g, int theTrackIndex, int theRenderGroup, TodTriangleGroup *theTriangleGroup) {
+    if (mReanimationType == ReanimationType::REANIM_LIGHTNING_REED_BEAM) {
+        Sexy::Graphics aLightningGraphics(*g);
+        const float aStartX = mOverlayMatrix.m01 * LightningReedBeam::AXIS_Y + mOverlayMatrix.m02 + g->mTransX;
+        const float aStartY = mOverlayMatrix.m11 * LightningReedBeam::AXIS_Y + mOverlayMatrix.m12 + g->mTransY;
+        const float aEndX = aStartX + mOverlayMatrix.m00 * LightningReedBeam::LENGTH;
+        const float aEndY = aStartY + mOverlayMatrix.m10 * LightningReedBeam::LENGTH;
+        Sexy::Rect &aClip = aLightningGraphics.mClipRect;
+        // 沿电弧的主要方向裁剪，横向沿用巨人闪电的做法，竖向连锁裁剪 Y。
+        if (std::abs(aEndX - aStartX) >= std::abs(aEndY - aStartY)) {
+            const int aRight = std::min(aClip.mX + aClip.mWidth, int(std::floor(std::max(aStartX, aEndX))));
+            aClip.mX = std::max(aClip.mX, int(std::ceil(std::min(aStartX, aEndX))));
+            aClip.mWidth = std::max(0, aRight - aClip.mX);
+        } else {
+            const int aBottom = std::min(aClip.mY + aClip.mHeight, int(std::floor(std::max(aStartY, aEndY))));
+            aClip.mY = std::max(aClip.mY, int(std::ceil(std::min(aStartY, aEndY))));
+            aClip.mHeight = std::max(0, aBottom - aClip.mY);
+        }
+        return old_Reanimation_DrawTrack(this, &aLightningGraphics, theTrackIndex, theRenderGroup, theTriangleGroup);
+    }
     // 修复模仿者植物变白
     if (mFilterEffect != FilterEffect::FILTEREFFECT_NONE) {
         ReanimatorTransform *reanimatorTransform = mReanimatorTransforms + theTrackIndex;
@@ -145,9 +167,15 @@ static ReanimationParams gExtendedReanimationParamArray[] = {
     {ReanimationType::REANIM_PEANUT, "addonFiles/compiled/reanim/Peanut.reanim", 0},
     {ReanimationType::REANIM_ENDURIAN, "addonFiles/compiled/reanim/Endurian.reanim", 0},
     {ReanimationType::REANIM_RED_STINGER, "addonFiles/compiled/reanim/RedStinger.reanim", 0},
+    {ReanimationType::REANIM_LIGHTNING_REED, "addonFiles/compiled/reanim/LightningReed.reanim", 0},
+    {ReanimationType::REANIM_LIGHTNING_REED_BEAM, "addonFiles/compiled/reanim/lightning_reed_beam.reanim", 0},
+    {ReanimationType::REANIM_LIGHTNING_REED_HIT, "addonFiles/compiled/reanim/lightning_reed_hit.reanim", 0},
     {ReanimationType::REANIM_IMP_PEAR, "addonFiles/compiled/reanim/ImpPear.reanim", 0},
     {ReanimationType::REANIM_AKEE, "addonFiles/compiled/reanim/AKEE.reanim", 0},
     {ReanimationType::REANIM_APPLE_CLOCK, "addonFiles/compiled/reanim/apple_clock.reanim", 0},
+    {ReanimationType::REANIM_ZOMBIE_ELECTROCUTION, "addonFiles/compiled/reanim/Zombie_electrocution.reanim", 0},
+    {ReanimationType::REANIM_ZOMBIE_ELECTROCUTION_IMP, "addonFiles/compiled/reanim/Zombie_electrocution_imp.reanim", 0},
+    {ReanimationType::REANIM_ZOMBIE_ELECTROCUTION_GARGANTUAR, "addonFiles/compiled/reanim/Zombie_electrocution_gargantuar.reanim", 0},
 };
 
 const char *GetReanimationFileName(ReanimationType type) {

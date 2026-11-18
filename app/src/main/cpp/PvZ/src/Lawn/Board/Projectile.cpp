@@ -93,7 +93,7 @@ ProjectileType ResolveInitialProjectileType(ProjectileType theProjectileType) {
 }
 
 bool IsPiercingSpike(const Projectile *theProjectile) {
-    return theProjectile->mApp->IsVSMode() && !Challenge::msVSClassicMode && theProjectile->mProjectileType == ProjectileType::PROJECTILE_SPIKE;
+    return theProjectile->mApp->IsVSMode() && !Challenge::msVSLegacyMode && theProjectile->mProjectileType == ProjectileType::PROJECTILE_SPIKE;
 }
 
 int FindHitZombieSlot(const Projectile *theProjectile, Zombie *theZombie) {

@@ -45,7 +45,7 @@ constexpr int kReplayTicksPerSecond = 100;
 
 void ApplyReplayBackground(int vsBackground) {
     Challenge::msVSShuffleMode = false;
-    Challenge::msVSClassicMode = false;
+    Challenge::msVSLegacyMode = false;
     switch (vsBackground) {
         case 0:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
@@ -68,7 +68,7 @@ void ApplyReplayBackground(int vsBackground) {
             break;
         case -2:
             gVSBackground = BackgroundType::BACKGROUND_1_DAY;
-            Challenge::msVSClassicMode = true;
+            Challenge::msVSLegacyMode = true;
             break;
         default:
             break;

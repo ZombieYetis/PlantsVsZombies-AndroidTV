@@ -1141,8 +1141,9 @@ PlantingReason Board::CanPlantAt(int theGridX, int theGridY, SeedType theSeedTyp
         }
     }
     // 非水生植物不能种在水面上（南瓜头可以种在香蒲上）
+    // 闪电芦苇是两栖植物
     Plant *aPumpkinPlant = aPlantOnLawn.mPumpkinPlant;
-    if (aGridSquare == GridSquareType::GRIDSQUARE_POOL && !aHasLilypad && theSeedType != SeedType::SEED_CATTAIL) {
+    if (aGridSquare == GridSquareType::GRIDSQUARE_POOL && !aHasLilypad && theSeedType != SeedType::SEED_CATTAIL && theSeedType != SeedType::SEED_LIGHTNING_REED) {
         if (!aNormalPlant || aNormalPlant->mSeedType != SeedType::SEED_CATTAIL || theSeedType != SeedType::SEED_PUMPKINSHELL) {
             return PlantingReason::PLANTING_NOT_ON_WATER;
         }
@@ -2821,13 +2822,7 @@ void Board::processServerEvent(const BaseEvent *event) {
                     }
                     break;
                 }
-                if (aPlant->mSeedType == SeedType::SEED_PEANUT) {
-                    aPlant->LaunchPeanut();
-                } else if (aPlant->mSeedType == SeedType::SEED_RED_STINGER) {
-                    aPlant->LaunchRedStinger();
-                } else {
-                    old_Plant_FindTargetAndFire(aPlant, event1->u8_0, PlantWeapon(event1->u8_1));
-                }
+                aPlant->FindTargetAndFire_Origin(event1->u8_0, PlantWeapon(event1->u8_1));
                 // 扩展包在公共字段后附带玉米或黄油状态，先播放起手再校正图层。
                 if (aPlant->mSeedType == SeedType::SEED_KERNELPULT && event->size == sizeof(U8U8U16U16_Event)) {
                     const auto *kernelEvent = static_cast<const U8U8U16U16_Event *>(event);
@@ -2852,9 +2847,6 @@ void Board::processServerEvent(const BaseEvent *event) {
                     aHeadReanim->SetFramesForLayer("anim_head_idle");
                     aHeadReanim->SetAnimRate(aBodyReanim->mAnimRate);
                     aHeadReanim->mAnimTime = aBodyReanim->mAnimTime;
-                }
-                if (aPlant->mSeedType == SeedType::SEED_BLOOMERANG) {
-                    mApp->PlayFoley(FoleyType::FOLEY_BLOOMERANG);
                 }
             }
         } break;
@@ -2925,12 +2917,20 @@ void Board::processServerEvent(const BaseEvent *event) {
             //                PlantsWon_Origin(aGridItem);
             //            }
         } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN: {
-            const auto *burnEvent = static_cast<const U16_Event *>(event);
+        case EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN:
+        case EVENT_SERVER_BOARD_ZOMBIE_APPLY_ELECTROCUTION: {
+            if (event->size != sizeof(U16_Event)) {
+                break;
+            }
+            const uint16_t serverZombieID = static_cast<const U16_Event *>(event)->u16_0;
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, burnEvent->u16_0, clientZombieID)) {
+            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
-                aZombie->ApplyBurn_Origin();
+                if (event->type == EVENT_SERVER_BOARD_ZOMBIE_APPLY_ELECTROCUTION) {
+                    aZombie->ApplyElectrocution_Origin();
+                } else {
+                    aZombie->ApplyBurn_Origin();
+                }
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_DIE: {

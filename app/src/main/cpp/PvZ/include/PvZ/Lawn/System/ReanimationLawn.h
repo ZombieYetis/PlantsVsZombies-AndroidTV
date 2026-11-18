@@ -31,6 +31,12 @@ class MemoryImage;
 
 class LawnApp;
 
+// 两种闪电动画的接头在素材坐标中共用这条轴线，摆放和裁剪使用同一组尺寸。
+namespace LightningReedBeam {
+inline constexpr float AXIS_Y = 43.5f;
+inline constexpr float LENGTH = 80.0f;
+}
+
 class ReanimCacheImageVariation {
 public:
     SeedType mSeedType;
