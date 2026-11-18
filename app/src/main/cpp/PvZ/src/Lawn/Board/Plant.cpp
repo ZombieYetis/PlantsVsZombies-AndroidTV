@@ -4032,6 +4032,11 @@ void DrawLightningReedArc(LawnApp *theApp, const LightningReedTarget &theTarget)
 
 void Plant::LightningReedFire() {
     const auto aChain = GetLightningReedChain(this);
+    if (aChain.empty()) {
+        return;
+    }
+
+    mApp->PlayFoley(FoleyType::FOLEY_LIGHTNING_REED);
     for (size_t i = 0; i < aChain.size(); ++i) {
         const LightningReedTarget &aTarget = aChain[i];
         DrawLightningReedArc(mApp, aTarget);

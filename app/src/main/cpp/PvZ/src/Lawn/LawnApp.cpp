@@ -414,6 +414,11 @@ void LawnApp::LoadAddonSounds() {
     addonSounds.teleportation = GetSoundByFileName("addonFiles/sounds/teleportation");
     addonSounds.red_stinger_primary = GetSoundByFileName("addonFiles/sounds/red_stinger_primary");
     addonSounds.red_stinger_secondary = GetSoundByFileName("addonFiles/sounds/red_stinger_secondary");
+    addonSounds.lightning_reed[0] = GetSoundByFileName("addonFiles/sounds/lightning_reed_1");
+    addonSounds.lightning_reed[1] = GetSoundByFileName("addonFiles/sounds/lightning_reed_2");
+    addonSounds.lightning_reed[2] = GetSoundByFileName("addonFiles/sounds/lightning_reed_3");
+    addonSounds.lightning_reed[3] = GetSoundByFileName("addonFiles/sounds/lightning_reed_4");
+    addonSounds.zombie_electrocution = GetSoundByFileName("addonFiles/sounds/zombie_electrocution");
 
     int addonSoundsNum = (sizeof(addonSounds) / sizeof(int));
     mCompletedLoadingThreadTasks += 54 * addonSoundsNum;

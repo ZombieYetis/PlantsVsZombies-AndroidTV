@@ -8735,7 +8735,8 @@ void Zombie::TakeBodyDamage(int theDamage, unsigned int theDamageFlags) {
     int aBodyHealthOrigin = mBodyHealth;
     int aDamageIndexBeforeDamage = GetBodyDamageIndex();
     mBodyHealth -= theDamage;
-    if (TestBit(theDamageFlags, int(DamageFlags::DAMAGE_ELECTRIC)) && mZombieType != ZombieType::ZOMBIE_BOSS) {
+    if (TestBit(theDamageFlags, int(DamageFlags::DAMAGE_ELECTRIC)) && mZombieType != ZombieType::ZOMBIE_BOSS && mZombieType != ZombieType::ZOMBIE_ZOMBLOB_SMALL
+        && mZombieType != ZombieType::ZOMBIE_SKELETON && mZombieType != ZombieType::ZOMBIE_PIGEON) {
         // 先结算防具，再按本体掉头或死亡的临界值触发电死。
         if (mBodyHealth <= 0 || (mHasHead && CanLoseBodyParts() && mZombieType != ZOMBIE_PIGEON_FEEDER && mBodyHealth < mBodyMaxHealth / 3)) {
             if (mHasHead && !mButtered && (mZombieType == ZOMBIE_ZOMBLOB || mZombieType == ZOMBIE_ZOMBLOB_MIDDLE)) {
@@ -9556,6 +9557,7 @@ void Zombie::ApplyElectrocution_Origin() {
         DieNoLoot();
         return;
     }
+    mApp->PlayFoley(FoleyType::FOLEY_ZOMBIE_ELECTROCUTION);
     ApplyAshDeath(true);
 }
 
