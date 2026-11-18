@@ -6832,9 +6832,8 @@ void Zombie::MowDown_Original() {
 
     if (mZombiePhase == ZombiePhase::PHASE_ZOMBIE_DYING || mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_IN_VAULT || mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE
         || mZombiePhase == ZombiePhase::PHASE_DANCER_RISING || mZombiePhase == ZombiePhase::PHASE_SNORKEL_INTO_POOL || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED || IsGargantuar()
-        || mZombieType == ZombieType::ZOMBIE_BUNGEE || mZombieType == ZombieType::ZOMBIE_DIGGER || mZombieType == ZombieType::ZOMBIE_CROSSING_GUARD || IsImp()
-        || mZombieType == ZombieType::ZOMBIE_YETI || mZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER
-        || IsBobsledTeamWithSled() || IsFlying() || mInPool) {
+        || mZombieType == ZombieType::ZOMBIE_BUNGEE || mZombieType == ZombieType::ZOMBIE_DIGGER || mZombieType == ZombieType::ZOMBIE_CROSSING_GUARD || IsImp() || mZombieType == ZombieType::ZOMBIE_YETI
+        || mZombieType == ZombieType::ZOMBIE_DOLPHIN_RIDER || IsBobsledTeamWithSled() || IsFlying() || mInPool) {
         Reanimation *aPuffReanim = mApp->AddReanimation(mPosX - 73.0f, mPosY - 56.0f, mRenderOrder + 2, ReanimationType::REANIM_PUFF);
         aPuffReanim->SetFramesForLayer("anim_puff");
         mApp->AddTodParticle(mPosX + 110.0f, mPosY + 0.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_MOWER_CLOUD);
@@ -9630,8 +9629,8 @@ void Zombie::ApplyAshDeath(bool theElectrocuted) {
         || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISING
         || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISE_WITHOUT_AXE || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_MOWERED || mInPool) {
         DieWithLoot();
-    } else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mZombieType == ZOMBIE_CROSSING_GUARD || mZombieType == ZOMBIE_DOG
-               || Zombie::IsZombotany(mZombieType) || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
+    } else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mZombieType == ZOMBIE_CROSSING_GUARD || mZombieType == ZOMBIE_DOG || Zombie::IsZombotany(mZombieType)
+               || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
         SetAnimRate(0.0f);
         Reanimation *aHeadReanim = mApp->ReanimationTryToGet(mSpecialHeadReanimID);
         if (aHeadReanim) {

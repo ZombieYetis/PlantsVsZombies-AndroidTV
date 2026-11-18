@@ -35,7 +35,7 @@ class LawnApp;
 namespace LightningReedBeam {
 inline constexpr float AXIS_Y = 43.5f;
 inline constexpr float LENGTH = 80.0f;
-}
+} // namespace LightningReedBeam
 
 class ReanimCacheImageVariation {
 public:

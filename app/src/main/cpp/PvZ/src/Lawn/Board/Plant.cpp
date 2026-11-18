@@ -833,21 +833,6 @@ void Plant::UpdateEndurian() {
     DoRowAreaDamage(kEndurianDamage, 0U);
 }
 
-bool Plant::HasActiveBoomerang() {
-    if (mBoard == nullptr) {
-        return false;
-    }
-
-    const PlantID aPlantID = mBoard->PlantGetID(this);
-    Projectile *aProjectile = nullptr;
-    while (mBoard->IterateProjectiles(aProjectile)) {
-        if (!aProjectile->mDead && aProjectile->mProjectileType == ProjectileType::PROJECTILE_BOOMERANG && aProjectile->mRelatedPlantID == aPlantID) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void Plant::BloomerangFire() {
     mApp->PlayFoley(FoleyType::FOLEY_BLOOMERANG);
 
@@ -1009,11 +994,8 @@ void Plant::UpdateBloomerang() {
             mState = PlantState::STATE_NOTREADY;
             mRenderOrder = CalcRenderOrder();
         }
-    } else if (mState == PlantState::STATE_BLOOMERANG_CATCHING) {
-        if (aBodyReanim && aBodyReanim->mLoopCount > 0) {
-            PlayIdleAnim(0.0f);
-            mState = PlantState::STATE_NOTREADY;
-        }
+    } else if (aBodyReanim && aBodyReanim->mLoopCount > 0 && aBodyReanim->IsAnimPlaying("anim_catch")) {
+        PlayIdleAnim(0.0f);
     }
 }
 
@@ -3959,7 +3941,10 @@ std::vector<LightningReedTarget> GetLightningReedChain(Plant *thePlant) {
     const Rect aZombieRect = aPrimaryZombie ? aPrimaryZombie->GetZombieRect() : Rect{};
     const Rect aItemRect = aPrimaryItem ? aPrimaryItem->GetItemRect() : Rect{};
     std::vector<LightningReedTarget> aChain;
-    if (aPrimaryZombie && (!aPrimaryItem || Distance2D(aOriginX, aOriginY, aZombieRect.mX + aZombieRect.mWidth / 2.0f, aZombieRect.mY + aZombieRect.mHeight / 2.0f) <= Distance2D(aOriginX, aOriginY, aItemRect.mX + aItemRect.mWidth / 2.0f, aItemRect.mY + aItemRect.mHeight / 2.0f))) {
+    if (aPrimaryZombie
+        && (!aPrimaryItem
+            || Distance2D(aOriginX, aOriginY, aZombieRect.mX + aZombieRect.mWidth / 2.0f, aZombieRect.mY + aZombieRect.mHeight / 2.0f)
+                <= Distance2D(aOriginX, aOriginY, aItemRect.mX + aItemRect.mWidth / 2.0f, aItemRect.mY + aItemRect.mHeight / 2.0f))) {
         aChain.push_back({aPrimaryZombie, nullptr, aZombieRect, aPrimaryZombie->mRow, thePlant->mX + 55, thePlant->mY + 15});
     } else {
         aChain.push_back({nullptr, aPrimaryItem, aItemRect, aPrimaryItem->mGridY, thePlant->mX + 55, thePlant->mY + 15});
@@ -4329,8 +4314,7 @@ void Plant::UpdateShooter() {
     }
 
     mLaunchCounter--;
-    if (mSeedType == SeedType::SEED_BLOOMERANG
-        && (HasActiveBoomerang() || mState == PlantState::STATE_BLOOMERANG_CATCHING || mState == PlantState::STATE_UMBRELLA_TRIGGERED || mState == PlantState::STATE_UMBRELLA_REFLECTING)) {
+    if (mSeedType == SeedType::SEED_BLOOMERANG && (mState == PlantState::STATE_UMBRELLA_TRIGGERED || mState == PlantState::STATE_UMBRELLA_REFLECTING)) {
         return;
     }
     if (mLaunchCounter <= 0) {

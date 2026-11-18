@@ -2919,9 +2919,6 @@ void Board::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_APPLY_BURN:
         case EVENT_SERVER_BOARD_ZOMBIE_APPLY_ELECTROCUTION: {
-            if (event->size != sizeof(U16_Event)) {
-                break;
-            }
             const uint16_t serverZombieID = static_cast<const U16_Event *>(event)->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {

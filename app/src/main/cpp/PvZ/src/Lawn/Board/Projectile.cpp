@@ -769,10 +769,9 @@ void Projectile::UpdateBoomerang() {
         const auto aCatchX = static_cast<float>(aRelatedPlant->mX + 48);
         if (mPosX <= aCatchX) {
             Reanimation *aBodyReanim = mApp->ReanimationTryToGet(aRelatedPlant->mBodyReanimID);
-            const float anAnimRate = aBodyReanim && aBodyReanim->mDefinition ? aBodyReanim->mDefinition->mFPS : 24.0f;
-
-            aRelatedPlant->mState = PlantState::STATE_BLOOMERANG_CATCHING;
-            aRelatedPlant->PlayBodyReanim("anim_catch", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, anAnimRate);
+            if (aBodyReanim && aBodyReanim->IsAnimPlaying("anim_idle")) {
+                aRelatedPlant->PlayBodyReanim("anim_catch", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
+            }
 
             Die();
         }
