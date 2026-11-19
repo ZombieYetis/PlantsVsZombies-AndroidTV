@@ -1062,12 +1062,12 @@ void Plant::UpdateSweetPotato() {
 
     Zombie *aZombie = nullptr;
     while (mBoard->IterateZombies(aZombie)) {
-        if (aZombie->mDead || !aZombie->IsOnBoard()) {
+        if (!aZombie->mHasHead || aZombie->IsDeadOrDying() || aZombie->mDead || !aZombie->IsOnBoard()) {
             continue;
         }
 
-        if (aZombie->mZombieType == ZombieType::ZOMBIE_BUNGEE || aZombie->mZombieType == ZombieType::ZOMBIE_CATAPULT || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || !aZombie->CanBeFrozen()
-            || aZombie->ZombieNotWalking()) {
+        if (aZombie->mZombieType == ZombieType::ZOMBIE_BUNGEE || aZombie->mZombieType == ZombieType::ZOMBIE_CATAPULT || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->ZombieNotWalking()
+            || (!aZombie->CanBeFrozen() && aZombie->mZombieType != ZombieType::ZOMBIE_PIGEON)) {
             continue;
         }
 
