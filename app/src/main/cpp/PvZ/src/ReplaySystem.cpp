@@ -306,7 +306,7 @@ void replay::RecordPacket(ReplayPacketDir dir, const std::byte *data, std::size_
     }
 
     const std::uint32_t normalizedTick = tick - gRecordStartTick;
-    if (IsRemoteServer() && gLawnApp && gLawnApp->IsVSMode()) {
+    if (IsRemoteServer()) {
         GetRecordingEpoch();
         if (!gHistorySource->sealed)
             gHistorySource->Append(dir, normalizedTick, data, len);

@@ -107,14 +107,16 @@ void DrawPanel(Graphics *g, const Rect &rect) {
     g->DrawRect(rect);
 }
 
-pvzstl::string BuildRoomTag(const ServerRoomItem &room, bool coop) {
+pvzstl::string BuildRoomTag(const ServerRoomItem &room, Color &color) {
+    color = Color(190, 225, 190);
     if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION) {
         return TodStringTranslate(room.protocolVersion < NETPLAY_VERSION ? "[SERVER_ROOM_VERSION_ERROR_LOWER]" : "[SERVER_ROOM_VERSION_ERROR_HIGHER]");
     }
     if (room.reconnectPending)
         return TodStringTranslate(room.reconnectBusy ? "[TAG_RECONNECT_BUSY]" : "[TAG_RECONNECT_WAIT]");
     if (room.full && room.spectateAllowed) {
-        return TodStringTranslate(room.gaming && coop ? "[SPECTATE_QUEUE_AVAILABLE]" : "[SPECTATE_AVAILABLE]");
+        color = Color(255, 255, 0);
+        return TodStringTranslate("[SPECTATE_AVAILABLE]");
     }
     if (room.gaming) {
         return TodStringTranslate("[TAG_GAMING]");
@@ -122,7 +124,8 @@ pvzstl::string BuildRoomTag(const ServerRoomItem &room, bool coop) {
     if (room.full) {
         return TodStringTranslate("[TAG_FULL]");
     }
-    return TodStringTranslate(room.hostProbeDone ? "[P2P_READY]" : "[P2P_NOT_READY]");
+    color = Color(0, 255, 0);
+    return TodStringTranslate("[JOIN_AVAILABLE]");
 }
 
 pvzstl::string BuildSpectatorsText(const NetplayLobbyWidget *dialog) {
@@ -243,8 +246,10 @@ public:
                 TodDrawString(g, StrFormat("%s:%d", room.ip, room.tcpPort), x + kRoomCardWidth / 2, y + 72, FONT_HOUSEOFTERROR16, Color(208, 208, 208), DS_ALIGN_CENTER);
             } else {
                 const ServerRoomItem &room = dialog->mServerRooms[i];
+                Color tagColor;
+                const pvzstl::string tag = BuildRoomTag(room, tagColor);
                 TodDrawString(g, room.name, x + kRoomCardWidth / 2, y + 38, FONT_DWARVENTODCRAFT18, Color(255, 244, 195), DS_ALIGN_CENTER);
-                TodDrawString(g, BuildRoomTag(room, dialog->mIsCoopLobby), x + kRoomCardWidth / 2, y + 72, FONT_HOUSEOFTERROR16, Color(190, 225, 190), DS_ALIGN_CENTER);
+                TodDrawString(g, tag, x + kRoomCardWidth / 2, y + 72, FONT_HOUSEOFTERROR16, tagColor, DS_ALIGN_CENTER);
             }
         }
     }
@@ -1159,7 +1164,7 @@ void NetplayLobbyWidget::RefreshButtons() {
                 this->mPrimaryActionButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || !this->mServerHostHasGuest || startBusy);
             } else if (this->mServerSpectating) {
                 if (this->mServerJoinedRoomGaming) {
-                    this->mPrimaryActionButton->SetLabel(this->mIsCoopLobby ? "[RESERVE_SPECTATE]" : "[SPECTATE]");
+                    this->mPrimaryActionButton->SetLabel("[SPECTATE]");
                     this->mPrimaryActionButton->mDisabled = this->mServerSpectateReservationActive || ((!this->mServerConnected && gTcpServerSocket < 0) || startBusy);
                 } else {
                     this->mPrimaryActionButton->SetLabel("[START_GAME]");
@@ -1648,7 +1653,7 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                         std::strncpy(gServerHostName, this->mServerJoinedRoomName, sizeof(gServerHostName) - 1);
                         gServerHostName[sizeof(gServerHostName) - 1] = '\0';
                         gSecondPlayerName[0] = '\0';
-                        this->mServerStatusText = this->mServerJoinedRoomGaming ? TodStringTranslate("[SPECTATE_ROOM_GAMING_CAN_RESERVE]") : TodStringTranslate("[JOINED_AS_SPECTATOR]");
+                        this->mServerStatusText = this->mServerJoinedRoomGaming ? TodStringTranslate("[ROOM_STARTED]") : TodStringTranslate("[JOINED_AS_SPECTATOR]");
                     }
                     this->mServerSpectatorCount = 0;
                     std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
@@ -1778,18 +1783,13 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     int rid = homura::ReadBEI32(payload);
                     bool reserve = payload[4] != 0;
                     [[maybe_unused]] bool relayMode = payload[5] != 0;
-                    bool relayOpen = payload[6] != 0;
                     std::uint32_t relayEpoch = (std::uint32_t)homura::ReadBEI32(payload + 7);
                     if (this->mServerSpectating && rid == this->mServerJoinedRoomId) {
                         this->mServerSpectateReservationActive = reserve;
                         this->mServerRelayEpoch = relayEpoch;
                         this->mServerSpectateReserveTick = 0;
                         this->mServerSpectateReserveWarnTick = 0;
-                        if (reserve) {
-                            this->mServerStatusText = TodStringTranslate(this->mIsCoopLobby ? "[SPECTATE_ALIGN_READY]" : "[LIVE_SPECTATE_LOADING]");
-                        } else {
-                            this->mServerStatusText = relayOpen ? TodStringTranslate("[SPECTATE_RESERVE_STREAM_OPEN]") : TodStringTranslate("[SPECTATE_RESERVE_WAIT_STREAM]");
-                        }
+                        this->mServerStatusText = TodStringTranslate(reserve ? "[LIVE_SPECTATE_LOADING]" : "[LIVE_SPECTATE_WAIT_NEXT]");
                     }
                 }
                 break;
@@ -1977,7 +1977,7 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                         gIsServerModeNetplay = true;
                         gServerModeTransport = ServerModeTransport::RELAY;
                         gIsServerModeSpectator = true;
-                        this->mServerStatusText = TodStringTranslate(this->mIsCoopLobby ? "[SPECTATE_ALIGN_READY]" : "[LIVE_SPECTATE_LOADING]");
+                        this->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_LOADING]");
                         break;
                     }
                 } else {
@@ -2732,7 +2732,7 @@ void NetplayLobbyWidget::DrawServerRoomList(Sexy::Graphics *g) {
 
         const bool canSpectate = r.spectateAllowed && r.full;
         if (canSpectate) {
-            tag = TodStringTranslate(r.gaming && this->mIsCoopLobby ? "[SPECTATE_QUEUE_AVAILABLE]" : "[SPECTATE_AVAILABLE]");
+            tag = TodStringTranslate("[SPECTATE_AVAILABLE]");
         }
         if (r.gaming && !canSpectate) {
             tag = tag.empty() ? TodStringTranslate("[ROOM_STARTED]") : tag + ' ' + TodStringTranslate("[ROOM_STARTED]");
@@ -2936,7 +2936,7 @@ void NetplayLobbyWidget::ServerSendReserveSpectate(bool reserve) {
     buf[0] = 0x11; // RESERVE_SPECTATE
     buf[1] = reserve ? 1 : 0;
     if (!SendAll(sock, buf, sizeof(buf))) {
-        this->mServerStatusText = TodStringTranslate("[SPECTATE_RESERVE_FAILED]");
+        this->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_REQUEST_FAILED]");
         return;
     }
     this->mServerSpectateReserveTick = 0;
@@ -4411,7 +4411,7 @@ void NetplayLobbyWidget::HandleButtonDepress(int theId) {
                             RefreshButtons();
                             return;
                         }
-                        aDialog->mServerStatusText = TodStringTranslate(aDialog->mIsCoopLobby ? "[RESERVING_SPECTATE_NEXT_GAME]" : "[LIVE_SPECTATE_LOADING]");
+                        aDialog->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_LOADING]");
                         aDialog->ServerSendReserveSpectate(true);
                         RefreshButtons();
                         return;

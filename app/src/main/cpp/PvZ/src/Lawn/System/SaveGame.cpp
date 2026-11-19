@@ -364,7 +364,6 @@ uint32_t gSpectatorSnapshotSize = 0, gSpectatorSnapshotHash = 0;
 uint32_t gSpectatorHistoryEpoch = 0;
 auto gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
 constexpr std::size_t kMaxSpectatorCatchup = 16 * 1024 * 1024;
-constexpr uint16_t kSpectatorSnapshotVersion = 4;
 
 // UI objects contain local pointers, listeners and widget-manager links. Only
 // serialize explicit value fields; construct the actual widgets on the viewer.
@@ -621,6 +620,8 @@ bool ApplyRuntimeSnapshot(LawnApp *app, std::vector<unsigned char> &data, GameMo
     context.mBuffer.mWriteBitPos = context.mBuffer.mDataBitSize;
     SnapshotReadScope diagnostics(context, spectator, spectator && gSpectatorLayoutReceiver.present ? &gSpectatorLayoutsIn : nullptr);
     gSnapshotReadFailureMessage = "[SPECTATE_SNAPSHOT_LOAD_FAILED]";
+    if (spectator)
+        context.SyncBytes(&mode, sizeof(mode));
     LOG_INFO("[SNAPSHOT] apply base_version={} netplay_version={} bytes={} mode={} spectator={} board_before={}",
              PVZ_VERSION,
              NETPLAY_VERSION,
@@ -905,13 +906,13 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
             return;
         }
         gSpectatorSnapshotRequested = false;
-        if (app->mGameMode != GameMode::GAMEMODE_MP_VS || (app->mGameScene != SCENE_PLAYING && app->mGameScene != SCENE_LEVEL_INTRO) || !app->mBoard || app->mVSResultsMenu
-            || IsSynchronizingSaveGame()) {
+        if ((app->mGameScene != SCENE_PLAYING && app->mGameScene != SCENE_LEVEL_INTRO) || !app->mBoard || app->mVSResultsMenu || IsSynchronizingSaveGame()) {
             BaseEvent abort{EVENT_SERVER_SPECTATE_SNAPSHOT_ABORT};
             PutEvent(abort);
             return;
         }
         SaveGameContext context{};
+        context.SyncBytes(&app->mGameMode, sizeof(app->mGameMode));
         auto scene = GetSpectatorScene(app);
         gSpectatorHistoryEpoch = scene.historyEpoch;
         scene.Sync(context);
@@ -949,9 +950,8 @@ void netplay::UpdateSpectatorSnapshot(LawnApp *app) {
         gSpectatorSourcePlant = app->mSeedChooserScreen;
         gSpectatorSourceZombie = app->mZombieChooserScreen;
         gSpectatorSourceScene = app->mGameScene;
-        U16UNI32UNI32_Event begin{};
+        UNI32UNI32_Event begin{};
         begin.type = EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN;
-        begin.u16_0 = kSpectatorSnapshotVersion;
         begin.uni32_0.u32 = static_cast<uint32_t>(gSpectatorSnapshotOut.size());
         begin.uni32_1.u32 = SaveDataHash(gSpectatorSnapshotOut);
         gSpectatorLayoutsOut.clear();
@@ -1029,20 +1029,15 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
     if (!gReceivingSpectatorSnapshot && (!lobby || !lobby->ServerIsWaitingReservedSpectate()))
         return snapshotEvent;
     if (event->type == EVENT_SERVER_SPECTATE_SNAPSHOT_BEGIN) {
-        if (event->size != sizeof(U16UNI32UNI32_Event)) {
-            LOG_ERROR("[SNAPSHOT] begin expected_bytes={} actual_bytes={}", sizeof(U16UNI32UNI32_Event), event->size);
+        if (event->size != sizeof(UNI32UNI32_Event)) {
+            LOG_ERROR("[SNAPSHOT] begin expected_bytes={} actual_bytes={}", sizeof(UNI32UNI32_Event), event->size);
             FailSpectatorSnapshot("begin_size");
             return true;
         }
-        const auto *begin = static_cast<const U16UNI32UNI32_Event *>(event);
-        if (begin->u16_0 != kSpectatorSnapshotVersion || begin->uni32_0.u32 < sizeof(SaveFileHeader) || begin->uni32_0.u32 > kMaxOnlineSaveSize) {
-            LOG_ERROR("[SNAPSHOT] begin expected_version={} actual_version={} bytes={} min_bytes={} max_bytes={}",
-                      kSpectatorSnapshotVersion,
-                      begin->u16_0,
-                      begin->uni32_0.u32,
-                      sizeof(SaveFileHeader),
-                      kMaxOnlineSaveSize);
-            FailSpectatorSnapshot("begin_version_or_length");
+        const auto *begin = static_cast<const UNI32UNI32_Event *>(event);
+        if (begin->uni32_0.u32 < sizeof(SaveFileHeader) || begin->uni32_0.u32 > kMaxOnlineSaveSize) {
+            LOG_ERROR("[SNAPSHOT] begin bytes={} min_bytes={} max_bytes={}", begin->uni32_0.u32, sizeof(SaveFileHeader), kMaxOnlineSaveSize);
+            FailSpectatorSnapshot("begin_length");
             return true;
         }
         gSpectatorSnapshotIn.clear();
@@ -1053,7 +1048,7 @@ bool netplay::HandleSpectatorSnapshotEvent(LawnApp *app, const BaseEvent *event,
         gSpectatorSnapshotHash = begin->uni32_1.u32;
         gReceivingSpectatorSnapshot = true;
         gSpectatorSnapshotProgress = std::chrono::steady_clock::now();
-        LOG_INFO("[SNAPSHOT] receive begin version={} expected_bytes={} expected_hash=0x{:08X}", begin->u16_0, gSpectatorSnapshotSize, gSpectatorSnapshotHash);
+        LOG_INFO("[SNAPSHOT] receive begin expected_bytes={} expected_hash=0x{:08X}", gSpectatorSnapshotSize, gSpectatorSnapshotHash);
         return true;
     }
     if (!gReceivingSpectatorSnapshot) {

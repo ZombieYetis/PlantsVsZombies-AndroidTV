@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3224;
+inline constexpr uint32_t NETPLAY_VERSION = 3225;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -439,6 +439,11 @@ struct VSSetupGlobalBpSyncEvent : BaseEvent {
 struct U16UNI32_Event : BaseEvent {
     uint16_t u16_0;
     Union32Bit uni32_0;
+};
+
+struct UNI32UNI32_Event : BaseEvent {
+    Union32Bit uni32_0;
+    Union32Bit uni32_1;
 };
 
 struct U16UNI32UNI32_Event : BaseEvent {
