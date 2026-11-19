@@ -3877,7 +3877,7 @@ void SeedChooserScreen::ButtonPress(int theId) {
 }
 
 void SeedChooserScreen::ButtonDepress(int theId) {
-    if (gIsServerModeSpectator || gIsReplayMode) {
+    if ((gIsServerModeSpectator || gIsReplayMode) && theId != SeedChooserScreen_Menu) {
         return;
     }
     if (mApp->IsVSMode() && !IsLocalChooserInputAllowed(this)) {
