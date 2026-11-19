@@ -416,11 +416,11 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
             break;
 
         case ZombieType::ZOMBIE_PIGEON_FEEDER:
-            mPhaseCounter = 700;
+            mBodyHealth = 500;
             break;
 
         case ZombieType::ZOMBIE_PIGEON:
-            mBodyHealth = 10;
+            mBodyHealth = 25;
             mSummonCounter = 0;
             ReanimShowPrefix("anim_bandage", RENDER_GROUP_HIDDEN);
             ReanimShowPrefix("anim_eyelid", RENDER_GROUP_HIDDEN);
@@ -1025,7 +1025,7 @@ void Zombie::SetPigeonPhase(ZombiePhase thePhase) {
         if (thePhase == ZombiePhase::PHASE_PIGEON_FEEDER_FEEDING) {
             PlayZombieReanim("anim_feed", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 24.0f);
         } else {
-            mPhaseCounter = 700;
+            mPhaseCounter = RandRangeInt(600, 800);
             StartWalkAnim(20);
         }
     } else {
@@ -1081,7 +1081,7 @@ void Zombie::SummonPigeons() {
         }
         for (int dx = -1; dx <= 1; ++dx) {
             const float aPosX = mPosX + dx * 100.0f;
-            if ((dx == 0 && dy == 0) || aPosX < -80.0f) {
+            if ((dx == 0 && dy == 0) || aPosX <= -50.0f) {
                 continue;
             }
             aPositionsX[aCount] = aPosX;
@@ -2702,7 +2702,7 @@ bool Zombie::CanRevived() const {
         && mZombieType != ZombieType::ZOMBIE_DOLPHIN_RIDER && mZombieType != ZombieType::ZOMBIE_BALLOON && mZombieType != ZombieType::ZOMBIE_DIGGER && mZombieType != ZombieType::ZOMBIE_POGO
         && mZombieType != ZombieType::ZOMBIE_BUNGEE && mZombieType != ZombieType::ZOMBIE_CATAPULT && !IsGargantuar() && mZombieType != ZombieType::ZOMBIE_BOSS
         && mZombieType != ZombieType::ZOMBIE_JACKSON && mZombieType != ZombieType::ZOMBIE_DOGWALKER && mZombieType != ZombieType::ZOMBIE_DOG && mZombieType != ZombieType::ZOMBIE_SKELETON
-        && !IsZomblob(mZombieType);
+        && mZombieType != ZombieType::ZOMBIE_PIGEON && !IsZomblob(mZombieType);
 }
 
 ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol) {
@@ -5312,7 +5312,7 @@ void Zombie::UpdateDamageStates(unsigned int theDamageFlags) {
         DropArm(theDamageFlags);
     }
 
-    if (mHasHead && (mZombieType == ZombieType::ZOMBIE_PIGEON_FEEDER ? mBodyHealth <= 0 : mBodyHealth < mBodyMaxHealth / 3)) {
+    if (mHasHead && mBodyHealth < mBodyMaxHealth / 3) {
         DropHead(theDamageFlags);
         DropLoot();
         StopZombieSound();
@@ -6945,7 +6945,7 @@ int Zombie::GetSunBeanDamageCapacity(unsigned int theDamageFlags) {
     }
 
     int aBodyDamageCapacity = std::max(0, mBodyHealth);
-    if (mHasHead && CanLoseBodyParts() && mZombieType != ZombieType::ZOMBIE_PIGEON_FEEDER) {
+    if (mHasHead && CanLoseBodyParts()) {
         aBodyDamageCapacity = std::max(0, mBodyHealth - mBodyMaxHealth / 3 + 1);
     }
     return aDamageCapacity + aBodyDamageCapacity;
@@ -7413,6 +7413,8 @@ void Zombie::DrawButter(Graphics *g, const ZombieDrawPosition &theDrawPos) {
         GetTrackPosition("Zombie_catapult_driver_head", aOffsetX, aOffsetY);
     } else if (mZombieType == ZombieType::ZOMBIE_DOG) {
         GetTrackPosition("Zombie_dog_outer_head1", aOffsetX, aOffsetY);
+    } else if (mZombieType == ZombieType::ZOMBIE_PIGEON_FEEDER) {
+        GetTrackPosition("Zombie_pigeon_feeder_head2", aOffsetX, aOffsetY);
     } else if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL) {
         GetTrackPosition("anim_head1", aOffsetX, aOffsetY);
     }
@@ -8331,9 +8333,6 @@ void Zombie::SetupReanimForLostArm(unsigned int theDamageFlags) {
 }
 
 void Zombie::DropArm(unsigned int theDamageFlags) {
-    if (mZombieType == ZombieType::ZOMBIE_PIGEON_FEEDER) {
-        return;
-    }
     if (mZombieType >= ZombieType::NUM_CACHED_ZOMBIE_TYPES) {
         if (!CanLoseBodyParts()) {
             return;
@@ -8738,7 +8737,7 @@ void Zombie::TakeBodyDamage(int theDamage, unsigned int theDamageFlags) {
     if (TestBit(theDamageFlags, int(DamageFlags::DAMAGE_ELECTRIC)) && mZombieType != ZombieType::ZOMBIE_BOSS && mZombieType != ZombieType::ZOMBIE_ZOMBLOB_SMALL
         && mZombieType != ZombieType::ZOMBIE_SKELETON && mZombieType != ZombieType::ZOMBIE_PIGEON) {
         // 先结算防具，再按本体掉头或死亡的临界值触发电死。
-        if (mBodyHealth <= 0 || (mHasHead && CanLoseBodyParts() && mZombieType != ZOMBIE_PIGEON_FEEDER && mBodyHealth < mBodyMaxHealth / 3)) {
+        if (mBodyHealth <= 0 || (mHasHead && CanLoseBodyParts() && mBodyHealth < mBodyMaxHealth / 3)) {
             if (mHasHead && !mButtered && (mZombieType == ZOMBIE_ZOMBLOB || mZombieType == ZOMBIE_ZOMBLOB_MIDDLE)) {
                 UpdateDamageStates(theDamageFlags);
             } else {
@@ -9632,7 +9631,7 @@ void Zombie::ApplyAshDeath(bool theElectrocuted) {
         || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISE_WITHOUT_AXE || mZombiePhase == ZombiePhase::PHASE_ZOMBIE_MOWERED || mInPool) {
         DieWithLoot();
     } else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mZombieType == ZOMBIE_CROSSING_GUARD || mZombieType == ZOMBIE_DOG || Zombie::IsZombotany(mZombieType)
-               || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
+               || mZombieType == ZOMBIE_PIGEON || IsBobsledTeamWithSled() || IsFlying() || !mHasHead) {
         SetAnimRate(0.0f);
         Reanimation *aHeadReanim = mApp->ReanimationTryToGet(mSpecialHeadReanimID);
         if (aHeadReanim) {
