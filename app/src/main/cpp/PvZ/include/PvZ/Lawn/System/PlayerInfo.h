@@ -112,7 +112,8 @@ public:
     bool mVSAIDraftDisabledMode;
     bool mVSAITemplateDeckDisabledMode;
     bool mVSTimedDraftMode;
-    bool mUnused676[65];
+    unsigned char mNetplayPlayerId[16];
+    bool mUnused676[49];
     bool mHapticFeedbackEnabled;
     bool mZombatarEnabled;
     unsigned char mZombatarHat;
@@ -220,6 +221,7 @@ public:
         return (LawnPlayerInfoVTable *)vTable;
     }
     void AddCoins(int theAmount);
+    void EnsureNetplayPlayerId();
 };
 
 #endif // PVZ_LAWN_SYSTEM_PLAYER_INFO_H

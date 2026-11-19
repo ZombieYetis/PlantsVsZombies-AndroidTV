@@ -20,6 +20,22 @@
 #include "PvZ/Lawn/System/PlayerInfo.h"
 #include "PvZ/Lawn/LawnApp.h"
 
+#include <algorithm>
+#include <iterator>
+#include <random>
+
+void LawnPlayerInfo::EnsureNetplayPlayerId() {
+    if (std::any_of(std::begin(mNetplayPlayerId), std::end(mNetplayPlayerId), [](unsigned char value) { return value != 0; }))
+        return;
+
+    std::random_device random;
+    for (auto &value : mNetplayPlayerId)
+        value = static_cast<unsigned char>(random());
+    mNetplayPlayerId[6] = (mNetplayPlayerId[6] & 0x0f) | 0x40;
+    mNetplayPlayerId[8] = (mNetplayPlayerId[8] & 0x3f) | 0x80;
+    SaveDetails();
+}
+
 void LawnPlayerInfo::AddCoins(int theAmount) {
     // 用于 购物愉快 成就
     int aNumCoin = mCoins + theAmount;

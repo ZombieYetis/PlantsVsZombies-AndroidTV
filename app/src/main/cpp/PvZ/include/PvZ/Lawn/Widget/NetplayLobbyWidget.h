@@ -30,7 +30,6 @@ enum class InputPurpose {
     LAN_JOIN_MANUAL,
     HOST_SET_PORT,
     SERVER_CONNECT_ADDR,
-    RECONNECT_CODE,
 };
 
 struct ServerRoomItem {

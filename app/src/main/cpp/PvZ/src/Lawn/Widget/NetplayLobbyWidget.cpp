@@ -122,10 +122,13 @@ int GetRoomSortPriority(const ServerRoomItem &room) {
 pvzstl::string BuildRoomTag(const ServerRoomItem &room, Color &color) {
     color = Color(190, 225, 190);
     if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION) {
+        color = Color(128, 128, 128);
         return TodStringTranslate(room.protocolVersion < NETPLAY_VERSION ? "[SERVER_ROOM_VERSION_ERROR_LOWER]" : "[SERVER_ROOM_VERSION_ERROR_HIGHER]");
     }
-    if (room.reconnectPending)
+    if (room.reconnectPending) {
+        color = Color(255, 255, 255);
         return TodStringTranslate(room.reconnectBusy ? "[TAG_RECONNECT_BUSY]" : "[TAG_RECONNECT_WAIT]");
+    }
     if (room.full && room.spectateAllowed) {
         color = Color(255, 255, 0);
         return TodStringTranslate("[SPECTATE_AVAILABLE]");
@@ -311,6 +314,7 @@ NetplayLobbyWidget::NetplayLobbyWidget(LawnApp *app, bool isCoopLobby) {
     Sexy::Widget::vTable = sVTable;
     Sexy::ButtonListener::vTable = &sButtonListenerVtable;
     mApp = app;
+    mApp->mPlayerInfo->EnsureNetplayPlayerId();
     mResult = 0;
     mCloseRequested = false;
     gInstance = this;
@@ -2011,7 +2015,7 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     static const char *errors[] = {"",
                                                    "[STATUS_RECONNECT_ROOM_ENDED]",
                                                    "[STATUS_RECONNECT_UNAVAILABLE]",
-                                                   "[STATUS_RECONNECT_CODE_WRONG]",
+                                                   "[STATUS_RECONNECT_ID_MISMATCH]",
                                                    "[STATUS_RECONNECT_FAILED]",
                                                    "[STATUS_RECONNECT_VERSION_MISMATCH]",
                                                    "[STATUS_RECONNECT_RETRY_LATER]"};
@@ -2681,8 +2685,9 @@ void NetplayLobbyWidget::ServerSendCreate() {
         mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
         return;
     }
-    uint8_t versionBuf[4];
+    uint8_t versionBuf[4 + 16];
     homura::WriteBEI32(versionBuf, NETPLAY_VERSION);
+    std::memcpy(versionBuf + 4, mApp->mPlayerInfo->mNetplayPlayerId, 16);
     if (!SendAll(mServerSock, versionBuf, sizeof(versionBuf))) {
         mServerCreatePending = false;
         mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
@@ -2871,9 +2876,17 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
             mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_BUSY]");
             return;
         }
+        uint8_t request[1 + 4 + 4 + 16]{0x12}; // RECONNECT_JOIN
+        homura::WriteBEI32(request + 1, roomId);
+        homura::WriteBEI32(request + 5, NETPLAY_VERSION);
+        std::memcpy(request + 9, mApp->mPlayerInfo->mNetplayPlayerId, 16);
         mReconnectRoomId = roomId;
-        mInputPurpose = InputPurpose::RECONNECT_CODE;
-        ShowTextInput("[INPUT_TITLE_RECONNECT_CODE]", "[HINT_RECONNECT_CODE]");
+        mReconnectPending = true;
+        mReconnectStartedAt = Sexy::GetTickCount();
+        if (!SendAll(mServerSock, request, sizeof(request)))
+            ServerDisconnect("reconnect join failed");
+        else
+            mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_VERIFYING]");
         return;
     }
 
@@ -2882,7 +2895,7 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
     if (nameLen > 255)
         nameLen = 255;
 
-    uint8_t buf[1 + 4 + 4 + 1 + 255];
+    uint8_t buf[1 + 4 + 4 + 1 + 255 + 16];
     buf[0] = 0x03; // JOIN
     homura::WriteBEI32(buf + 1, roomId);
     homura::WriteBEI32(buf + 5, NETPLAY_VERSION);
@@ -2890,10 +2903,11 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
     if (nameLen > 0) {
         std::memcpy(buf + 10, playerName, nameLen);
     }
+    std::memcpy(buf + 10 + nameLen, mApp->mPlayerInfo->mNetplayPlayerId, 16);
 
     const bool wantSpectate = (room.full && room.spectateAllowed);
     buf[0] = wantSpectate ? 0x0F : 0x03; // JOIN_SPECTATE / JOIN
-    if (!SendAll(mServerSock, buf, size_t(10 + nameLen))) {
+    if (!SendAll(mServerSock, buf, size_t(10 + nameLen + 16))) {
         mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
         ServerDisconnect("join send fail");
     }
@@ -2976,7 +2990,7 @@ void NetplayLobbyWidget::ServerSendRejoinRole(bool toSpectator) {
     if (nameLen > 255)
         nameLen = 255;
 
-    uint8_t buf[1 + 4 + 4 + 1 + 255];
+    uint8_t buf[1 + 4 + 4 + 1 + 255 + 16];
     buf[0] = toSpectator ? 0x0F : 0x03; // JOIN_SPECTATE / JOIN
     homura::WriteBEI32(buf + 1, mServerJoinedRoomId);
     homura::WriteBEI32(buf + 5, NETPLAY_VERSION);
@@ -2984,12 +2998,13 @@ void NetplayLobbyWidget::ServerSendRejoinRole(bool toSpectator) {
     if (nameLen > 0) {
         std::memcpy(buf + 10, playerName, nameLen);
     }
+    std::memcpy(buf + 10 + nameLen, mApp->mPlayerInfo->mNetplayPlayerId, 16);
 
     if (!ServerSendU8(0x07)) { // LEAVE_ROOM
         mServerStatusText = TodStringTranslate("[STATUS_SEND_LEAVE_FAIL]");
         return;
     }
-    if (!SendAll(mServerSock, buf, size_t(10 + nameLen))) {
+    if (!SendAll(mServerSock, buf, size_t(10 + nameLen + 16))) {
         mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
         return;
     }
@@ -3494,26 +3509,7 @@ void NetplayLobbyWidget::UpdateNetplay() {
         assert(!gInputString.empty());
 
         // MODE2：WIFI 手动加入指定 IP
-        if (mInputPurpose == InputPurpose::RECONNECT_CODE) {
-            const std::string input = std::move(gInputString);
-            gHasInputContent = false;
-            gHasInputContent.notify_one();
-            mInputPurpose = InputPurpose::NONE;
-            if (input.size() != 2 || input[0] < '0' || input[0] > '9' || input[1] < '0' || input[1] > '9') {
-                mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_CODE_INVALID]");
-            } else if (mServerConnected && mServerSock >= 0 && !mReconnectPending) {
-                uint8_t request[10]{0x12};
-                homura::WriteBEI32(request + 1, mReconnectRoomId);
-                homura::WriteBEI32(request + 5, NETPLAY_VERSION);
-                request[9] = uint8_t((input[0] - '0') * 10 + input[1] - '0');
-                mReconnectPending = true;
-                mReconnectStartedAt = Sexy::GetTickCount();
-                if (!SendAll(mServerSock, request, sizeof(request)))
-                    ServerDisconnect("reconnect join failed");
-                else
-                    mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_VERIFYING]");
-            }
-        } else if (mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && mUIMode == UIMode::MODE2_WIFI) {
+        if (mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && mUIMode == UIMode::MODE2_WIFI) {
             mUseManualTarget = true;
             ManualIpConnect(); // 内部会消费 gInputString
             mInputPurpose = InputPurpose::NONE;

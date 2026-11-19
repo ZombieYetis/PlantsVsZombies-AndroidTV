@@ -28,7 +28,7 @@ namespace {
     std::vector<unsigned char> incoming, outgoing;
     std::size_t offset = 0;
     bool receiving = false, cancelRequested = false, previousPause = false;
-    int code = -1, shownPhase = -1, heartbeatSocket = -1;
+    int shownPhase = -1, heartbeatSocket = -1;
     auto lastPing = Clock::now(), lastPong = Clock::now(), progress = Clock::now();
     constexpr auto dialogId = DIALOG_RECONNECT;
 
@@ -81,11 +81,10 @@ namespace {
         pvzstl::string message;
         if (gIsServerModeSpectator) {
             message = TodStringTranslate("[RECONNECT_SPECTATOR_WAIT]");
-        } else if (IsRemoteServer() && code >= 0) {
-            auto status = TodStringTranslate(phase == PHASE_WAITING ? "[RECONNECT_WAITING]" : "[RECONNECT_SYNCING]");
-            message = Sexy::StrFormat(TodStringTranslate("[RECONNECT_HOST_CODE_FMT]").c_str(), code, status.c_str());
+        } else if (IsRemoteServer()) {
+            message = TodStringTranslate(phase == PHASE_FREEZING ? "[RECONNECT_PREPARING]" : phase == PHASE_WAITING ? "[RECONNECT_WAITING]" : "[RECONNECT_SYNCING]");
         } else {
-            message = TodStringTranslate(IsRemoteServer() ? "[RECONNECT_PREPARING]" : "[RECONNECT_CLIENT_SYNCING]");
+            message = TodStringTranslate("[RECONNECT_CLIENT_SYNCING]");
         }
         auto *dialog = app->GetVTable()->DoDialog(app, dialogId, true, TodStringTranslate("[RECONNECT_TITLE]"), message, TodStringTranslate("[DISCONNECT]"), 3);
         static const Sexy::ButtonListener::VTable listener{
@@ -130,7 +129,6 @@ void Reset(LawnApp *app) noexcept {
     HideDialog(app);
     phase = PHASE_NONE;
     epoch = transfer = 0;
-    code = -1;
     cancelRequested = false;
     previousPause = false;
     heartbeatSocket = -1;
@@ -165,11 +163,6 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
             ClearHeldInput();
             if (phase == PHASE_FREEZING || phase == PHASE_WAITING)
                 ClearTransfer();
-            const auto value = Read32(p + 12);
-            if (IsRemoteServer() && phase == PHASE_WAITING && value < 100) {
-                code = int(value);
-                shownPhase = -1;
-            }
             if (phase == PHASE_FREEZING && IsRemoteServer()) {
                 // Already queued events stay in order; the relay treats FROZEN as a barrier.
                 // Preserve any spectator snapshot and catchup already in flight.
@@ -213,7 +206,6 @@ bool HandleEvent(LawnApp *app, const BaseEvent *event) {
         } else if (op == OP_RESUME && IsFrozen()) {
             ClearTransfer();
             ClearHeldInput();
-            code = -1;
             // Modal removal calls Board::Pause(false). Keep the reconnect
             // barrier active and suppress pause echoes while closing both
             // dialogs, then resume through Pause so audio is restored too.
