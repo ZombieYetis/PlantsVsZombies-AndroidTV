@@ -400,6 +400,15 @@ bool Plant::IsInPlay() {
     return IsOnBoard() && mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN && mApp->mGameMode != GameMode::GAMEMODE_TREE_OF_WISDOM;
 }
 
+void Plant::UpdateBlink() {
+    // 红针花的 anim_blink 只适用于一形态。
+    if (mSeedType == SeedType::SEED_RED_STINGER && GetRedStingerForm() != 1) {
+        return;
+    }
+
+    reinterpret_cast<void (*)(Plant *)>(Plant_UpdateBlinkAddr)(this);
+}
+
 void Plant::Animate() {
     if ((mSeedType == SeedType::SEED_CHERRYBOMB || mSeedType == SeedType::SEED_JALAPENO) && mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN) {
         mShakeOffsetX = RandRangeFloat(-1.0f, 1.0f);

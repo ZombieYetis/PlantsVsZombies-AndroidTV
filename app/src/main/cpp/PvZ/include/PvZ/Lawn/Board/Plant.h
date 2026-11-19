@@ -286,14 +286,12 @@ public:
     void AnimatePumpkin() {
         reinterpret_cast<void (*)(Plant *)>(Plant_AnimatePumpkinAddr)(this);
     }
-    void UpdateBlink() {
-        reinterpret_cast<void (*)(Plant *)>(Plant_UpdateBlinkAddr)(this);
-    }
 
     void PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, SeedType theImitaterType, int a6);
     void Update();
     void UpdateAbilities();
     void UpdateBowling();
+    void UpdateBlink();
     void ImitaterMorph();
     void Squish();
     void Draw(Sexy::Graphics *g);
