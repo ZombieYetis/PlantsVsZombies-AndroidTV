@@ -931,6 +931,7 @@ void Zombie::SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePh
             StopEating();
             PlayZombieReanim("anim_pick", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
         } else if (mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_TAKE) {
+            StopEating();
             PlayZombieReanim("anim_take", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 16.0f);
         } else if (mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_PRE_VAULT || mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_POST_VAULT) {
             StartWalkAnim(0);
