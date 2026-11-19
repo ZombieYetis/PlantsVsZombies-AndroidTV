@@ -1384,7 +1384,7 @@ void Plant::Draw(Sexy::Graphics *g) {
 void Plant::DrawShadow(Sexy::Graphics *g, float theOffsetX, float theOffsetY) {
     if (mSeedType == SeedType::SEED_LILYPAD || mSeedType == SeedType::SEED_STARFRUIT || mSeedType == SeedType::SEED_TANGLEKELP || mSeedType == SeedType::SEED_SEASHROOM
         || mSeedType == SeedType::SEED_COBCANNON || mSeedType == SeedType::SEED_SPIKEWEED || mSeedType == SeedType::SEED_SPIKEROCK || mSeedType == SeedType::SEED_GRAVEBUSTER
-        || mSeedType == SeedType::SEED_CATTAIL || mOnBungeeState == PlantOnBungeeState::RISING_WITH_BUNGEE)
+        || mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_LIGHTNING_REED || mOnBungeeState == PlantOnBungeeState::RISING_WITH_BUNGEE)
         return;
 
     if (IsOnBoard() && mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN && mApp->mZenGarden->mGardenType == GardenType::GARDEN_MAIN)

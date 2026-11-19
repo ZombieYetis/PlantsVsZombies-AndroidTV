@@ -486,9 +486,9 @@ void DrawSeedPacket(Sexy::Graphics *g,
             theDrawScale = 0.4f;
             break;
         case SeedType::SEED_LIGHTNING_REED:
-            offsetY = 15.0f;
+            offsetY = 12.0f;
             offsetX = 8.0f;
-            theDrawScale = 0.4f;
+            theDrawScale = 0.45f;
             break;
         case SeedType::SEED_ZOMBIE_NORMAL:
         case SeedType::SEED_ZOMBIE_NEWSPAPER:
