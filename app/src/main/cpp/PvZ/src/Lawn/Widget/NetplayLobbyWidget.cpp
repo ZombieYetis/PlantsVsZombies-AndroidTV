@@ -107,6 +107,18 @@ void DrawPanel(Graphics *g, const Rect &rect) {
     g->DrawRect(rect);
 }
 
+int GetRoomSortPriority(const ServerRoomItem &room) {
+    if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION)
+        return 3;
+    if (room.reconnectPending)
+        return 2;
+    if (!room.full && !room.gaming)
+        return 0;
+    if (room.full && room.spectateAllowed)
+        return 1;
+    return 2;
+}
+
 pvzstl::string BuildRoomTag(const ServerRoomItem &room, Color &color) {
     color = Color(190, 225, 190);
     if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION) {
@@ -287,7 +299,7 @@ NetplayLobbyWidget::NetplayLobbyWidget(LawnApp *app, bool isCoopLobby) {
     static void *sVTable[122];
     static std::once_flag sVTableInit;
     std::call_once(sVTableInit, [&] {
-        std::memcpy(sVTable, this->Sexy::Widget::vTable, sizeof(sVTable));
+        std::memcpy(sVTable, Sexy::Widget::vTable, sizeof(sVTable));
         sVTable[0] = (void *)homura::ExtractMemFuncPtr(&NetplayLobbyWidget::_destructor);
         sVTable[1] = (void *)homura::ExtractMemFuncPtr(&NetplayLobbyWidget::_destructor2);
         sVTable[29] = (void *)homura::ExtractMemFuncPtr(&NetplayLobbyWidget::AddedToManager);
@@ -296,7 +308,7 @@ NetplayLobbyWidget::NetplayLobbyWidget(LawnApp *app, bool isCoopLobby) {
         sVTable[36] = (void *)homura::ExtractMemFuncPtr(&NetplayLobbyWidget::Draw);
         sVTable[78] = (void *)homura::ExtractMemFuncPtr(&NetplayLobbyWidget::MouseDown);
     });
-    this->Sexy::Widget::vTable = sVTable;
+    Sexy::Widget::vTable = sVTable;
     Sexy::ButtonListener::vTable = &sButtonListenerVtable;
     mApp = app;
     mResult = 0;
@@ -491,11 +503,11 @@ int NetplayLobbyWidget::GetRoomCount() const {
     if (mIsCreatingRoom || mIsJoiningRoom || mServerHosting || mServerJoined || mServerSpectating) {
         return 0;
     }
-    if (this->mUIMode == UIMode::MODE2_WIFI) {
+    if (mUIMode == UIMode::MODE2_WIFI) {
         return std::max(0, gScannedServerCount);
     }
-    if (this->mUIMode == UIMode::MODE3_SERVER && this->mServerConnected) {
-        return std::max(0, this->mServerRoomCount);
+    if (mUIMode == UIMode::MODE3_SERVER && mServerConnected) {
+        return std::max(0, mServerRoomCount);
     }
     return 0;
 }
@@ -503,10 +515,10 @@ int NetplayLobbyWidget::GetRoomCount() const {
 void NetplayLobbyWidget::RefreshControls() {
     RefreshButtons();
 
-    const bool lanRoomActive = this->mIsCreatingRoom || this->mIsJoiningRoom;
-    const bool serverRoomActive = this->mServerHosting || this->mServerJoined || this->mServerSpectating;
+    const bool lanRoomActive = mIsCreatingRoom || mIsJoiningRoom;
+    const bool serverRoomActive = mServerHosting || mServerJoined || mServerSpectating;
     const bool roomActive = lanRoomActive || serverRoomActive;
-    const bool serverIdleDisconnected = this->mUIMode == UIMode::MODE3_SERVER && !this->mServerConnected && !this->mServerConnecting && !serverRoomActive;
+    const bool serverIdleDisconnected = mUIMode == UIMode::MODE3_SERVER && !mServerConnected && !mServerConnecting && !serverRoomActive;
     if (serverIdleDisconnected) {
         mCreateRoomButton->SetLabel("[CREATE_ROOM_BUTTON]");
         mCreateRoomButton->mDisabled = true;
@@ -515,16 +527,16 @@ void NetplayLobbyWidget::RefreshControls() {
     // These two controls are fixed parts of the lobby layout. Context-sensitive
     // room actions are presented separately inside the room panel below.
     mAddServerButton->SetLabel("[CONNECT_CUSTOM_SERVER]");
-    mAddServerButton->mDisabled = lanRoomActive || serverRoomActive || this->mServerConnecting;
+    mAddServerButton->mDisabled = lanRoomActive || serverRoomActive || mServerConnecting;
     mReplayManageButton->SetLabel("[REPLAY_MANAGE]");
     mReplayManageButton->mDisabled = roomActive;
     mLocalBattleButton->SetLabel("[PLAY_OFFLINE]");
-    mLocalBattleButton->mDisabled = roomActive || this->mServerConnecting;
+    mLocalBattleButton->mDisabled = roomActive || mServerConnecting;
 
-    const bool showPrimaryAction = this->mIsCreatingRoom || serverRoomActive;
+    const bool showPrimaryAction = mIsCreatingRoom || serverRoomActive;
     mPrimaryActionButton->SetVisible(showPrimaryAction);
 
-    const bool showRoomOption = this->mUIMode == UIMode::MODE3_SERVER && this->mServerHosting;
+    const bool showRoomOption = mUIMode == UIMode::MODE3_SERVER && mServerHosting;
     mRoomOptionButton->SetVisible(showRoomOption);
 
     if (roomActive) {
@@ -538,7 +550,7 @@ void NetplayLobbyWidget::RefreshControls() {
         }
         // Hosts keep "kick guest" before "leave room". Guests and spectators
         // put the role-switch action before "leave room".
-        if (this->mServerJoined || this->mServerSpectating) {
+        if (mServerJoined || mServerSpectating) {
             roomActions[roomActionCount++] = mCreateRoomButton;
             roomActions[roomActionCount++] = mJoinRoomButton;
         } else {
@@ -633,18 +645,18 @@ void NetplayLobbyWidget::Draw(Graphics *g) {
     if (mSelectedServerListIndex > 0 && mSelectedServerListIndex <= targetCount) {
         // Target probes are stopped and cleared after connecting. From that
         // point the room-list query round trip is the current server latency.
-        const int latency = this->mServerConnected ? this->mServerLatencyMs : this->mServerTargetLatencyMs[mSelectedServerListIndex - 1];
+        const int latency = mServerConnected ? mServerLatencyMs : mServerTargetLatencyMs[mSelectedServerListIndex - 1];
         const pvzstl::string latencyText = latency >= 0 ? StrFormat("%dms", latency) : "--ms";
         TodDrawString(g, latencyText, kSelectedServerLatencyX, kSelectedServerLatencyY, FONT_HOUSEOFTERROR16, Color(235, 220, 185), DS_ALIGN_LEFT);
     }
 
     {
         pvzstl::string status;
-        if (this->mUIMode == UIMode::MODE3_SERVER) {
-            status = this->mServerStatusText;
-        } else if (this->mIsCreatingRoom) {
+        if (mUIMode == UIMode::MODE3_SERVER) {
+            status = mServerStatusText;
+        } else if (mIsCreatingRoom) {
             status = TodStringTranslate("[WAIT_OTHER_JOIN]");
-        } else if (this->mIsJoiningRoom) {
+        } else if (mIsJoiningRoom) {
             status = TodStringTranslate("[JOINING_MANUAL]");
         } else {
             status = TodStringTranslate(gScannedServerCount > 0 ? "[AVAILABLE_ROOMS]" : "[SCANNING_ROOMS]");
@@ -679,12 +691,12 @@ void NetplayLobbyWidget::SelectServer(int listIndex) {
     if (listIndex != mSelectedServerListIndex && ServerHostRoomLocked()) {
         return;
     }
-    if (listIndex == mSelectedServerListIndex && ((listIndex == 0 && this->mUIMode == UIMode::MODE2_WIFI) || (listIndex > 0 && (this->mServerConnected || this->mServerConnecting)))) {
+    if (listIndex == mSelectedServerListIndex && ((listIndex == 0 && mUIMode == UIMode::MODE2_WIFI) || (listIndex > 0 && (mServerConnected || mServerConnecting)))) {
         return;
     }
     mSelectedServerListIndex = listIndex;
     mRoomScrollWidget->ScrollToMin(false);
-    this->mApp->PlaySample(SOUND_GRAVEBUTTON);
+    mApp->PlaySample(SOUND_GRAVEBUTTON);
     if (listIndex == 0) {
         SetMode(UIMode::MODE2_WIFI);
     } else {
@@ -697,12 +709,12 @@ void NetplayLobbyWidget::SelectRoom(int roomIndex) {
     if (roomIndex < 0 || roomIndex >= GetRoomCount()) {
         return;
     }
-    if (this->mUIMode == UIMode::MODE2_WIFI) {
-        this->mSelectedServerIndex = roomIndex;
+    if (mUIMode == UIMode::MODE2_WIFI) {
+        mSelectedServerIndex = roomIndex;
     } else {
-        this->mSelectedRoomIndex_Server = roomIndex;
+        mSelectedRoomIndex_Server = roomIndex;
     }
-    this->mApp->PlaySample(SOUND_GRAVEBUTTON);
+    mApp->PlaySample(SOUND_GRAVEBUTTON);
 }
 
 
@@ -1021,18 +1033,18 @@ static void Mode3ResetTargetLatencyProbes(NetplayLobbyWidget *dialog) {
 } // namespace
 
 bool NetplayLobbyWidget::ServerHostRoomLocked() const {
-    return this->mUIMode == UIMode::MODE3_SERVER && this->mServerConnected && this->mServerHosting && (this->mServerHostHasGuest || this->mServerSpectating);
+    return mUIMode == UIMode::MODE3_SERVER && mServerConnected && mServerHosting && (mServerHostHasGuest || mServerSpectating);
 }
 
 bool NetplayLobbyWidget::ServerIsWaitingReservedSpectate() const {
-    return this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive && gIsServerModeSpectator;
+    return mServerSpectating && mServerJoinedRoomGaming && mServerSpectateReservationActive && gIsServerModeSpectator;
 }
 
 void NetplayLobbyWidget::SetMode(UIMode mode) {
-    if (this->mReplayManageWidget != nullptr) {
+    if (mReplayManageWidget != nullptr) {
         CloseReplayManageWidget();
     }
-    if (mode != this->mUIMode && mode != UIMode::MODE3_SERVER && ServerHostRoomLocked()) {
+    if (mode != mUIMode && mode != UIMode::MODE3_SERVER && ServerHostRoomLocked()) {
         RefreshButtons();
         return;
     }
@@ -1040,156 +1052,156 @@ void NetplayLobbyWidget::SetMode(UIMode mode) {
     // 退出旧模式时做必要清理
 
 
-    if (this->mUIMode == UIMode::MODE2_WIFI) {
+    if (mUIMode == UIMode::MODE2_WIFI) {
         // 离开 WIFI 模式：停止广播、退出/离开、关闭扫描
         StopUdpBroadcastRoom();
         LeaveRoom();
         ExitRoom();
         CloseUdpScanSocket();
     }
-    if (this->mUIMode == UIMode::MODE3_SERVER) {
+    if (mUIMode == UIMode::MODE3_SERVER) {
         // 这里先只清状态；真正断开服务器连接你后续接入socket再处理
         ServerDisconnect("mode change");
     }
 
-    this->mUIMode = mode;
+    mUIMode = mode;
     // 进入 WIFI 模式默认开始扫描
-    if (this->mUIMode == UIMode::MODE2_WIFI) {
-        this->mIsCreatingRoom = false;
-        this->mIsJoiningRoom = false;
+    if (mUIMode == UIMode::MODE2_WIFI) {
+        mIsCreatingRoom = false;
+        mIsJoiningRoom = false;
         InitUdpScanSocket();
-    } else if (this->mUIMode == UIMode::MODE3_SERVER) {
-        this->mSelectedRoomIndex_Server = 0; // 默认选中官方服第1项
-        this->mServerRoomPage = 0;
+    } else if (mUIMode == UIMode::MODE3_SERVER) {
+        mSelectedRoomIndex_Server = 0; // 默认选中官方服第1项
+        mServerRoomPage = 0;
     }
 
     RefreshButtons();
 }
 
 void NetplayLobbyWidget::RefreshButtons() {
-    switch (this->mUIMode) {
+    switch (mUIMode) {
         case UIMode::MODE1_INIT: {
-            this->mJoinRoomButton->SetLabel("[WIFI_VS]");
-            this->mJoinRoomButton->mDisabled = false;
+            mJoinRoomButton->SetLabel("[WIFI_VS]");
+            mJoinRoomButton->mDisabled = false;
 
-            this->mCreateRoomButton->SetLabel("[SERVER_VS]");
-            this->mCreateRoomButton->mDisabled = false;
+            mCreateRoomButton->SetLabel("[SERVER_VS]");
+            mCreateRoomButton->mDisabled = false;
 
-            this->mPrimaryActionButton->SetLabel("[PLAY_OFFLINE]");
-            this->mPrimaryActionButton->mDisabled = false;
+            mPrimaryActionButton->SetLabel("[PLAY_OFFLINE]");
+            mPrimaryActionButton->mDisabled = false;
 
-            this->mRoomOptionButton->SetLabel("[BACK]");
-            this->mRoomOptionButton->mDisabled = false;
+            mRoomOptionButton->SetLabel("[BACK]");
+            mRoomOptionButton->mDisabled = false;
         } break;
         case UIMode::MODE2_WIFI: {
             //  如果正在创建房间（Host），左按钮改成“设置房间端口”
-            if (this->mIsCreatingRoom) {
+            if (mIsCreatingRoom) {
                 // left: 设置端口
-                this->mJoinRoomButton->SetLabel("[SET_ROOM_PORT]");
-                this->mJoinRoomButton->mDisabled = IsRemoteServer();
+                mJoinRoomButton->SetLabel("[SET_ROOM_PORT]");
+                mJoinRoomButton->mDisabled = IsRemoteServer();
 
                 // right: 退出房间
-                this->mCreateRoomButton->SetLabel("[EXIT_ROOM_BUTTON]");
-                this->mCreateRoomButton->mDisabled = false;
+                mCreateRoomButton->SetLabel("[EXIT_ROOM_BUTTON]");
+                mCreateRoomButton->mDisabled = false;
 
                 // Yes: 开始游戏（有人加入才可点）
-                this->mPrimaryActionButton->SetLabel("[START_GAME]");
-                this->mPrimaryActionButton->mDisabled = !IsRemoteServer();
+                mPrimaryActionButton->SetLabel("[START_GAME]");
+                mPrimaryActionButton->mDisabled = !IsRemoteServer();
 
                 // No: 返回模式选择
-                this->mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
-                this->mRoomOptionButton->mDisabled = false;
+                mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
+                mRoomOptionButton->mDisabled = false;
 
                 break;
             }
 
             // left: 加入/离开
-            this->mJoinRoomButton->SetLabel(this->mIsJoiningRoom ? "[LEAVE_ROOM_BUTTON]" : "[JOIN_ROOM_BUTTON]");
-            if (this->mIsJoiningRoom) {
-                this->mJoinRoomButton->mDisabled = false;
+            mJoinRoomButton->SetLabel(mIsJoiningRoom ? "[LEAVE_ROOM_BUTTON]" : "[JOIN_ROOM_BUTTON]");
+            if (mIsJoiningRoom) {
+                mJoinRoomButton->mDisabled = false;
             } else {
                 // 扫描模式下：没房间就禁用“加入房间”
-                bool inScanMode = (!this->mIsCreatingRoom && !this->mIsJoiningRoom);
+                bool inScanMode = (!mIsCreatingRoom && !mIsJoiningRoom);
                 if (inScanMode) {
-                    this->mJoinRoomButton->mDisabled = (gScannedServerCount == 0);
+                    mJoinRoomButton->mDisabled = (gScannedServerCount == 0);
                 } else {
                     // 其他情况（例如创建房间时 left 通常禁用）
-                    this->mJoinRoomButton->mDisabled = true;
+                    mJoinRoomButton->mDisabled = true;
                 }
             }
 
             // right: 创建/退出
-            this->mCreateRoomButton->SetLabel(this->mIsCreatingRoom ? "[EXIT_ROOM_BUTTON]" : "[CREATE_ROOM_BUTTON]");
-            this->mCreateRoomButton->mDisabled = this->mIsJoiningRoom;
+            mCreateRoomButton->SetLabel(mIsCreatingRoom ? "[EXIT_ROOM_BUTTON]" : "[CREATE_ROOM_BUTTON]");
+            mCreateRoomButton->mDisabled = mIsJoiningRoom;
 
             // Yes：未创建房间 -> “加入指定IP房间”；创建房间 -> “开始游戏”
-            this->mPrimaryActionButton->SetLabel("[JOIN_SPECIFIED_IP_ROOM]");
-            this->mPrimaryActionButton->mDisabled = this->mIsJoiningRoom;
+            mPrimaryActionButton->SetLabel("[JOIN_SPECIFIED_IP_ROOM]");
+            mPrimaryActionButton->mDisabled = mIsJoiningRoom;
 
-            this->mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
-            this->mRoomOptionButton->mDisabled = false;
+            mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
+            mRoomOptionButton->mDisabled = false;
         } break;
         case UIMode::MODE3_SERVER: {
-            const bool startBusy = this->mServerGameStarting;
+            const bool startBusy = mServerGameStarting;
             const bool hostLocked = ServerHostRoomLocked();
-            const bool inServerListMode = (!this->mServerConnected && !this->mServerConnecting && !this->mServerHosting && !this->mServerJoined && !this->mServerSpectating);
-            if (this->mServerHosting) {
-                this->mJoinRoomButton->SetLabel("[KICK_GUEST_BUTTON]");
-            } else if (this->mServerSpectating) {
-                this->mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
-            } else if (this->mServerJoined) {
-                this->mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
+            const bool inServerListMode = (!mServerConnected && !mServerConnecting && !mServerHosting && !mServerJoined && !mServerSpectating);
+            if (mServerHosting) {
+                mJoinRoomButton->SetLabel("[KICK_GUEST_BUTTON]");
+            } else if (mServerSpectating) {
+                mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
+            } else if (mServerJoined) {
+                mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
             } else if (inServerListMode) {
-                this->mJoinRoomButton->SetLabel("[CONNECT_THIS_SERVER]");
+                mJoinRoomButton->SetLabel("[CONNECT_THIS_SERVER]");
             } else {
-                this->mJoinRoomButton->SetLabel("[JOIN_ROOM_BUTTON]");
+                mJoinRoomButton->SetLabel("[JOIN_ROOM_BUTTON]");
             }
 
             // right: 创建 / 退出
-            if (this->mServerHosting) {
-                this->mCreateRoomButton->SetLabel("[EXIT_ROOM_BUTTON]");
-            } else if (this->mServerJoined) {
-                this->mCreateRoomButton->SetLabel("[SWITCH_TO_SPECTATOR]");
-            } else if (this->mServerSpectating) {
-                this->mCreateRoomButton->SetLabel("[SWITCH_TO_GUEST]");
+            if (mServerHosting) {
+                mCreateRoomButton->SetLabel("[EXIT_ROOM_BUTTON]");
+            } else if (mServerJoined) {
+                mCreateRoomButton->SetLabel("[SWITCH_TO_SPECTATOR]");
+            } else if (mServerSpectating) {
+                mCreateRoomButton->SetLabel("[SWITCH_TO_GUEST]");
             } else if (inServerListMode) {
-                this->mCreateRoomButton->SetLabel("[REPLAY_MANAGE]");
+                mCreateRoomButton->SetLabel("[REPLAY_MANAGE]");
             } else {
-                this->mCreateRoomButton->SetLabel("[CREATE_ROOM_BUTTON]");
+                mCreateRoomButton->SetLabel("[CREATE_ROOM_BUTTON]");
             }
 
             // ✅ YesButton：host/joined 都显示“开始游戏”
-            if (this->mServerHosting) {
-                this->mPrimaryActionButton->SetLabel("[START_GAME]");
-                this->mPrimaryActionButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || !this->mServerHostHasGuest || startBusy);
-            } else if (this->mServerSpectating) {
-                if (this->mServerJoinedRoomGaming) {
-                    this->mPrimaryActionButton->SetLabel("[SPECTATE]");
-                    this->mPrimaryActionButton->mDisabled = this->mServerSpectateReservationActive || ((!this->mServerConnected && gTcpServerSocket < 0) || startBusy);
+            if (mServerHosting) {
+                mPrimaryActionButton->SetLabel("[START_GAME]");
+                mPrimaryActionButton->mDisabled = (!mServerConnected || mServerConnecting || !mServerHostHasGuest || startBusy);
+            } else if (mServerSpectating) {
+                if (mServerJoinedRoomGaming) {
+                    mPrimaryActionButton->SetLabel("[SPECTATE]");
+                    mPrimaryActionButton->mDisabled = mServerSpectateReservationActive || ((!mServerConnected && gTcpServerSocket < 0) || startBusy);
                 } else {
-                    this->mPrimaryActionButton->SetLabel("[START_GAME]");
-                    this->mPrimaryActionButton->mDisabled = true;
+                    mPrimaryActionButton->SetLabel("[START_GAME]");
+                    mPrimaryActionButton->mDisabled = true;
                 }
-            } else if (this->mServerJoined) {
-                this->mPrimaryActionButton->SetLabel("[START_GAME]");
-                this->mPrimaryActionButton->mDisabled = true; // ✅ guest 永远禁用
-            } else if (this->mServerConnecting) {
-                this->mPrimaryActionButton->SetLabel("[CONNECT_STOP]");
-                this->mPrimaryActionButton->mDisabled = startBusy || hostLocked;
-            } else if (this->mServerConnected) {
-                this->mPrimaryActionButton->SetLabel("[DISCONNECT_SERVER]");
-                this->mPrimaryActionButton->mDisabled = startBusy || hostLocked;
+            } else if (mServerJoined) {
+                mPrimaryActionButton->SetLabel("[START_GAME]");
+                mPrimaryActionButton->mDisabled = true; // ✅ guest 永远禁用
+            } else if (mServerConnecting) {
+                mPrimaryActionButton->SetLabel("[CONNECT_STOP]");
+                mPrimaryActionButton->mDisabled = startBusy || hostLocked;
+            } else if (mServerConnected) {
+                mPrimaryActionButton->SetLabel("[DISCONNECT_SERVER]");
+                mPrimaryActionButton->mDisabled = startBusy || hostLocked;
             } else {
-                this->mPrimaryActionButton->SetLabel("[CONNECT_CUSTOM_SERVER]");
-                this->mPrimaryActionButton->mDisabled = startBusy || hostLocked;
+                mPrimaryActionButton->SetLabel("[CONNECT_CUSTOM_SERVER]");
+                mPrimaryActionButton->mDisabled = startBusy || hostLocked;
             }
 
-            if (this->mServerHosting) {
-                this->mRoomOptionButton->SetLabel(this->mServerHostSpectateAllowed ? "[DISABLE_SPECTATE]" : "[ENABLE_SPECTATE]");
-                this->mRoomOptionButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || startBusy);
+            if (mServerHosting) {
+                mRoomOptionButton->SetLabel(mServerHostSpectateAllowed ? "[DISABLE_SPECTATE]" : "[ENABLE_SPECTATE]");
+                mRoomOptionButton->mDisabled = (!mServerConnected || mServerConnecting || startBusy);
             } else {
-                this->mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
-                this->mRoomOptionButton->mDisabled = hostLocked;
+                mRoomOptionButton->SetLabel("[BACK_TO_MODE_SELECT]");
+                mRoomOptionButton->mDisabled = hostLocked;
             }
 
             bool canJoinServer = false;
@@ -1198,46 +1210,45 @@ void NetplayLobbyWidget::RefreshButtons() {
                 canJoinServer = Mode3GetSelectedTargetAddr(this, targetAddr);
             }
 
-            bool canJoinIdle = (this->mServerConnected && !this->mServerConnecting && !this->mServerHosting && !this->mServerJoined && !this->mServerSpectating && !this->mServerCreatePending
-                                && !startBusy && (this->mServerRoomCount > 0));
+            bool canJoinIdle = (mServerConnected && !mServerConnecting && !mServerHosting && !mServerJoined && !mServerSpectating && !mServerCreatePending && !startBusy && (mServerRoomCount > 0));
             if (inServerListMode) {
-                this->mJoinRoomButton->mDisabled = !canJoinServer || startBusy || hostLocked;
+                mJoinRoomButton->mDisabled = !canJoinServer || startBusy || hostLocked;
             } else {
-                this->mJoinRoomButton->mDisabled = !canJoinIdle && !this->mServerJoined && !this->mServerSpectating; // 离开房间时应可点
+                mJoinRoomButton->mDisabled = !canJoinIdle && !mServerJoined && !mServerSpectating; // 离开房间时应可点
             }
-            if (this->mServerHosting) {
-                this->mJoinRoomButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || !this->mServerHostHasGuest || startBusy);
+            if (mServerHosting) {
+                mJoinRoomButton->mDisabled = (!mServerConnected || mServerConnecting || !mServerHostHasGuest || startBusy);
             }
-            if (this->mServerJoined) {
-                this->mJoinRoomButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || startBusy);
+            if (mServerJoined) {
+                mJoinRoomButton->mDisabled = (!mServerConnected || mServerConnecting || startBusy);
             }
-            if (this->mServerSpectating) {
-                if (this->mServerJoinedRoomGaming && !this->mServerSpectateReservationActive) {
-                    this->mJoinRoomButton->mDisabled = false;
+            if (mServerSpectating) {
+                if (mServerJoinedRoomGaming && !mServerSpectateReservationActive) {
+                    mJoinRoomButton->mDisabled = false;
                 } else {
-                    this->mJoinRoomButton->mDisabled = this->mServerSpectateReservationActive || (((!this->mServerConnected || this->mServerConnecting) && gTcpServerSocket < 0) || startBusy);
+                    mJoinRoomButton->mDisabled = mServerSpectateReservationActive || (((!mServerConnected || mServerConnecting) && gTcpServerSocket < 0) || startBusy);
                 }
             }
 
             // 创建按钮：空闲态可创建；hosting 时可退出
-            bool canCreateIdle = (this->mServerConnected && !this->mServerConnecting && !this->mServerJoined && !this->mServerSpectating && !this->mServerCreatePending && !startBusy);
-            if (this->mServerJoined) {
-                this->mCreateRoomButton->mDisabled = !Mode3CanSwitchGuestToSpectator(this);
-            } else if (this->mServerSpectating) {
-                this->mCreateRoomButton->mDisabled = this->mServerJoinedRoomGaming || this->mServerSpectateReservationActive || !Mode3CanSwitchSpectatorToGuest(this);
+            bool canCreateIdle = (mServerConnected && !mServerConnecting && !mServerJoined && !mServerSpectating && !mServerCreatePending && !startBusy);
+            if (mServerJoined) {
+                mCreateRoomButton->mDisabled = !Mode3CanSwitchGuestToSpectator(this);
+            } else if (mServerSpectating) {
+                mCreateRoomButton->mDisabled = mServerJoinedRoomGaming || mServerSpectateReservationActive || !Mode3CanSwitchSpectatorToGuest(this);
             } else if (inServerListMode) {
-                this->mCreateRoomButton->mDisabled = false;
+                mCreateRoomButton->mDisabled = false;
             } else {
-                this->mCreateRoomButton->mDisabled = !canCreateIdle;
+                mCreateRoomButton->mDisabled = !canCreateIdle;
             }
         } break;
     }
 
-    if (this->mUIMode == UIMode::MODE3_SERVER && this->mServerJoined) {
-        this->mPrimaryActionButton->SetLabel("[ASK_START]");
-        this->mPrimaryActionButton->mDisabled = (!this->mServerConnected || this->mServerConnecting || this->mServerGameStarting);
+    if (mUIMode == UIMode::MODE3_SERVER && mServerJoined) {
+        mPrimaryActionButton->SetLabel("[ASK_START]");
+        mPrimaryActionButton->mDisabled = (!mServerConnected || mServerConnecting || mServerGameStarting);
     }
-    if (this->mUIMode == UIMode::MODE3_SERVER && mReconnectPending) {
+    if (mUIMode == UIMode::MODE3_SERVER && mReconnectPending) {
         // READY starts the raw-stream handoff. Do not send lobby actions while
         // waiting for GO; the back button can still close the connection.
         mJoinRoomButton->mDisabled = true;
@@ -1263,30 +1274,30 @@ void NetplayLobbyWidget::ShowTextInput(const char *titleKey, const char *hintKey
 }
 
 void NetplayLobbyWidget::OpenReplayManageWidget() {
-    if (this->mReplayManageWidget != nullptr) {
+    if (mReplayManageWidget != nullptr) {
         return;
     }
-    this->mReplayManageWidget = new ReplayManageWidget(this->mApp, this);
-    this->AddWidget(this->mReplayManageWidget);
+    mReplayManageWidget = new ReplayManageWidget(mApp, this);
+    AddWidget(mReplayManageWidget);
 }
 
 void NetplayLobbyWidget::CloseReplayManageWidget() {
-    if (this->mReplayManageWidget == nullptr) {
+    if (mReplayManageWidget == nullptr) {
         return;
     }
-    this->RemoveWidget(this->mReplayManageWidget);
-    delete this->mReplayManageWidget;
-    this->mReplayManageWidget = nullptr;
+    RemoveWidget(mReplayManageWidget);
+    delete mReplayManageWidget;
+    mReplayManageWidget = nullptr;
 }
 
 int NetplayLobbyWidget::GetLobbyServerTargetCount() const {
     int count = 2;
-    if (this->mApp == nullptr || this->mApp->mPlayerInfo == nullptr) {
+    if (mApp == nullptr || mApp->mPlayerInfo == nullptr) {
         return count;
     }
     for (int i = 0; i < kMode3ServerRecentCount; ++i) {
         char address[kMode3ServerTargetMaxLen]{};
-        if (Mode3LoadRecentServer(this->mApp->mPlayerInfo, i, address)) {
+        if (Mode3LoadRecentServer(mApp->mPlayerInfo, i, address)) {
             ++count;
         }
     }
@@ -1304,7 +1315,7 @@ bool NetplayLobbyWidget::GetLobbyServerTargetAddress(int index, char *outAddress
         address = kOfficialServer1Addr;
     } else if (index == 1) {
         address = kOfficialServer2Addr;
-    } else if (this->mApp != nullptr && this->mApp->mPlayerInfo != nullptr && Mode3LoadRecentServer(this->mApp->mPlayerInfo, index - 2, recentAddress)) {
+    } else if (mApp != nullptr && mApp->mPlayerInfo != nullptr && Mode3LoadRecentServer(mApp->mPlayerInfo, index - 2, recentAddress)) {
         address = recentAddress;
     }
     if (address == nullptr) {
@@ -1319,23 +1330,23 @@ bool NetplayLobbyWidget::ConnectLobbyServerTarget(int index) {
     if (index < 0 || index >= GetLobbyServerTargetCount()) {
         return false;
     }
-    this->mSelectedRoomIndex_Server = index;
+    mSelectedRoomIndex_Server = index;
     return Mode3ConnectSelectedTarget(this);
 }
 
 void NetplayLobbyWidget::OpenCustomServerInput() {
-    if (this->mUIMode != UIMode::MODE3_SERVER) {
+    if (mUIMode != UIMode::MODE3_SERVER) {
         SetMode(UIMode::MODE3_SERVER);
     }
-    this->mInputPurpose = InputPurpose::SERVER_CONNECT_ADDR;
+    mInputPurpose = InputPurpose::SERVER_CONNECT_ADDR;
     ShowTextInput("[INPUT_TITLE_CONNECT_SERVER]", "[HINT_IP_PORT]");
 }
 
 void NetplayLobbyWidget::ExitNetplayLobby() {
-    if (this->mUIMode == UIMode::MODE3_SERVER) {
-        if (this->mServerHosting) {
+    if (mUIMode == UIMode::MODE3_SERVER) {
+        if (mServerHosting) {
             ServerSendExitRoom();
-        } else if (this->mServerJoined || this->mServerSpectating) {
+        } else if (mServerJoined || mServerSpectating) {
             ServerSendLeaveRoom();
         }
         ServerDisconnect("leave netplay lobby");
@@ -1345,101 +1356,101 @@ void NetplayLobbyWidget::ExitNetplayLobby() {
 }
 
 bool NetplayLobbyWidget::ServerTryReadOneFrame(uint8_t &outType, uint8_t *outPayload, uint16_t &outLen) {
-    if (this->mSrvRecvLen < 3)
+    if (mSrvRecvLen < 3)
         return false;
 
-    uint8_t type = this->mSrvRecvBuf[0];
-    uint16_t len = (uint16_t(this->mSrvRecvBuf[1]) << 8) | uint16_t(this->mSrvRecvBuf[2]);
+    uint8_t type = mSrvRecvBuf[0];
+    uint16_t len = (uint16_t(mSrvRecvBuf[1]) << 8) | uint16_t(mSrvRecvBuf[2]);
     const bool knownType = (type == 0x81 || type == 0x82 || type == 0x83 || type == 0x84 || type == 0x85 || type == 0x86 || type == 0x87 || type == 0x88 || type == 0x89 || type == 0x8A || type == 0x8B
                             || type == 0x8C || type == 0x8D || type == 0x8E || type == 0x8F || type == 0x90 || type == 0x91 || type == 0x92 || type == 0xFF);
     if (!knownType) {
-        std::memmove(this->mSrvRecvBuf, this->mSrvRecvBuf + 1, this->mSrvRecvLen - 1);
-        --this->mSrvRecvLen;
+        std::memmove(mSrvRecvBuf, mSrvRecvBuf + 1, mSrvRecvLen - 1);
+        --mSrvRecvLen;
         return false;
     }
-    if (len > sizeof(this->mSrvRecvBuf) - 3) {
-        std::memmove(this->mSrvRecvBuf, this->mSrvRecvBuf + 1, this->mSrvRecvLen - 1);
-        --this->mSrvRecvLen;
+    if (len > sizeof(mSrvRecvBuf) - 3) {
+        std::memmove(mSrvRecvBuf, mSrvRecvBuf + 1, mSrvRecvLen - 1);
+        --mSrvRecvLen;
         return false;
     }
-    if (this->mSrvRecvLen < 3 + (int)len) {
-        if (this->mSrvRecvLen >= 32) {}
+    if (mSrvRecvLen < 3 + (int)len) {
+        if (mSrvRecvLen >= 32) {}
         return false;
     }
 
     outType = type;
     outLen = len;
     if (len > 0 && outPayload) {
-        std::memcpy(outPayload, this->mSrvRecvBuf + 3, len);
+        std::memcpy(outPayload, mSrvRecvBuf + 3, len);
     }
 
     // consume
-    int remain = this->mSrvRecvLen - (3 + (int)len);
+    int remain = mSrvRecvLen - (3 + (int)len);
     if (remain > 0) {
-        std::memmove(this->mSrvRecvBuf, this->mSrvRecvBuf + 3 + len, remain);
+        std::memmove(mSrvRecvBuf, mSrvRecvBuf + 3 + len, remain);
     }
-    this->mSrvRecvLen = remain;
+    mSrvRecvLen = remain;
     return true;
 }
 
 void NetplayLobbyWidget::ServerMoveBufferedRelayBytesToVsStream(bool asHost) {
-    if (this->mSrvRecvLen <= 0) {
+    if (mSrvRecvLen <= 0) {
         return;
     }
 
     auto &recvBuffer = asHost ? clientRecvBuffer : serverRecvBuffer;
-    const auto *begin = reinterpret_cast<const std::byte *>(this->mSrvRecvBuf);
-    recvBuffer.insert(recvBuffer.end(), begin, begin + this->mSrvRecvLen);
-    this->mSrvRecvLen = 0;
+    const auto *begin = reinterpret_cast<const std::byte *>(mSrvRecvBuf);
+    recvBuffer.insert(recvBuffer.end(), begin, begin + mSrvRecvLen);
+    mSrvRecvLen = 0;
 }
 
 static bool SendAll(int sock, const void *data, size_t len);
 
 void NetplayLobbyWidget::ServerUpdateIO() {
-    if (this->mServerSock < 0)
+    if (mServerSock < 0)
         return;
 
     // 1) connect 完成检测
-    if (this->mServerConnecting && !this->mServerConnected) {
+    if (mServerConnecting && !mServerConnected) {
         fd_set wfds;
         FD_ZERO(&wfds);
-        FD_SET(this->mServerSock, &wfds);
+        FD_SET(mServerSock, &wfds);
         timeval tv{0, 0};
-        int r = select(this->mServerSock + 1, nullptr, &wfds, nullptr, &tv);
-        if (r > 0 && FD_ISSET(this->mServerSock, &wfds)) {
+        int r = select(mServerSock + 1, nullptr, &wfds, nullptr, &tv);
+        if (r > 0 && FD_ISSET(mServerSock, &wfds)) {
             int err = 0;
             socklen_t elen = sizeof(err);
-            getsockopt(this->mServerSock, SOL_SOCKET, SO_ERROR, &err, &elen);
+            getsockopt(mServerSock, SOL_SOCKET, SO_ERROR, &err, &elen);
             if (err == 0) {
                 gIsConnectedToServer = true;
-                this->mServerConnecting = false;
-                this->mServerConnected = true;
-                this->mServerStatusText = TodStringTranslate("[STATUS_CONNECTED]");
+                mServerConnecting = false;
+                mServerConnected = true;
+                mServerStatusText = TodStringTranslate("[STATUS_CONNECTED]");
                 ServerResetP2PState(false);
                 ServerOpenP2PListener();
-                if (this->mServerP2PListenSock >= 0) {
+                if (mServerP2PListenSock >= 0) {
                     ServerSendNatPort();
                 }
                 ServerSendQuery();
             } else {
                 ServerDisconnect("connect error");
-                this->mServerStatusText = TodStringTranslate("[STATUS_CONNECT_FAILED]");
+                mServerStatusText = TodStringTranslate("[STATUS_CONNECT_FAILED]");
             }
         }
     }
 
     // 2) 读数据（非阻塞）
     while (true) {
-        if (this->mSrvRecvLen >= (int)sizeof(this->mSrvRecvBuf)) {
+        if (mSrvRecvLen >= (int)sizeof(mSrvRecvBuf)) {
             // RELAY_GO may be followed immediately by a large snapshot. Parse
             // the control frames and hand off the buffered raw bytes before
             // reading more; leave the rest in the socket for the game reader.
             break;
         }
 
-        ssize_t n = recv(this->mServerSock, this->mSrvRecvBuf + this->mSrvRecvLen, sizeof(this->mSrvRecvBuf) - this->mSrvRecvLen, 0);
+        ssize_t n = recv(mServerSock, mSrvRecvBuf + mSrvRecvLen, sizeof(mSrvRecvBuf) - mSrvRecvLen, 0);
         if (n > 0) {
-            this->mSrvRecvLen += (int)n;
+            mSrvRecvLen += (int)n;
         } else if (n == 0) {
             ServerDisconnect("server closed");
             return;
@@ -1463,41 +1474,41 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                 if (len >= 4) {
                     int id = homura::ReadBEI32(payload);
                     ServerResetP2PState(true);
-                    this->mServerCreatePending = false;
-                    this->mServerHostProbeDone = false;
-                    this->mServerGuestProbeDone = false;
-                    this->mServerHosting = true;
-                    this->mServerJoined = false;
-                    this->mServerSpectating = false;
-                    this->mServerHostHasGuest = false;
-                    this->mServerHostSpectateAllowed = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mHostAllowSpectate);
-                    this->mServerJoinedSpectateAllowed = false;
-                    this->mServerHostForceRelay = false;
-                    this->mServerClientWantStart = false;
-                    this->mServerAskedWantStart = false;
-                    this->mServerHostedRoomId = id;
+                    mServerCreatePending = false;
+                    mServerHostProbeDone = false;
+                    mServerGuestProbeDone = false;
+                    mServerHosting = true;
+                    mServerJoined = false;
+                    mServerSpectating = false;
+                    mServerHostHasGuest = false;
+                    mServerHostSpectateAllowed = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mHostAllowSpectate);
+                    mServerJoinedSpectateAllowed = false;
+                    mServerHostForceRelay = false;
+                    mServerClientWantStart = false;
+                    mServerAskedWantStart = false;
+                    mServerHostedRoomId = id;
                     netplay::MetricsSetRoomId(id);
                     netplay::MetricsResetSettlementEvents();
-                    this->mServerJoinedRoomId = 0;
-                    this->mServerJoinedRoomName[0] = '\0';
-                    this->mServerRoomCount = 0;
-                    this->mSelectedRoomIndex_Server = 0;
-                    this->mServerRoomPage = 0;
+                    mServerJoinedRoomId = 0;
+                    mServerJoinedRoomName[0] = '\0';
+                    mServerRoomCount = 0;
+                    mSelectedRoomIndex_Server = 0;
+                    mServerRoomPage = 0;
                     gSecondPlayerName[0] = '\0';
-                    this->mServerSpectatorCount = 0;
-                    std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
-                    if (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) {
-                        std::strncpy(this->mServerHostedRoomName, this->mApp->mPlayerInfo->mName, sizeof(this->mServerHostedRoomName) - 1);
-                        this->mServerHostedRoomName[sizeof(this->mServerHostedRoomName) - 1] = '\0';
+                    mServerSpectatorCount = 0;
+                    std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
+                    if (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) {
+                        std::strncpy(mServerHostedRoomName, mApp->mPlayerInfo->mName, sizeof(mServerHostedRoomName) - 1);
+                        mServerHostedRoomName[sizeof(mServerHostedRoomName) - 1] = '\0';
                     } else {
-                        this->mServerHostedRoomName[0] = '\0';
+                        mServerHostedRoomName[0] = '\0';
                     }
                     // Relay rooms do not use the LAN player-name handshake.
                     // Keep the host name available to spectators and replays.
-                    std::strncpy(gServerHostName, this->mServerHostedRoomName, sizeof(gServerHostName) - 1);
+                    std::strncpy(gServerHostName, mServerHostedRoomName, sizeof(gServerHostName) - 1);
                     gServerHostName[sizeof(gServerHostName) - 1] = '\0';
-                    this->mServerStatusText = TodStringTranslate("[STATUS_ROOM_CREATED]");
-                    if (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mHostAllowSpectate) {
+                    mServerStatusText = TodStringTranslate("[STATUS_ROOM_CREATED]");
+                    if (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mHostAllowSpectate) {
                         ServerSendSetSpectate(true);
                     }
                 }
@@ -1505,24 +1516,25 @@ void NetplayLobbyWidget::ServerUpdateIO() {
             }
             case 0x82: { // ROOM_LIST
                 // payload: [count:1] + count*([roomId:4][flags:1][version:4][nameLen:1][nameBytes])
-                if (this->mServerQueryPending) {
-                    this->mServerLatencyMs = std::max(0, Sexy::GetTickCount() - this->mServerQuerySentTick);
-                    this->mServerQueryPending = false;
+                if (mServerQueryPending) {
+                    mServerLatencyMs = std::max(0, Sexy::GetTickCount() - mServerQuerySentTick);
+                    mServerQueryPending = false;
                 }
-                if (this->mServerHosting || this->mServerJoined || this->mServerSpectating || this->mServerCreatePending) {
-                    this->mServerRoomCount = 0;
-                    this->mSelectedRoomIndex_Server = 0;
-                    this->mServerRoomPage = 0;
+                if (mServerHosting || mServerJoined || mServerSpectating || mServerCreatePending) {
+                    mServerRoomCount = 0;
+                    mSelectedRoomIndex_Server = 0;
+                    mServerRoomPage = 0;
                     break;
                 }
-                this->mServerRoomCount = 0;
+                const int selectedRoomId = mServerRoomCount > 0 ? mServerRooms[mSelectedRoomIndex_Server].roomId : 0;
+                mServerRoomCount = 0;
                 bool foundCurrentRoomProbe = false;
                 if (len < 1)
                     break;
                 int count = payload[0] & 0xFF;
                 int off = 1;
 
-                for (int i = 0; i < count && this->mServerRoomCount < 255; i++) {
+                for (int i = 0; i < count && mServerRoomCount < 255; i++) {
                     if (off + 10 > (int)len)
                         break;
                     int id = homura::ReadBEI32(payload + off);
@@ -1537,11 +1549,11 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     const std::string_view wireRoomName(reinterpret_cast<const char *>(payload + off), nameLen);
                     off += nameLen;
                     std::string_view displayRoomName;
-                    if (!GetServerRoomDisplayName(wireRoomName, this->mIsCoopLobby, displayRoomName)) {
+                    if (!GetServerRoomDisplayName(wireRoomName, mIsCoopLobby, displayRoomName)) {
                         continue;
                     }
 
-                    ServerRoomItem &it = this->mServerRooms[this->mServerRoomCount++];
+                    ServerRoomItem &it = mServerRooms[mServerRoomCount++];
                     it.roomId = id;
                     it.protocolVersion = version;
                     it.full = (flags & 1) != 0;
@@ -1558,39 +1570,47 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                         cp = (int)sizeof(it.name) - 1;
                     std::memcpy(it.name, displayRoomName.data(), cp);
 
-                    const bool inCurrentHostRoom = this->mServerHosting && id == this->mServerHostedRoomId;
-                    const bool inCurrentGuestRoom = (this->mServerJoined || this->mServerSpectating) && id == this->mServerJoinedRoomId;
+                    const bool inCurrentHostRoom = mServerHosting && id == mServerHostedRoomId;
+                    const bool inCurrentGuestRoom = (mServerJoined || mServerSpectating) && id == mServerJoinedRoomId;
                     if (inCurrentHostRoom || inCurrentGuestRoom) {
-                        this->mServerHostProbeDone = it.hostProbeDone;
-                        this->mServerGuestProbeDone = it.guestProbeDone;
+                        mServerHostProbeDone = it.hostProbeDone;
+                        mServerGuestProbeDone = it.guestProbeDone;
                         if (inCurrentHostRoom) {
-                            this->mServerHostSpectateAllowed = it.spectateAllowed;
-                            this->mServerHostForceRelay = it.forceRelay;
+                            mServerHostSpectateAllowed = it.spectateAllowed;
+                            mServerHostForceRelay = it.forceRelay;
                         } else {
-                            this->mServerJoinedSpectateAllowed = it.spectateAllowed;
+                            mServerJoinedSpectateAllowed = it.spectateAllowed;
                         }
                         foundCurrentRoomProbe = true;
                     }
                 }
 
-                if ((this->mServerHosting || this->mServerJoined || this->mServerSpectating) && !foundCurrentRoomProbe) {
-                    this->mServerHostProbeDone = false;
-                    this->mServerGuestProbeDone = false;
+                if ((mServerHosting || mServerJoined || mServerSpectating) && !foundCurrentRoomProbe) {
+                    mServerHostProbeDone = false;
+                    mServerGuestProbeDone = false;
                 }
 
-                if (this->mSelectedRoomIndex_Server < 0)
-                    this->mSelectedRoomIndex_Server = 0;
-                if (this->mSelectedRoomIndex_Server >= this->mServerRoomCount)
-                    this->mSelectedRoomIndex_Server = this->mServerRoomCount - 1;
-                if (this->mSelectedRoomIndex_Server < 0)
-                    this->mSelectedRoomIndex_Server = 0;
-                int totalPages = (this->mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
+                std::stable_sort(mServerRooms, mServerRooms + mServerRoomCount, [](const ServerRoomItem &a, const ServerRoomItem &b) { return GetRoomSortPriority(a) < GetRoomSortPriority(b); });
+                for (int i = 0; i < mServerRoomCount; ++i) {
+                    if (mServerRooms[i].roomId == selectedRoomId) {
+                        mSelectedRoomIndex_Server = i;
+                        break;
+                    }
+                }
+
+                if (mSelectedRoomIndex_Server < 0)
+                    mSelectedRoomIndex_Server = 0;
+                if (mSelectedRoomIndex_Server >= mServerRoomCount)
+                    mSelectedRoomIndex_Server = mServerRoomCount - 1;
+                if (mSelectedRoomIndex_Server < 0)
+                    mSelectedRoomIndex_Server = 0;
+                int totalPages = (mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
                 if (totalPages < 1)
                     totalPages = 1;
-                if (this->mServerRoomPage < 0)
-                    this->mServerRoomPage = 0;
-                if (this->mServerRoomPage >= totalPages)
-                    this->mServerRoomPage = totalPages - 1;
+                if (mServerRoomPage < 0)
+                    mServerRoomPage = 0;
+                if (mServerRoomPage >= totalPages)
+                    mServerRoomPage = totalPages - 1;
                 break;
             }
             case 0x83: { // JOIN_RESULT
@@ -1606,64 +1626,64 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                 }
                 if (ok) {
                     ServerResetP2PState(true);
-                    this->mServerCreatePending = false;
-                    this->mServerHostProbeDone = false;
-                    this->mServerGuestProbeDone = false;
-                    this->mServerJoined = (joinRole == 0);
-                    this->mServerSpectating = (joinRole == 1);
-                    gIsServerModeSpectator = this->mServerSpectating;
-                    this->mServerHosting = false;
-                    this->mServerHostedRoomId = 0;
-                    this->mServerJoinedRoomId = rid;
+                    mServerCreatePending = false;
+                    mServerHostProbeDone = false;
+                    mServerGuestProbeDone = false;
+                    mServerJoined = (joinRole == 0);
+                    mServerSpectating = (joinRole == 1);
+                    gIsServerModeSpectator = mServerSpectating;
+                    mServerHosting = false;
+                    mServerHostedRoomId = 0;
+                    mServerJoinedRoomId = rid;
                     netplay::MetricsSetRoomId(rid);
                     netplay::MetricsResetSettlementEvents();
-                    this->mServerHostHasGuest = false;
-                    this->mServerHostSpectateAllowed = false;
-                    this->mServerJoinedSpectateAllowed = false;
-                    this->mServerHostForceRelay = false;
-                    this->mServerClientWantStart = false;
-                    this->mServerAskedWantStart = false;
-                    this->mServerJoinedRoomGaming = (roomFlags & 1) != 0;
-                    this->mServerSpectateReservationActive = false;
-                    this->mServerSpectateReserveTick = 0;
-                    this->mServerSpectateReserveWarnTick = 0;
-                    this->mServerHostedRoomName[0] = '\0';
+                    mServerHostHasGuest = false;
+                    mServerHostSpectateAllowed = false;
+                    mServerJoinedSpectateAllowed = false;
+                    mServerHostForceRelay = false;
+                    mServerClientWantStart = false;
+                    mServerAskedWantStart = false;
+                    mServerJoinedRoomGaming = (roomFlags & 1) != 0;
+                    mServerSpectateReservationActive = false;
+                    mServerSpectateReserveTick = 0;
+                    mServerSpectateReserveWarnTick = 0;
+                    mServerHostedRoomName[0] = '\0';
                     if (hostNameValid) {
                         const std::string_view wireHostName(reinterpret_cast<const char *>(payload + 10), hostNameLen);
                         std::string_view displayHostName;
-                        if (!GetServerRoomDisplayName(wireHostName, this->mIsCoopLobby, displayHostName)) {
+                        if (!GetServerRoomDisplayName(wireHostName, mIsCoopLobby, displayHostName)) {
                             displayHostName = wireHostName;
                         }
                         int copyLen = (int)displayHostName.size();
-                        if (copyLen > (int)sizeof(this->mServerJoinedRoomName) - 1)
-                            copyLen = (int)sizeof(this->mServerJoinedRoomName) - 1;
-                        std::memcpy(this->mServerJoinedRoomName, displayHostName.data(), copyLen);
-                        this->mServerJoinedRoomName[copyLen] = '\0';
+                        if (copyLen > (int)sizeof(mServerJoinedRoomName) - 1)
+                            copyLen = (int)sizeof(mServerJoinedRoomName) - 1;
+                        std::memcpy(mServerJoinedRoomName, displayHostName.data(), copyLen);
+                        mServerJoinedRoomName[copyLen] = '\0';
                     }
-                    if (this->mServerJoined) {
+                    if (mServerJoined) {
                         // Guest join: JOIN_RESULT carries host name.
-                        std::strncpy(gServerHostName, this->mServerJoinedRoomName, sizeof(gServerHostName) - 1);
+                        std::strncpy(gServerHostName, mServerJoinedRoomName, sizeof(gServerHostName) - 1);
                         gServerHostName[sizeof(gServerHostName) - 1] = '\0';
-                        const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+                        const char *localName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
                         std::strncpy(gSecondPlayerName, localName, sizeof(gSecondPlayerName) - 1);
                         gSecondPlayerName[sizeof(gSecondPlayerName) - 1] = '\0';
-                        this->mServerStatusText = TodStringTranslate("[STATUS_JOINED_ROOM]");
+                        mServerStatusText = TodStringTranslate("[STATUS_JOINED_ROOM]");
                     } else {
                         // Spectator: host name comes from JOIN_RESULT hostName field.
-                        std::strncpy(gServerHostName, this->mServerJoinedRoomName, sizeof(gServerHostName) - 1);
+                        std::strncpy(gServerHostName, mServerJoinedRoomName, sizeof(gServerHostName) - 1);
                         gServerHostName[sizeof(gServerHostName) - 1] = '\0';
                         gSecondPlayerName[0] = '\0';
-                        this->mServerStatusText = this->mServerJoinedRoomGaming ? TodStringTranslate("[ROOM_STARTED]") : TodStringTranslate("[JOINED_AS_SPECTATOR]");
+                        mServerStatusText = mServerJoinedRoomGaming ? TodStringTranslate("[ROOM_STARTED]") : TodStringTranslate("[JOINED_AS_SPECTATOR]");
                     }
-                    this->mServerSpectatorCount = 0;
-                    std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
+                    mServerSpectatorCount = 0;
+                    std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
 
                 } else {
-                    this->mServerCreatePending = false;
+                    mServerCreatePending = false;
                     if (roomVersion != 0 && roomVersion != NETPLAY_VERSION) {
-                        this->mServerStatusText = TodStringTranslate("[STATUS_ROOM_VERSION_ERR]");
+                        mServerStatusText = TodStringTranslate("[STATUS_ROOM_VERSION_ERR]");
                     } else {
-                        this->mServerStatusText = TodStringTranslate("[STATUS_JOIN_FAILED]");
+                        mServerStatusText = TodStringTranslate("[STATUS_JOIN_FAILED]");
                     }
                 }
                 break;
@@ -1671,9 +1691,9 @@ void NetplayLobbyWidget::ServerUpdateIO() {
             case 0x84: { // GUEST_JOINED
                 if (len >= 4) {
                     int rid = homura::ReadBEI32(payload);
-                    if (this->mServerHosting && rid == this->mServerHostedRoomId) {
-                        this->mServerHostHasGuest = true;
-                        this->mServerClientWantStart = false;
+                    if (mServerHosting && rid == mServerHostedRoomId) {
+                        mServerHostHasGuest = true;
+                        mServerClientWantStart = false;
                         if (len >= 5) {
                             int guestNameLen = payload[4] & 0xFF;
                             if (5 + guestNameLen <= len) {
@@ -1684,8 +1704,8 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                                 gSecondPlayerName[copyLen] = '\0';
                             }
                         }
-                        this->mServerStatusText = TodStringTranslate("[STATUS_GUEST_JOINED]");
-                    } else if (this->mServerSpectating && rid == this->mServerJoinedRoomId) {
+                        mServerStatusText = TodStringTranslate("[STATUS_GUEST_JOINED]");
+                    } else if (mServerSpectating && rid == mServerJoinedRoomId) {
                         if (len >= 5) {
                             int guestNameLen = payload[4] & 0xFF;
                             if (5 + guestNameLen <= len) {
@@ -1703,13 +1723,13 @@ void NetplayLobbyWidget::ServerUpdateIO() {
             case 0x87: { // GUEST_LEFT
                 if (len >= 4) {
                     int rid = homura::ReadBEI32(payload);
-                    if (this->mServerHosting && rid == this->mServerHostedRoomId) {
-                        this->mServerHostHasGuest = false;
-                        this->mServerHostForceRelay = false;
-                        this->mServerClientWantStart = false;
+                    if (mServerHosting && rid == mServerHostedRoomId) {
+                        mServerHostHasGuest = false;
+                        mServerHostForceRelay = false;
+                        mServerClientWantStart = false;
                         gSecondPlayerName[0] = '\0';
-                        this->mServerStatusText = TodStringTranslate("[STATUS_GUEST_LEFT]");
-                    } else if (this->mServerSpectating && rid == this->mServerJoinedRoomId) {
+                        mServerStatusText = TodStringTranslate("[STATUS_GUEST_LEFT]");
+                    } else if (mServerSpectating && rid == mServerJoinedRoomId) {
                         gSecondPlayerName[0] = '\0';
                     }
                 }
@@ -1720,32 +1740,32 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     int rid = homura::ReadBEI32(payload);
                     bool hostReady = payload[4] != 0;
                     bool guestReady = payload[5] != 0;
-                    if ((this->mServerHosting && rid == this->mServerHostedRoomId) || (this->mServerJoined && rid == this->mServerJoinedRoomId)) {
-                        this->mServerHostProbeDone = hostReady;
-                        this->mServerGuestProbeDone = guestReady;
+                    if ((mServerHosting && rid == mServerHostedRoomId) || (mServerJoined && rid == mServerJoinedRoomId)) {
+                        mServerHostProbeDone = hostReady;
+                        mServerGuestProbeDone = guestReady;
                     }
                 }
                 break;
             }
             case 0x8D: { // CLIENT_WANT_START
-                if (this->mServerHosting && this->mServerHostHasGuest) {
-                    this->mServerClientWantStart = true;
-                    this->mApp->PlaySample(Sexy::SOUND_POTATO_MINE);
+                if (mServerHosting && mServerHostHasGuest) {
+                    mServerClientWantStart = true;
+                    mApp->PlaySample(Sexy::SOUND_POTATO_MINE);
                 }
                 break;
             }
             case 0x8E: { // SPECTATE_STATE
                 if (len >= 6) {
                     int rid = homura::ReadBEI32(payload);
-                    if (this->mServerHosting && rid == this->mServerHostedRoomId) {
-                        this->mServerHostSpectateAllowed = (payload[4] != 0);
-                        this->mServerHostForceRelay = (payload[5] != 0);
-                        if (this->mApp && this->mApp->mPlayerInfo) {
-                            this->mApp->mPlayerInfo->mHostAllowSpectate = this->mServerHostSpectateAllowed;
-                            this->mApp->mPlayerInfo->SaveDetails();
+                    if (mServerHosting && rid == mServerHostedRoomId) {
+                        mServerHostSpectateAllowed = (payload[4] != 0);
+                        mServerHostForceRelay = (payload[5] != 0);
+                        if (mApp && mApp->mPlayerInfo) {
+                            mApp->mPlayerInfo->mHostAllowSpectate = mServerHostSpectateAllowed;
+                            mApp->mPlayerInfo->SaveDetails();
                         }
-                    } else if (this->mServerJoined && rid == this->mServerJoinedRoomId) {
-                        this->mServerJoinedSpectateAllowed = (payload[4] != 0);
+                    } else if (mServerJoined && rid == mServerJoinedRoomId) {
+                        mServerJoinedSpectateAllowed = (payload[4] != 0);
                     }
                 }
                 break;
@@ -1753,25 +1773,25 @@ void NetplayLobbyWidget::ServerUpdateIO() {
             case 0x8F: { // SPECTATOR_LIST
                 if (len >= 5) {
                     int rid = homura::ReadBEI32(payload);
-                    const bool sameRoom = (this->mServerHosting && rid == this->mServerHostedRoomId) || ((this->mServerJoined || this->mServerSpectating) && rid == this->mServerJoinedRoomId);
+                    const bool sameRoom = (mServerHosting && rid == mServerHostedRoomId) || ((mServerJoined || mServerSpectating) && rid == mServerJoinedRoomId);
                     if (sameRoom) {
                         int cnt = payload[4] & 0xFF;
                         int off = 5;
-                        this->mServerSpectatorCount = cnt;
-                        std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
+                        mServerSpectatorCount = cnt;
+                        std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
                         for (int i = 0; i < cnt && i < kMaxSpectatorNamesShown && off < len; ++i) {
                             int nlen = payload[off++] & 0xFF;
                             if (off + nlen > len) {
                                 break;
                             }
                             int copyLen = nlen;
-                            if (copyLen > (int)sizeof(this->mServerSpectatorNames[i]) - 1) {
-                                copyLen = (int)sizeof(this->mServerSpectatorNames[i]) - 1;
+                            if (copyLen > (int)sizeof(mServerSpectatorNames[i]) - 1) {
+                                copyLen = (int)sizeof(mServerSpectatorNames[i]) - 1;
                             }
                             if (copyLen > 0) {
-                                std::memcpy(this->mServerSpectatorNames[i], payload + off, copyLen);
+                                std::memcpy(mServerSpectatorNames[i], payload + off, copyLen);
                             }
-                            this->mServerSpectatorNames[i][copyLen] = '\0';
+                            mServerSpectatorNames[i][copyLen] = '\0';
                             off += nlen;
                         }
                     }
@@ -1784,129 +1804,121 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                     bool reserve = payload[4] != 0;
                     [[maybe_unused]] bool relayMode = payload[5] != 0;
                     std::uint32_t relayEpoch = (std::uint32_t)homura::ReadBEI32(payload + 7);
-                    if (this->mServerSpectating && rid == this->mServerJoinedRoomId) {
-                        this->mServerSpectateReservationActive = reserve;
-                        this->mServerRelayEpoch = relayEpoch;
-                        this->mServerSpectateReserveTick = 0;
-                        this->mServerSpectateReserveWarnTick = 0;
-                        this->mServerStatusText = TodStringTranslate(reserve ? "[LIVE_SPECTATE_LOADING]" : "[LIVE_SPECTATE_WAIT_NEXT]");
+                    if (mServerSpectating && rid == mServerJoinedRoomId) {
+                        mServerSpectateReservationActive = reserve;
+                        mServerRelayEpoch = relayEpoch;
+                        mServerSpectateReserveTick = 0;
+                        mServerSpectateReserveWarnTick = 0;
+                        mServerStatusText = TodStringTranslate(reserve ? "[LIVE_SPECTATE_LOADING]" : "[LIVE_SPECTATE_WAIT_NEXT]");
                     }
                 }
                 break;
             }
             case 0x89: { // P2P_READY
                 if (len >= 2) {
-                    this->mServerP2PLocalPort = homura::ReadBEU16(payload);
+                    mServerP2PLocalPort = homura::ReadBEU16(payload);
 
-                    LOG_DEBUG("[P2P_READY] recv len={} localPort={}", len, this->mServerP2PLocalPort);
+                    LOG_DEBUG("[P2P_READY] recv len={} localPort={}", len, mServerP2PLocalPort);
 
                     if (len >= 8) {
-                        this->mServerP2PProbePort = homura::ReadBEU16(payload + 2);
+                        mServerP2PProbePort = homura::ReadBEU16(payload + 2);
                         if (len >= 10) {
-                            this->mServerP2PProbePort2 = homura::ReadBEU16(payload + 4);
-                            this->mServerP2PProbeToken = (uint32_t)homura::ReadBEI32(payload + 6);
+                            mServerP2PProbePort2 = homura::ReadBEU16(payload + 4);
+                            mServerP2PProbeToken = (uint32_t)homura::ReadBEI32(payload + 6);
                         } else {
-                            this->mServerP2PProbePort2 = this->mServerP2PProbePort;
-                            this->mServerP2PProbeToken = (uint32_t)homura::ReadBEI32(payload + 4);
+                            mServerP2PProbePort2 = mServerP2PProbePort;
+                            mServerP2PProbeToken = (uint32_t)homura::ReadBEI32(payload + 4);
                         }
-                        this->mServerP2PProbeDone = false;
+                        mServerP2PProbeDone = false;
 
-                        LOG_DEBUG("[P2P_READY] probePort1={} probePort2={} token={} localPort={}",
-                                  this->mServerP2PProbePort,
-                                  this->mServerP2PProbePort2,
-                                  this->mServerP2PProbeToken,
-                                  this->mServerP2PLocalPort);
+                        LOG_DEBUG("[P2P_READY] probePort1={} probePort2={} token={} localPort={}", mServerP2PProbePort, mServerP2PProbePort2, mServerP2PProbeToken, mServerP2PLocalPort);
 
                         const bool started = ServerSendP2PProbe();
-                        LOG_DEBUG("[P2P_READY] probe started={} probeDone={}", started, this->mServerP2PProbeDone);
+                        LOG_DEBUG("[P2P_READY] probe started={} probeDone={}", started, mServerP2PProbeDone);
                     }
 
-                    if (!this->mServerGameStarting) {
-                        if (this->mServerP2PProbeDone) {
-                            this->mServerP2PStatusText = StrFormat("P2P: server registered %d, probe complete", this->mServerP2PLocalPort);
+                    if (!mServerGameStarting) {
+                        if (mServerP2PProbeDone) {
+                            mServerP2PStatusText = StrFormat("P2P: server registered %d, probe complete", mServerP2PLocalPort);
                         } else {
-                            this->mServerP2PStatusText = StrFormat("P2P: server accepted local port %d", this->mServerP2PLocalPort);
+                            mServerP2PStatusText = StrFormat("P2P: server accepted local port %d", mServerP2PLocalPort);
                         }
                     }
                 }
                 break;
             }
             case 0x88: { // P2P_INFO
-                LOG_DEBUG("[P2P_INFO] role={} hosting={} localPort={} probeDone={} rawLen={}",
-                          this->mServerHosting ? "host" : "guest",
-                          (int)this->mServerHosting,
-                          this->mServerP2PLocalPort,
-                          (int)this->mServerP2PProbeDone,
-                          len);
+                LOG_DEBUG(
+                    "[P2P_INFO] role={} hosting={} localPort={} probeDone={} rawLen={}", mServerHosting ? "host" : "guest", (int)mServerHosting, mServerP2PLocalPort, (int)mServerP2PProbeDone, len);
                 ServerHandleP2PInfo(payload, len);
                 LOG_DEBUG("[P2P_INFO] parsed roomId={} peer={}:{} timeoutSec={} status='{}'",
-                          this->mServerP2PTargetRoomId,
-                          this->mServerP2PPeerIp,
-                          this->mServerP2PPeerPort,
-                          this->mServerP2PTimeoutSec,
-                          this->mServerP2PStatusText.c_str());
+                          mServerP2PTargetRoomId,
+                          mServerP2PPeerIp,
+                          mServerP2PPeerPort,
+                          mServerP2PTimeoutSec,
+                          mServerP2PStatusText.c_str());
                 break;
             }
             case 0x8A: { // P2P_DONE
-                this->mServerP2PDoneReceived = true;
-                this->mServerGameStartingTick = 0;
-                this->mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
-                if (this->mServerP2PPendingSock >= 0) {
-                    this->mServerP2PStatusText = "P2P: server confirmed direct channel";
+                mServerP2PDoneReceived = true;
+                mServerGameStartingTick = 0;
+                mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
+                if (mServerP2PPendingSock >= 0) {
+                    mServerP2PStatusText = "P2P: server confirmed direct channel";
                     ServerAdoptP2PSocket();
                     return;
                 }
-                this->mServerP2PStatusText = "P2P: confirmed by server, waiting local socket";
+                mServerP2PStatusText = "P2P: confirmed by server, waiting local socket";
                 break;
             }
             case 0x86: { // ROOM_EXITED
                 // 不管 host/guest 哪边退出成功，回到空闲
-                this->mServerHosting = false;
-                this->mServerJoined = false;
-                this->mServerSpectating = false;
+                mServerHosting = false;
+                mServerJoined = false;
+                mServerSpectating = false;
                 gIsServerModeSpectator = false;
-                this->mServerCreatePending = false;
-                this->mServerHostProbeDone = false;
-                this->mServerGuestProbeDone = false;
-                this->mServerHostHasGuest = false;
-                this->mServerHostSpectateAllowed = false;
-                this->mServerJoinedSpectateAllowed = false;
-                this->mServerHostForceRelay = false;
-                this->mServerClientWantStart = false;
-                this->mServerAskedWantStart = false;
-                this->mServerJoinedRoomGaming = false;
-                this->mServerSpectateReservationActive = false;
-                this->mServerSpectateReserveTick = 0;
-                this->mServerSpectateReserveWarnTick = 0;
-                this->mServerGameStartingTick = 0;
-                this->mServerHostedRoomId = 0;
-                this->mServerJoinedRoomId = 0;
-                this->mServerHostedRoomName[0] = '\0';
-                this->mServerJoinedRoomName[0] = '\0';
-                this->mServerSpectatorCount = 0;
-                std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
+                mServerCreatePending = false;
+                mServerHostProbeDone = false;
+                mServerGuestProbeDone = false;
+                mServerHostHasGuest = false;
+                mServerHostSpectateAllowed = false;
+                mServerJoinedSpectateAllowed = false;
+                mServerHostForceRelay = false;
+                mServerClientWantStart = false;
+                mServerAskedWantStart = false;
+                mServerJoinedRoomGaming = false;
+                mServerSpectateReservationActive = false;
+                mServerSpectateReserveTick = 0;
+                mServerSpectateReserveWarnTick = 0;
+                mServerGameStartingTick = 0;
+                mServerHostedRoomId = 0;
+                mServerJoinedRoomId = 0;
+                mServerHostedRoomName[0] = '\0';
+                mServerJoinedRoomName[0] = '\0';
+                mServerSpectatorCount = 0;
+                std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
                 gSecondPlayerName[0] = '\0';
                 gServerHostName[0] = '\0';
                 ServerResetP2PState(true);
 
-                this->mServerStatusText = TodStringTranslate("[STATUS_ROOM_EXITED]");
+                mServerStatusText = TodStringTranslate("[STATUS_ROOM_EXITED]");
 
                 // 退出后拉一次列表
                 ServerSendQuery();
                 break;
             }
             case 0x85: { // RELAY_BEGIN
-                this->mServerRelayEpoch = (len >= 4) ? (std::uint32_t)homura::ReadBEI32(payload) : 0;
-                this->mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
-                this->mServerP2PStatusText = "P2P: relay fallback active";
-                this->mServerP2PFailSent = true;
-                this->mServerP2PTargetRoomId = 0;
-                this->mServerP2PPeerPort = 0;
-                this->mServerP2PPeerIp[0] = '\0';
-                CloseSocketFd(this->mServerP2PConnectingSock);
-                CloseSocketFd(this->mServerP2PPendingSock);
-                CloseSocketFd(this->mServerP2PListenSock, false);
-                if (this->mServerSock < 0) {
+                mServerRelayEpoch = (len >= 4) ? (std::uint32_t)homura::ReadBEI32(payload) : 0;
+                mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
+                mServerP2PStatusText = "P2P: relay fallback active";
+                mServerP2PFailSent = true;
+                mServerP2PTargetRoomId = 0;
+                mServerP2PPeerPort = 0;
+                mServerP2PPeerIp[0] = '\0';
+                CloseSocketFd(mServerP2PConnectingSock);
+                CloseSocketFd(mServerP2PPendingSock);
+                CloseSocketFd(mServerP2PListenSock, false);
+                if (mServerSock < 0) {
                     break;
                 }
 
@@ -1924,26 +1936,26 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                 gTcpConnecting = false;
                 ResetVsStreamBuffersForServerMode();
 
-                const bool isRelayPlayer = (this->mServerHosting || this->mServerJoined);
-                if (isRelayPlayer && this->mServerRelayEpoch != 0 && !ServerSendRelayReady(this->mServerRelayEpoch)) {
+                const bool isRelayPlayer = (mServerHosting || mServerJoined);
+                if (isRelayPlayer && mServerRelayEpoch != 0 && !ServerSendRelayReady(mServerRelayEpoch)) {
                     ServerDisconnect("relay ready send fail");
                     break;
                 }
-                this->mServerStatusText = TodStringTranslate("[STATUS_RELAY_WAIT_START]");
-                this->mServerP2PStatusText = "P2P: relay fallback active, waiting relay go";
+                mServerStatusText = TodStringTranslate("[STATUS_RELAY_WAIT_START]");
+                mServerP2PStatusText = "P2P: relay fallback active, waiting relay go";
                 break;
             }
 
             case 0x8B: { // RELAY_GO
                 const std::uint32_t relayGoEpoch = (len >= 4) ? (std::uint32_t)homura::ReadBEI32(payload) : 0;
-                if (this->mServerRelayEpoch != 0 && relayGoEpoch != 0 && relayGoEpoch != this->mServerRelayEpoch) {
+                if (mServerRelayEpoch != 0 && relayGoEpoch != 0 && relayGoEpoch != mServerRelayEpoch) {
                     break;
                 }
 
-                this->mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
-                this->mServerP2PStatusText = "P2P: relay active";
+                mServerStatusText = TodStringTranslate("[STATUS_BATTLE_BEGIN]");
+                mServerP2PStatusText = "P2P: relay active";
 
-                if (this->mServerSock < 0) {
+                if (mServerSock < 0) {
                     break;
                 }
 
@@ -1958,26 +1970,26 @@ void NetplayLobbyWidget::ServerUpdateIO() {
                 gTcpConnected = false;
                 gTcpConnecting = false;
                 ResetVsStreamBuffersForServerMode();
-                ServerMoveBufferedRelayBytesToVsStream(this->mServerHosting);
+                ServerMoveBufferedRelayBytesToVsStream(mServerHosting);
 
-                if (this->mServerHosting) {
-                    gTcpClientSocket = this->mServerSock;
-                    this->mServerSock = -1;
-                } else if (this->mServerJoined) {
-                    gTcpServerSocket = this->mServerSock;
+                if (mServerHosting) {
+                    gTcpClientSocket = mServerSock;
+                    mServerSock = -1;
+                } else if (mServerJoined) {
+                    gTcpServerSocket = mServerSock;
                     gTcpConnected = true;
                     gTcpConnecting = false;
-                    this->mServerSock = -1;
-                } else if (this->mServerSpectating) {
-                    gTcpServerSocket = this->mServerSock;
+                    mServerSock = -1;
+                } else if (mServerSpectating) {
+                    gTcpServerSocket = mServerSock;
                     gTcpConnected = true;
                     gTcpConnecting = false;
-                    this->mServerSock = -1;
-                    if (this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive) {
+                    mServerSock = -1;
+                    if (mServerJoinedRoomGaming && mServerSpectateReservationActive) {
                         gIsServerModeNetplay = true;
                         gServerModeTransport = ServerModeTransport::RELAY;
                         gIsServerModeSpectator = true;
-                        this->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_LOADING]");
+                        mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_LOADING]");
                         break;
                     }
                 } else {
@@ -2047,8 +2059,8 @@ void NetplayLobbyWidget::ServerUpdateIO() {
             }
             case 0xFF: { // ERROR
                 int ec = (len >= 1) ? (payload[0] & 0xFF) : -1;
-                this->mServerCreatePending = false;
-                this->mServerStatusText = StrFormat("Server error code: %d", ec);
+                mServerCreatePending = false;
+                mServerStatusText = StrFormat("Server error code: %d", ec);
                 break;
             }
             default:
@@ -2074,64 +2086,63 @@ static bool SendAll(int sock, const void *data, size_t len) {
 }
 
 void NetplayLobbyWidget::ServerResetP2PState(bool keepListener) {
-    const bool p2pNegotiating = (this->mServerP2PTargetRoomId != 0 || this->mServerP2PConnectingSock >= 0 || this->mServerP2PPendingSock >= 0 || this->mServerP2PDoneReceived);
+    const bool p2pNegotiating = (mServerP2PTargetRoomId != 0 || mServerP2PConnectingSock >= 0 || mServerP2PPendingSock >= 0 || mServerP2PDoneReceived);
 
-    CloseSocketFd(this->mServerP2PConnectingSock);
-    CloseSocketFd(this->mServerP2PPendingSock);
-    this->mServerP2PPendingFromAccept = false;
+    CloseSocketFd(mServerP2PConnectingSock);
+    CloseSocketFd(mServerP2PPendingSock);
+    mServerP2PPendingFromAccept = false;
 
     if (!keepListener) {
-        CloseSocketFd(this->mServerP2PListenSock, false);
-        CloseSocketFd(this->mServerP2PProbeSock, false);
-        this->mServerP2PLocalPort = 0;
-        this->mServerP2PNatSent = false;
-        this->mServerP2PListenerFailed = false;
-        this->mServerP2PProbePort = 0;
-        this->mServerP2PProbePort2 = 0;
-        this->mServerP2PProbeToken = 0;
-        this->mServerP2PProbeDone = false;
-        this->mServerP2PProbeActive = false;
-        this->mServerP2PProbeSocketConnected = false;
-        this->mServerP2PProbeTargetOk[0] = false;
-        this->mServerP2PProbeTargetOk[1] = false;
-        this->mServerP2PProbeAttempt = 0;
-        this->mServerP2PProbeTargetIndex = 0;
-        this->mServerP2PProbeStartTick = 0;
-        this->mServerP2PProbeTokenBytesSent = 0;
+        CloseSocketFd(mServerP2PListenSock, false);
+        CloseSocketFd(mServerP2PProbeSock, false);
+        mServerP2PLocalPort = 0;
+        mServerP2PNatSent = false;
+        mServerP2PListenerFailed = false;
+        mServerP2PProbePort = 0;
+        mServerP2PProbePort2 = 0;
+        mServerP2PProbeToken = 0;
+        mServerP2PProbeDone = false;
+        mServerP2PProbeActive = false;
+        mServerP2PProbeSocketConnected = false;
+        mServerP2PProbeTargetOk[0] = false;
+        mServerP2PProbeTargetOk[1] = false;
+        mServerP2PProbeAttempt = 0;
+        mServerP2PProbeTargetIndex = 0;
+        mServerP2PProbeStartTick = 0;
+        mServerP2PProbeTokenBytesSent = 0;
     }
 
-    this->mServerP2POkSent = false;
-    this->mServerP2PFailSent = false;
-    this->mServerP2PDoneReceived = false;
-    this->mServerGameStarting = false;
-    this->mServerRelayEpoch = 0;
-    this->mServerP2PDeadlineTick = 0;
-    this->mServerP2PNextRetryTick = 0;
-    this->mServerP2PTargetRoomId = 0;
-    this->mServerP2PPeerPort = 0;
-    this->mServerP2PTimeoutSec = 0;
-    this->mServerP2PPeerIp[0] = '\0';
+    mServerP2POkSent = false;
+    mServerP2PFailSent = false;
+    mServerP2PDoneReceived = false;
+    mServerGameStarting = false;
+    mServerRelayEpoch = 0;
+    mServerP2PDeadlineTick = 0;
+    mServerP2PNextRetryTick = 0;
+    mServerP2PTargetRoomId = 0;
+    mServerP2PPeerPort = 0;
+    mServerP2PTimeoutSec = 0;
+    mServerP2PPeerIp[0] = '\0';
 
-    if (this->mServerP2PListenSock >= 0 && p2pNegotiating) {
-        this->mServerP2PStatusText =
-            this->mServerP2PNatSent ? StrFormat("P2P: local port %d registered", this->mServerP2PLocalPort) : StrFormat("P2P: listener ready on %d", this->mServerP2PLocalPort);
-    } else if (this->mServerP2PListenerFailed) {
-        this->mServerP2PStatusText = "P2P: listener unavailable, relay only";
+    if (mServerP2PListenSock >= 0 && p2pNegotiating) {
+        mServerP2PStatusText = mServerP2PNatSent ? StrFormat("P2P: local port %d registered", mServerP2PLocalPort) : StrFormat("P2P: listener ready on %d", mServerP2PLocalPort);
+    } else if (mServerP2PListenerFailed) {
+        mServerP2PStatusText = "P2P: listener unavailable, relay only";
     } else {
-        this->mServerP2PStatusText = "P2P: idle";
+        mServerP2PStatusText = "P2P: idle";
     }
 }
 
 bool NetplayLobbyWidget::ServerOpenP2PListener() {
-    if (this->mServerP2PListenSock >= 0) {
-        LOG_DEBUG("[P2P_LISTEN] already open fd={} localPort={}", this->mServerP2PListenSock, this->mServerP2PLocalPort);
+    if (mServerP2PListenSock >= 0) {
+        LOG_DEBUG("[P2P_LISTEN] already open fd={} localPort={}", mServerP2PListenSock, mServerP2PLocalPort);
         return true;
     }
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        this->mServerP2PListenerFailed = true;
-        this->mServerP2PStatusText = "P2P: listener socket failed";
+        mServerP2PListenerFailed = true;
+        mServerP2PStatusText = "P2P: listener socket failed";
         LOG_ERROR("[P2P_LISTEN] socket failed errno={}", errno);
         return false;
     }
@@ -2141,7 +2152,7 @@ bool NetplayLobbyWidget::ServerOpenP2PListener() {
     int flags = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
-    int preferredPort = (this->mApp && this->mApp->mPlayerInfo) ? this->mApp->mPlayerInfo->mVSRoomPort : 0;
+    int preferredPort = (mApp && mApp->mPlayerInfo) ? mApp->mPlayerInfo->mVSRoomPort : 0;
 
     sockaddr_in sa{
         .sin_family = AF_INET,
@@ -2168,71 +2179,71 @@ bool NetplayLobbyWidget::ServerOpenP2PListener() {
     if (!bound || listen(sock, 1) < 0) {
         LOG_ERROR("[P2P_LISTEN] listen/bind failed errno={}", errno);
         CloseSocketFd(sock, false);
-        this->mServerP2PListenerFailed = true;
-        this->mServerP2PStatusText = "P2P: listener bind failed";
+        mServerP2PListenerFailed = true;
+        mServerP2PStatusText = "P2P: listener bind failed";
         return false;
     }
 
     socklen_t salen = sizeof(sa);
     getsockname(sock, (sockaddr *)&sa, &salen);
 
-    this->mServerP2PListenSock = sock;
-    this->mServerP2PLocalPort = ntohs(sa.sin_port);
-    this->mServerP2PListenerFailed = false;
-    this->mServerP2PStatusText = StrFormat("P2P: listener ready on %d", this->mServerP2PLocalPort);
+    mServerP2PListenSock = sock;
+    mServerP2PLocalPort = ntohs(sa.sin_port);
+    mServerP2PListenerFailed = false;
+    mServerP2PStatusText = StrFormat("P2P: listener ready on %d", mServerP2PLocalPort);
 
-    LOG_DEBUG("[P2P_LISTEN] ready fd={} localPort={} preferredPort={}", this->mServerP2PListenSock, this->mServerP2PLocalPort, preferredPort);
+    LOG_DEBUG("[P2P_LISTEN] ready fd={} localPort={} preferredPort={}", mServerP2PListenSock, mServerP2PLocalPort, preferredPort);
     return true;
 }
 
 bool NetplayLobbyWidget::ServerSendNatPort() {
-    if (this->mServerSock < 0 || this->mServerP2PLocalPort <= 0) {
-        LOG_WARN("[P2P_NAT_PORT] skip serverSock={} localPort={}", this->mServerSock, this->mServerP2PLocalPort);
+    if (mServerSock < 0 || mServerP2PLocalPort <= 0) {
+        LOG_WARN("[P2P_NAT_PORT] skip serverSock={} localPort={}", mServerSock, mServerP2PLocalPort);
         return false;
     }
 
     uint8_t buf[3];
     buf[0] = 0x08;
-    homura::WriteBEU16(buf + 1, (uint16_t)this->mServerP2PLocalPort);
+    homura::WriteBEU16(buf + 1, (uint16_t)mServerP2PLocalPort);
 
-    LOG_DEBUG("[P2P_NAT_PORT] send localPort={} server={}:{}", this->mServerP2PLocalPort, this->mServerIp, this->mServerPort);
+    LOG_DEBUG("[P2P_NAT_PORT] send localPort={} server={}:{}", mServerP2PLocalPort, mServerIp, mServerPort);
 
-    if (!SendAll(this->mServerSock, buf, sizeof(buf))) {
-        LOG_ERROR("[P2P_NAT_PORT] send failed localPort={}", this->mServerP2PLocalPort);
+    if (!SendAll(mServerSock, buf, sizeof(buf))) {
+        LOG_ERROR("[P2P_NAT_PORT] send failed localPort={}", mServerP2PLocalPort);
         ServerDisconnect("nat port send fail");
         return false;
     }
 
-    this->mServerP2PNatSent = true;
-    if (!this->mServerGameStarting) {
-        this->mServerP2PStatusText = StrFormat("P2P: local port %d sent to server", this->mServerP2PLocalPort);
+    mServerP2PNatSent = true;
+    if (!mServerGameStarting) {
+        mServerP2PStatusText = StrFormat("P2P: local port %d sent to server", mServerP2PLocalPort);
     }
     return true;
 }
 
 bool NetplayLobbyWidget::ServerSendP2PProbe() {
-    if (this->mServerP2PProbePort2 <= 0) {
-        this->mServerP2PProbePort2 = this->mServerP2PProbePort;
+    if (mServerP2PProbePort2 <= 0) {
+        mServerP2PProbePort2 = mServerP2PProbePort;
     }
-    if (this->mServerP2PLocalPort <= 0 || this->mServerP2PProbePort <= 0 || this->mServerP2PProbePort2 <= 0) {
+    if (mServerP2PLocalPort <= 0 || mServerP2PProbePort <= 0 || mServerP2PProbePort2 <= 0) {
         return false;
     }
 
-    CloseSocketFd(this->mServerP2PProbeSock, false);
-    this->mServerP2PProbeDone = false;
-    this->mServerP2PProbeActive = true;
-    this->mServerP2PProbeSocketConnected = false;
-    this->mServerP2PProbeTargetOk[0] = false;
-    this->mServerP2PProbeTargetOk[1] = false;
-    this->mServerP2PProbeAttempt = 1;
-    this->mServerP2PProbeTargetIndex = 0;
-    this->mServerP2PProbeStartTick = 0;
-    this->mServerP2PProbeTokenBytesSent = 0;
+    CloseSocketFd(mServerP2PProbeSock, false);
+    mServerP2PProbeDone = false;
+    mServerP2PProbeActive = true;
+    mServerP2PProbeSocketConnected = false;
+    mServerP2PProbeTargetOk[0] = false;
+    mServerP2PProbeTargetOk[1] = false;
+    mServerP2PProbeAttempt = 1;
+    mServerP2PProbeTargetIndex = 0;
+    mServerP2PProbeStartTick = 0;
+    mServerP2PProbeTokenBytesSent = 0;
     return true;
 }
 
 bool NetplayLobbyWidget::ServerStartP2PProbeTarget() {
-    const int targetPort = this->mServerP2PProbeTargetIndex == 0 ? this->mServerP2PProbePort : this->mServerP2PProbePort2;
+    const int targetPort = mServerP2PProbeTargetIndex == 0 ? mServerP2PProbePort : mServerP2PProbePort2;
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         return false;
@@ -2240,7 +2251,7 @@ bool NetplayLobbyWidget::ServerStartP2PProbeTarget() {
 
     EnableReuseOptions(sock);
     ConfigureTcpSocket(sock);
-    if (!BindSocketToAnyPort(sock, this->mServerP2PLocalPort)) {
+    if (!BindSocketToAnyPort(sock, mServerP2PLocalPort)) {
         CloseSocketFd(sock, false);
         return false;
     }
@@ -2249,7 +2260,7 @@ bool NetplayLobbyWidget::ServerStartP2PProbeTarget() {
         .sin_family = AF_INET,
         .sin_port = htons((uint16_t)targetPort),
     };
-    if (inet_pton(AF_INET, this->mServerIp, &probeSa.sin_addr) != 1) {
+    if (inet_pton(AF_INET, mServerIp, &probeSa.sin_addr) != 1) {
         CloseSocketFd(sock, false);
         return false;
     }
@@ -2260,90 +2271,90 @@ bool NetplayLobbyWidget::ServerStartP2PProbeTarget() {
         return false;
     }
 
-    this->mServerP2PProbeSock = sock;
-    this->mServerP2PProbeSocketConnected = ret == 0;
-    this->mServerP2PProbeStartTick = Sexy::GetTickCount();
-    this->mServerP2PProbeTokenBytesSent = 0;
-    LOG_DEBUG("[P2P_PROBE] attempt={} target={} port={} started", this->mServerP2PProbeAttempt, this->mServerP2PProbeTargetIndex, targetPort);
+    mServerP2PProbeSock = sock;
+    mServerP2PProbeSocketConnected = ret == 0;
+    mServerP2PProbeStartTick = Sexy::GetTickCount();
+    mServerP2PProbeTokenBytesSent = 0;
+    LOG_DEBUG("[P2P_PROBE] attempt={} target={} port={} started", mServerP2PProbeAttempt, mServerP2PProbeTargetIndex, targetPort);
     return true;
 }
 
 void NetplayLobbyWidget::ServerAdvanceP2PProbe(bool success) {
-    CloseSocketFd(this->mServerP2PProbeSock, false);
-    this->mServerP2PProbeSocketConnected = false;
-    this->mServerP2PProbeTokenBytesSent = 0;
-    this->mServerP2PProbeTargetOk[this->mServerP2PProbeTargetIndex] = success;
+    CloseSocketFd(mServerP2PProbeSock, false);
+    mServerP2PProbeSocketConnected = false;
+    mServerP2PProbeTokenBytesSent = 0;
+    mServerP2PProbeTargetOk[mServerP2PProbeTargetIndex] = success;
 
-    LOG_DEBUG("[P2P_PROBE] attempt={} target={} success={}", this->mServerP2PProbeAttempt, this->mServerP2PProbeTargetIndex, success);
-    if (++this->mServerP2PProbeTargetIndex < 2) {
+    LOG_DEBUG("[P2P_PROBE] attempt={} target={} success={}", mServerP2PProbeAttempt, mServerP2PProbeTargetIndex, success);
+    if (++mServerP2PProbeTargetIndex < 2) {
         return;
     }
 
-    if (this->mServerP2PProbeTargetOk[0] && this->mServerP2PProbeTargetOk[1]) {
-        this->mServerP2PProbeDone = true;
-        this->mServerP2PProbeActive = false;
-        if (!this->mServerGameStarting) {
-            this->mServerP2PStatusText = StrFormat("P2P: server registered %d, probe complete", this->mServerP2PLocalPort);
+    if (mServerP2PProbeTargetOk[0] && mServerP2PProbeTargetOk[1]) {
+        mServerP2PProbeDone = true;
+        mServerP2PProbeActive = false;
+        if (!mServerGameStarting) {
+            mServerP2PStatusText = StrFormat("P2P: server registered %d, probe complete", mServerP2PLocalPort);
         }
         return;
     }
 
-    if (++this->mServerP2PProbeAttempt > kServerP2PProbeAttempts) {
-        this->mServerP2PProbeActive = false;
+    if (++mServerP2PProbeAttempt > kServerP2PProbeAttempts) {
+        mServerP2PProbeActive = false;
         LOG_DEBUG("[P2P_PROBE] exhausted all attempts");
         return;
     }
 
-    this->mServerP2PProbeTargetOk[0] = false;
-    this->mServerP2PProbeTargetOk[1] = false;
-    this->mServerP2PProbeTargetIndex = 0;
+    mServerP2PProbeTargetOk[0] = false;
+    mServerP2PProbeTargetOk[1] = false;
+    mServerP2PProbeTargetIndex = 0;
 }
 
 void NetplayLobbyWidget::ServerUpdateP2PProbe() {
-    if (!this->mServerP2PProbeActive) {
+    if (!mServerP2PProbeActive) {
         return;
     }
-    if (this->mServerP2PProbeSock < 0) {
+    if (mServerP2PProbeSock < 0) {
         if (!ServerStartP2PProbeTarget()) {
             ServerAdvanceP2PProbe(false);
         }
         return;
     }
 
-    if (Sexy::GetTickCount() - this->mServerP2PProbeStartTick >= kServerP2PProbeTimeoutMs) {
+    if (Sexy::GetTickCount() - mServerP2PProbeStartTick >= kServerP2PProbeTimeoutMs) {
         ServerAdvanceP2PProbe(false);
         return;
     }
 
     fd_set wfds;
     FD_ZERO(&wfds);
-    FD_SET(this->mServerP2PProbeSock, &wfds);
+    FD_SET(mServerP2PProbeSock, &wfds);
     timeval tv{0, 0};
-    const int sel = select(this->mServerP2PProbeSock + 1, nullptr, &wfds, nullptr, &tv);
+    const int sel = select(mServerP2PProbeSock + 1, nullptr, &wfds, nullptr, &tv);
     if (sel < 0) {
         ServerAdvanceP2PProbe(false);
         return;
     }
-    if (sel == 0 || !FD_ISSET(this->mServerP2PProbeSock, &wfds)) {
+    if (sel == 0 || !FD_ISSET(mServerP2PProbeSock, &wfds)) {
         return;
     }
 
-    if (!this->mServerP2PProbeSocketConnected) {
+    if (!mServerP2PProbeSocketConnected) {
         int err = 0;
         socklen_t errLen = sizeof(err);
-        if (getsockopt(this->mServerP2PProbeSock, SOL_SOCKET, SO_ERROR, &err, &errLen) != 0 || err != 0) {
+        if (getsockopt(mServerP2PProbeSock, SOL_SOCKET, SO_ERROR, &err, &errLen) != 0 || err != 0) {
             ServerAdvanceP2PProbe(false);
             return;
         }
-        this->mServerP2PProbeSocketConnected = true;
+        mServerP2PProbeSocketConnected = true;
     }
 
     uint8_t tokenBuf[4];
-    homura::WriteBEI32(tokenBuf, (int32_t)this->mServerP2PProbeToken);
-    const ssize_t sent = send(this->mServerP2PProbeSock, tokenBuf + this->mServerP2PProbeTokenBytesSent, sizeof(tokenBuf) - (size_t)this->mServerP2PProbeTokenBytesSent, 0);
+    homura::WriteBEI32(tokenBuf, (int32_t)mServerP2PProbeToken);
+    const ssize_t sent = send(mServerP2PProbeSock, tokenBuf + mServerP2PProbeTokenBytesSent, sizeof(tokenBuf) - (size_t)mServerP2PProbeTokenBytesSent, 0);
     if (sent > 0) {
-        this->mServerP2PProbeTokenBytesSent += (int)sent;
-        if (this->mServerP2PProbeTokenBytesSent == (int)sizeof(tokenBuf)) {
+        mServerP2PProbeTokenBytesSent += (int)sent;
+        if (mServerP2PProbeTokenBytesSent == (int)sizeof(tokenBuf)) {
             ServerAdvanceP2PProbe(true);
         }
         return;
@@ -2356,46 +2367,46 @@ void NetplayLobbyWidget::ServerUpdateP2PProbe() {
 
 void NetplayLobbyWidget::ServerHandleP2PInfo(const uint8_t *payload, uint16_t len) {
     ServerResetP2PState(true);
-    this->mServerGameStarting = true;
+    mServerGameStarting = true;
 
     if (len < 8) {
-        this->mServerP2PFailSent = true;
-        this->mServerP2PStatusText = "P2P: malformed peer info, waiting relay";
+        mServerP2PFailSent = true;
+        mServerP2PStatusText = "P2P: malformed peer info, waiting relay";
         ServerSendU8(0x0A);
         return;
     }
 
     int off = 0;
-    this->mServerP2PTargetRoomId = homura::ReadBEI32(payload + off);
+    mServerP2PTargetRoomId = homura::ReadBEI32(payload + off);
     off += 4;
 
     int ipLen = payload[off++] & 0xFF;
     if (off + ipLen + 3 > (int)len || ipLen <= 0 || ipLen >= INET_ADDRSTRLEN) {
-        this->mServerP2PFailSent = true;
-        this->mServerP2PStatusText = "P2P: invalid peer endpoint, waiting relay";
+        mServerP2PFailSent = true;
+        mServerP2PStatusText = "P2P: invalid peer endpoint, waiting relay";
         ServerSendU8(0x0A);
         return;
     }
 
-    std::memcpy(this->mServerP2PPeerIp, payload + off, ipLen);
-    this->mServerP2PPeerIp[ipLen] = '\0';
+    std::memcpy(mServerP2PPeerIp, payload + off, ipLen);
+    mServerP2PPeerIp[ipLen] = '\0';
     off += ipLen;
 
-    this->mServerP2PPeerPort = homura::ReadBEU16(payload + off);
+    mServerP2PPeerPort = homura::ReadBEU16(payload + off);
     off += 2;
 
-    this->mServerP2PTimeoutSec = payload[off] > 0 ? (payload[off] & 0xFF) : 5;
-    this->mServerP2PDeadlineTick = this->mServerP2PTick + this->mServerP2PTimeoutSec * 100;
-    this->mServerP2PNextRetryTick = this->mServerP2PTick;
-    if (this->mServerHosting) {
-        this->mServerP2PStatusText = StrFormat("P2P: waiting inbound from %s:%d", this->mServerP2PPeerIp, this->mServerP2PPeerPort);
+    mServerP2PTimeoutSec = payload[off] > 0 ? (payload[off] & 0xFF) : 5;
+    mServerP2PDeadlineTick = mServerP2PTick + mServerP2PTimeoutSec * 100;
+    mServerP2PNextRetryTick = mServerP2PTick;
+    if (mServerHosting) {
+        mServerP2PStatusText = StrFormat("P2P: waiting inbound from %s:%d", mServerP2PPeerIp, mServerP2PPeerPort);
     } else {
-        this->mServerP2PStatusText = StrFormat("P2P: trying %s:%d", this->mServerP2PPeerIp, this->mServerP2PPeerPort);
+        mServerP2PStatusText = StrFormat("P2P: trying %s:%d", mServerP2PPeerIp, mServerP2PPeerPort);
     }
 }
 
 void NetplayLobbyWidget::ServerAdoptP2PSocket() {
-    if (this->mServerP2PPendingSock < 0) {
+    if (mServerP2PPendingSock < 0) {
         return;
     }
 
@@ -2411,23 +2422,23 @@ void NetplayLobbyWidget::ServerAdoptP2PSocket() {
     gTcpConnecting = false;
     ResetVsStreamBuffersForServerMode();
 
-    int directSock = this->mServerP2PPendingSock;
-    this->mServerP2PPendingSock = -1;
-    this->mServerP2PPendingFromAccept = false;
-    CloseSocketFd(this->mServerP2PConnectingSock);
-    CloseSocketFd(this->mServerP2PListenSock, false);
-    CloseSocketFd(this->mServerSock);
+    int directSock = mServerP2PPendingSock;
+    mServerP2PPendingSock = -1;
+    mServerP2PPendingFromAccept = false;
+    CloseSocketFd(mServerP2PConnectingSock);
+    CloseSocketFd(mServerP2PListenSock, false);
+    CloseSocketFd(mServerSock);
 
     // Once the match is handed off to a direct P2P socket, the lobby server is no longer active.
-    this->mServerConnected = false;
-    this->mServerConnecting = false;
-    this->mServerP2PStatusText = "P2P: direct channel active";
+    mServerConnected = false;
+    mServerConnecting = false;
+    mServerP2PStatusText = "P2P: direct channel active";
     gIsServerModeNetplay = true;
     gServerModeTransport = ServerModeTransport::P2P;
 
-    if (this->mServerHosting) {
+    if (mServerHosting) {
         gTcpClientSocket = directSock;
-    } else if (this->mServerJoined) {
+    } else if (mServerJoined) {
         gTcpServerSocket = directSock;
         gTcpConnected = true;
         gTcpConnecting = false;
@@ -2441,31 +2452,31 @@ void NetplayLobbyWidget::ServerAdoptP2PSocket() {
 }
 
 void NetplayLobbyWidget::ServerUpdateP2P() {
-    ++this->mServerP2PTick;
+    ++mServerP2PTick;
 
-    if (this->mServerP2PListenSock >= 0) {
+    if (mServerP2PListenSock >= 0) {
         sockaddr_in peerAddr{};
         socklen_t peerLen = sizeof(peerAddr);
-        int accepted = accept(this->mServerP2PListenSock, (sockaddr *)&peerAddr, &peerLen);
+        int accepted = accept(mServerP2PListenSock, (sockaddr *)&peerAddr, &peerLen);
         if (accepted >= 0) {
             char ip[INET_ADDRSTRLEN]{};
             inet_ntop(AF_INET, &peerAddr.sin_addr, ip, sizeof(ip));
-            LOG_DEBUG("[P2P_ACCEPT] role={} accepted from {}:{} localPort={}", this->mServerHosting ? "host" : "guest", ip, ntohs(peerAddr.sin_port), this->mServerP2PLocalPort);
+            LOG_DEBUG("[P2P_ACCEPT] role={} accepted from {}:{} localPort={}", mServerHosting ? "host" : "guest", ip, ntohs(peerAddr.sin_port), mServerP2PLocalPort);
             ConfigureTcpSocket(accepted);
-            if (this->mServerP2PTargetRoomId == 0 || this->mServerP2PFailSent) {
+            if (mServerP2PTargetRoomId == 0 || mServerP2PFailSent) {
                 CloseSocketFd(accepted);
-            } else if (this->mServerP2PPendingSock < 0 || !this->mServerP2PPendingFromAccept) {
-                if (this->mServerP2PPendingSock >= 0) {
-                    CloseSocketFd(this->mServerP2PPendingSock);
+            } else if (mServerP2PPendingSock < 0 || !mServerP2PPendingFromAccept) {
+                if (mServerP2PPendingSock >= 0) {
+                    CloseSocketFd(mServerP2PPendingSock);
                 }
-                this->mServerP2PPendingSock = accepted;
-                this->mServerP2PPendingFromAccept = true;
-                if (!this->mServerP2POkSent) {
+                mServerP2PPendingSock = accepted;
+                mServerP2PPendingFromAccept = true;
+                if (!mServerP2POkSent) {
                     if (ServerSendU8(0x09)) {
-                        this->mServerP2POkSent = true;
-                        this->mServerP2PStatusText = "P2P: inbound direct ready, waiting confirm";
+                        mServerP2POkSent = true;
+                        mServerP2PStatusText = "P2P: inbound direct ready, waiting confirm";
                     } else {
-                        CloseSocketFd(this->mServerP2PPendingSock);
+                        CloseSocketFd(mServerP2PPendingSock);
                         ServerDisconnect("p2p ok send fail");
                         return;
                     }
@@ -2476,68 +2487,68 @@ void NetplayLobbyWidget::ServerUpdateP2P() {
         }
     }
 
-    if (this->mServerP2PConnectingSock >= 0) {
+    if (mServerP2PConnectingSock >= 0) {
         fd_set wfds;
         FD_ZERO(&wfds);
-        FD_SET(this->mServerP2PConnectingSock, &wfds);
+        FD_SET(mServerP2PConnectingSock, &wfds);
         timeval tv{0, 0};
-        int r = select(this->mServerP2PConnectingSock + 1, nullptr, &wfds, nullptr, &tv);
-        if (r > 0 && FD_ISSET(this->mServerP2PConnectingSock, &wfds)) {
+        int r = select(mServerP2PConnectingSock + 1, nullptr, &wfds, nullptr, &tv);
+        if (r > 0 && FD_ISSET(mServerP2PConnectingSock, &wfds)) {
             int err = 0;
             socklen_t elen = sizeof(err);
-            getsockopt(this->mServerP2PConnectingSock, SOL_SOCKET, SO_ERROR, &err, &elen);
+            getsockopt(mServerP2PConnectingSock, SOL_SOCKET, SO_ERROR, &err, &elen);
             if (err == 0) {
-                if (!this->mServerP2PFailSent && this->mServerP2PPendingSock < 0) {
-                    this->mServerP2PPendingSock = this->mServerP2PConnectingSock;
-                    this->mServerP2PConnectingSock = -1;
-                    this->mServerP2PPendingFromAccept = false;
-                    if (!this->mServerP2POkSent) {
+                if (!mServerP2PFailSent && mServerP2PPendingSock < 0) {
+                    mServerP2PPendingSock = mServerP2PConnectingSock;
+                    mServerP2PConnectingSock = -1;
+                    mServerP2PPendingFromAccept = false;
+                    if (!mServerP2POkSent) {
                         if (ServerSendU8(0x09)) {
-                            this->mServerP2POkSent = true;
-                            this->mServerP2PStatusText = "P2P: outbound direct ready, waiting confirm";
+                            mServerP2POkSent = true;
+                            mServerP2PStatusText = "P2P: outbound direct ready, waiting confirm";
                         } else {
-                            CloseSocketFd(this->mServerP2PPendingSock);
+                            CloseSocketFd(mServerP2PPendingSock);
                             ServerDisconnect("p2p ok send fail");
                             return;
                         }
                     }
                 } else {
-                    CloseSocketFd(this->mServerP2PConnectingSock);
+                    CloseSocketFd(mServerP2PConnectingSock);
                 }
             } else {
-                CloseSocketFd(this->mServerP2PConnectingSock);
-                this->mServerP2PNextRetryTick = this->mServerP2PTick + kServerP2PConnectRetryTicks;
+                CloseSocketFd(mServerP2PConnectingSock);
+                mServerP2PNextRetryTick = mServerP2PTick + kServerP2PConnectRetryTicks;
             }
         }
     }
 
-    if (this->mServerP2PDoneReceived && this->mServerP2PPendingSock >= 0) {
+    if (mServerP2PDoneReceived && mServerP2PPendingSock >= 0) {
         ServerAdoptP2PSocket();
         return;
     }
 
-    if (this->mServerP2PFailSent || this->mServerP2POkSent || this->mServerP2PTargetRoomId == 0) {
+    if (mServerP2PFailSent || mServerP2POkSent || mServerP2PTargetRoomId == 0) {
         return;
     }
 
-    if (this->mServerP2PDeadlineTick > 0 && this->mServerP2PTick >= this->mServerP2PDeadlineTick) {
-        CloseSocketFd(this->mServerP2PConnectingSock);
-        this->mServerP2PFailSent = true;
-        this->mServerP2PStatusText = "P2P: direct timeout, waiting relay";
+    if (mServerP2PDeadlineTick > 0 && mServerP2PTick >= mServerP2PDeadlineTick) {
+        CloseSocketFd(mServerP2PConnectingSock);
+        mServerP2PFailSent = true;
+        mServerP2PStatusText = "P2P: direct timeout, waiting relay";
         if (!ServerSendU8(0x0A)) {
             ServerDisconnect("p2p fail send fail");
         }
         return;
     }
 
-    if (this->mServerP2PConnectingSock >= 0 || this->mServerP2PTick < this->mServerP2PNextRetryTick) {
+    if (mServerP2PConnectingSock >= 0 || mServerP2PTick < mServerP2PNextRetryTick) {
         return;
     }
 
     in_addr addr{};
-    if (inet_pton(AF_INET, this->mServerP2PPeerIp, &addr) != 1 || this->mServerP2PPeerPort <= 0) {
-        this->mServerP2PFailSent = true;
-        this->mServerP2PStatusText = "P2P: invalid peer address, waiting relay";
+    if (inet_pton(AF_INET, mServerP2PPeerIp, &addr) != 1 || mServerP2PPeerPort <= 0) {
+        mServerP2PFailSent = true;
+        mServerP2PStatusText = "P2P: invalid peer address, waiting relay";
         if (!ServerSendU8(0x0A)) {
             ServerDisconnect("p2p invalid peer");
         }
@@ -2546,15 +2557,15 @@ void NetplayLobbyWidget::ServerUpdateP2P() {
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        this->mServerP2PNextRetryTick = this->mServerP2PTick + kServerP2PConnectRetryTicks;
+        mServerP2PNextRetryTick = mServerP2PTick + kServerP2PConnectRetryTicks;
         return;
     }
 
     EnableReuseOptions(sock);
-    if (!BindSocketToAnyPort(sock, this->mServerP2PLocalPort)) {
+    if (!BindSocketToAnyPort(sock, mServerP2PLocalPort)) {
         CloseSocketFd(sock, false);
-        this->mServerP2PStatusText = "P2P: same-port bind failed, waiting relay";
-        this->mServerP2PNextRetryTick = this->mServerP2PTick + kServerP2PConnectRetryTicks;
+        mServerP2PStatusText = "P2P: same-port bind failed, waiting relay";
+        mServerP2PNextRetryTick = mServerP2PTick + kServerP2PConnectRetryTicks;
         return;
     }
 
@@ -2562,92 +2573,92 @@ void NetplayLobbyWidget::ServerUpdateP2P() {
 
     sockaddr_in peerSa{
         .sin_family = AF_INET,
-        .sin_port = htons((uint16_t)this->mServerP2PPeerPort),
+        .sin_port = htons((uint16_t)mServerP2PPeerPort),
         .sin_addr = addr,
     };
 
     LOG_DEBUG("[P2P_DIRECT_TRY] role={} peer={}:{} localPort={} tick={} deadline={} nextRetry={}",
-              this->mServerHosting ? "host" : "guest",
-              this->mServerP2PPeerIp,
-              this->mServerP2PPeerPort,
-              this->mServerP2PLocalPort,
-              this->mServerP2PTick,
-              this->mServerP2PDeadlineTick,
-              this->mServerP2PNextRetryTick);
+              mServerHosting ? "host" : "guest",
+              mServerP2PPeerIp,
+              mServerP2PPeerPort,
+              mServerP2PLocalPort,
+              mServerP2PTick,
+              mServerP2PDeadlineTick,
+              mServerP2PNextRetryTick);
 
     int ret = connect(sock, (sockaddr *)&peerSa, sizeof(peerSa));
     LOG_DEBUG("[P2P_DIRECT_CONNECT] ret={} errno={}", ret, errno);
     if (ret == 0) {
-        this->mServerP2PPendingSock = sock;
-        this->mServerP2PPendingFromAccept = false;
+        mServerP2PPendingSock = sock;
+        mServerP2PPendingFromAccept = false;
         if (!ServerSendU8(0x09)) {
-            CloseSocketFd(this->mServerP2PPendingSock);
+            CloseSocketFd(mServerP2PPendingSock);
             ServerDisconnect("p2p ok send fail");
             return;
         }
-        this->mServerP2POkSent = true;
-        this->mServerP2PStatusText = "P2P: outbound direct ready, waiting confirm";
+        mServerP2POkSent = true;
+        mServerP2PStatusText = "P2P: outbound direct ready, waiting confirm";
     } else if (errno == EINPROGRESS) {
-        this->mServerP2PConnectingSock = sock;
-        this->mServerP2PNextRetryTick = this->mServerP2PTick + kServerP2PConnectRetryTicks;
+        mServerP2PConnectingSock = sock;
+        mServerP2PNextRetryTick = mServerP2PTick + kServerP2PConnectRetryTicks;
     } else {
         CloseSocketFd(sock, false);
-        this->mServerP2PNextRetryTick = this->mServerP2PTick + kServerP2PConnectRetryTicks;
+        mServerP2PNextRetryTick = mServerP2PTick + kServerP2PConnectRetryTicks;
     }
 }
 
 void NetplayLobbyWidget::DrawServerP2PStatus(Sexy::Graphics *g, int x, int y) {
-    if (this->mServerP2PListenSock >= 0) {
-        g->DrawString(StrFormat("P2P listener: %d", this->mServerP2PLocalPort), x, y);
-    } else if (this->mServerP2PListenerFailed) {
+    if (mServerP2PListenSock >= 0) {
+        g->DrawString(StrFormat("P2P listener: %d", mServerP2PLocalPort), x, y);
+    } else if (mServerP2PListenerFailed) {
         g->DrawString("P2P listener: unavailable", x, y);
     } else {
         g->DrawString("P2P listener: not ready", x, y);
     }
 
-    pvzstl::string statusLine = this->mServerP2PStatusText.empty() ? "P2P: idle" : this->mServerP2PStatusText;
+    pvzstl::string statusLine = mServerP2PStatusText.empty() ? "P2P: idle" : mServerP2PStatusText;
     g->DrawString(statusLine, x, y + 35);
 
-    if (this->mServerP2PPeerPort > 0) {
-        g->DrawString(StrFormat("P2P peer: %s:%d room %d", this->mServerP2PPeerIp, this->mServerP2PPeerPort, this->mServerP2PTargetRoomId), x, y + 70);
+    if (mServerP2PPeerPort > 0) {
+        g->DrawString(StrFormat("P2P peer: %s:%d room %d", mServerP2PPeerIp, mServerP2PPeerPort, mServerP2PTargetRoomId), x, y + 70);
     }
 }
 
 bool NetplayLobbyWidget::ServerSendU8(uint8_t b) const {
-    if (this->mServerSock < 0)
+    if (mServerSock < 0)
         return false;
-    return SendAll(this->mServerSock, &b, 1);
+    return SendAll(mServerSock, &b, 1);
 }
 
 bool NetplayLobbyWidget::ServerSendRelayReady(std::uint32_t relayEpoch) const {
-    if (this->mServerSock < 0 || relayEpoch == 0) {
+    if (mServerSock < 0 || relayEpoch == 0) {
         return false;
     }
 
     uint8_t buf[5];
     buf[0] = 0x0B;
     homura::WriteBEI32(buf + 1, (int32_t)relayEpoch);
-    return SendAll(this->mServerSock, buf, sizeof(buf));
+    return SendAll(mServerSock, buf, sizeof(buf));
 }
 
 void NetplayLobbyWidget::ServerSendQuery() {
     // MsgType.QUERY = 0x02
     if (ServerSendU8(0x02)) {
-        this->mServerQuerySentTick = Sexy::GetTickCount();
-        this->mServerQueryPending = true;
+        mServerQuerySentTick = Sexy::GetTickCount();
+        mServerQueryPending = true;
     }
 }
 
 void NetplayLobbyWidget::ServerSendCreate() {
-    if (this->mServerSock < 0)
+    if (mServerSock < 0)
         return;
-    if (!this->mServerConnected || this->mServerConnecting || this->mServerHosting || this->mServerJoined || this->mServerSpectating || this->mServerCreatePending)
+    if (!mServerConnected || mServerConnecting || mServerHosting || mServerJoined || mServerSpectating || mServerCreatePending)
         return;
-    if (!this->mApp || !this->mApp->mPlayerInfo || !this->mApp->mPlayerInfo->mName)
+    if (!mApp || !mApp->mPlayerInfo || !mApp->mPlayerInfo->mName)
         return;
 
-    std::string wireName = this->mIsCoopLobby ? std::string(kCoopRoomNamePrefix) : std::string(kVsRoomNamePrefix);
-    wireName += this->mApp->mPlayerInfo->mName;
+    std::string wireName = mIsCoopLobby ? std::string(kCoopRoomNamePrefix) : std::string(kVsRoomNamePrefix);
+    wireName += mApp->mPlayerInfo->mName;
     int nlen = (int)wireName.size();
     if (nlen > 255)
         nlen = 255;
@@ -2656,71 +2667,71 @@ void NetplayLobbyWidget::ServerSendCreate() {
     head[0] = 0x01;          // MsgType.CREATE
     head[1] = (uint8_t)nlen; // nameLen
 
-    this->mServerCreatePending = true;
-    this->mServerRoomCount = 0;
-    this->mSelectedRoomIndex_Server = 0;
-    this->mServerRoomPage = 0;
-    if (!SendAll(this->mServerSock, head, 2)) {
-        this->mServerCreatePending = false;
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
+    mServerCreatePending = true;
+    mServerRoomCount = 0;
+    mSelectedRoomIndex_Server = 0;
+    mServerRoomPage = 0;
+    if (!SendAll(mServerSock, head, 2)) {
+        mServerCreatePending = false;
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
         return;
     }
-    if (nlen > 0 && !SendAll(this->mServerSock, wireName.data(), (size_t)nlen)) {
-        this->mServerCreatePending = false;
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
+    if (nlen > 0 && !SendAll(mServerSock, wireName.data(), (size_t)nlen)) {
+        mServerCreatePending = false;
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
         return;
     }
     uint8_t versionBuf[4];
     homura::WriteBEI32(versionBuf, NETPLAY_VERSION);
-    if (!SendAll(this->mServerSock, versionBuf, sizeof(versionBuf))) {
-        this->mServerCreatePending = false;
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
+    if (!SendAll(mServerSock, versionBuf, sizeof(versionBuf))) {
+        mServerCreatePending = false;
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_CREATE_FAIL]");
         return;
     }
-    this->mServerStatusText = TodStringTranslate("[STATUS_CREATING_ROOM]");
+    mServerStatusText = TodStringTranslate("[STATUS_CREATING_ROOM]");
 }
 
 
 void NetplayLobbyWidget::DrawServerRoomList(Sexy::Graphics *g) {
-    if (this->mServerRoomCount <= 0) {
+    if (mServerRoomCount <= 0) {
         TodDrawString(g, TodStringTranslate("[SERVER_NO_ROOMS_TIP]"), 400, kServerRoomListTitleY, g->GetFont(), g->GetColor(), DS_ALIGN_CENTER);
         return;
     }
 
-    int totalPages = (this->mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
+    int totalPages = (mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
     if (totalPages < 1)
         totalPages = 1;
-    if (this->mServerRoomPage < 0)
-        this->mServerRoomPage = 0;
-    if (this->mServerRoomPage >= totalPages)
-        this->mServerRoomPage = totalPages - 1;
+    if (mServerRoomPage < 0)
+        mServerRoomPage = 0;
+    if (mServerRoomPage >= totalPages)
+        mServerRoomPage = totalPages - 1;
 
-    const int pageStart = this->mServerRoomPage * kServerRoomListPageSize;
+    const int pageStart = mServerRoomPage * kServerRoomListPageSize;
     int pageEnd = pageStart + kServerRoomListPageSize;
-    if (pageEnd > this->mServerRoomCount) {
-        pageEnd = this->mServerRoomCount;
+    if (pageEnd > mServerRoomCount) {
+        pageEnd = mServerRoomCount;
     }
 
     int yPos = kServerRoomListItemStartY;
     Sexy::Color oldColor = g->mColor;
 
     g->SetFont(Sexy::FONT_DWARVENTODCRAFT18);
-    int idx = this->mSelectedRoomIndex_Server;
+    int idx = mSelectedRoomIndex_Server;
     if (idx < 0)
         idx = 0;
-    if (idx >= this->mServerRoomCount)
-        idx = this->mServerRoomCount - 1;
-    this->mSelectedRoomIndex_Server = idx;
+    if (idx >= mServerRoomCount)
+        idx = mServerRoomCount - 1;
+    mSelectedRoomIndex_Server = idx;
 
     for (int i = pageStart; i < pageEnd; i++) {
-        if (i == this->mSelectedRoomIndex_Server) {
+        if (i == mSelectedRoomIndex_Server) {
             TodDrawImageScaledF(g, addonImages.leaderboard_selector, 140, yPos - 35, 0.7, 0.7);
             g->SetColor(Sexy::Color(0, 255, 0));
         } else {
             g->SetColor(oldColor);
         }
 
-        const ServerRoomItem &r = this->mServerRooms[i];
+        const ServerRoomItem &r = mServerRooms[i];
         pvzstl::string tagGaming = TodStringTranslate("[TAG_GAMING]");
         pvzstl::string tagFull = TodStringTranslate("[TAG_FULL]");
         const bool versionLower = (r.protocolVersion != 0 && r.protocolVersion < NETPLAY_VERSION);
@@ -2755,13 +2766,13 @@ void NetplayLobbyWidget::DrawServerRoomList(Sexy::Graphics *g) {
     }
 
     if (totalPages > 1) {
-        if (this->mServerRoomPage > 0) {
+        if (mServerRoomPage > 0) {
             g->DrawImageMirror(Sexy::IMAGE_ZEN_NEXTGARDEN, kServerRoomListPrevPageX, kServerRoomListPageArrowY, true);
         }
-        if (this->mServerRoomPage + 1 < totalPages) {
+        if (mServerRoomPage + 1 < totalPages) {
             g->DrawImage(Sexy::IMAGE_ZEN_NEXTGARDEN, kServerRoomListNextPageX, kServerRoomListPageArrowY);
         }
-        TodDrawString(g, StrFormat("%d/%d", this->mServerRoomPage + 1, totalPages), 390, kServerRoomListPageNumberY, g->GetFont(), oldColor, DS_ALIGN_CENTER);
+        TodDrawString(g, StrFormat("%d/%d", mServerRoomPage + 1, totalPages), 390, kServerRoomListPageNumberY, g->GetFont(), oldColor, DS_ALIGN_CENTER);
     }
 
     g->SetColor(oldColor);
@@ -2770,8 +2781,8 @@ void NetplayLobbyWidget::DrawServerRoomList(Sexy::Graphics *g) {
 void NetplayLobbyWidget::ServerSelectRoomByMouse(int x, int y) {
     (void)x;
 
-    if (!this->mServerConnected) {
-        if (this->mServerConnecting || this->mServerHosting || this->mServerJoined) {
+    if (!mServerConnected) {
+        if (mServerConnecting || mServerHosting || mServerJoined) {
             return;
         }
 
@@ -2791,44 +2802,44 @@ void NetplayLobbyWidget::ServerSelectRoomByMouse(int x, int y) {
         if (targetIndex < 0) {
             return;
         }
-        if (this->mSelectedRoomIndex_Server != targetIndex) {
-            this->mSelectedRoomIndex_Server = targetIndex;
-            this->mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
+        if (mSelectedRoomIndex_Server != targetIndex) {
+            mSelectedRoomIndex_Server = targetIndex;
+            mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
         }
         return;
     }
 
-    if (this->mServerHosting || this->mServerJoined) {
+    if (mServerHosting || mServerJoined) {
         return;
     }
 
     const int listY = kServerRoomListItemStartY - 30;
     const int lineH = kServerRoomListLineH;
 
-    if (this->mServerRoomCount <= 0) {
+    if (mServerRoomCount <= 0) {
         return;
     }
 
-    int totalPages = (this->mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
+    int totalPages = (mServerRoomCount + kServerRoomListPageSize - 1) / kServerRoomListPageSize;
     if (totalPages < 1)
         totalPages = 1;
-    if (this->mServerRoomPage < 0)
-        this->mServerRoomPage = 0;
-    if (this->mServerRoomPage >= totalPages)
-        this->mServerRoomPage = totalPages - 1;
+    if (mServerRoomPage < 0)
+        mServerRoomPage = 0;
+    if (mServerRoomPage >= totalPages)
+        mServerRoomPage = totalPages - 1;
 
-    const int pageStart = this->mServerRoomPage * kServerRoomListPageSize;
-    int pageCount = this->mServerRoomCount - pageStart;
+    const int pageStart = mServerRoomPage * kServerRoomListPageSize;
+    int pageCount = mServerRoomCount - pageStart;
     if (pageCount > kServerRoomListPageSize) {
         pageCount = kServerRoomListPageSize;
     }
 
     if (y >= listY && y < listY + pageCount * lineH) {
         int idx = pageStart + (y - listY) / lineH;
-        if (idx >= 0 && idx < this->mServerRoomCount) {
-            if (this->mSelectedRoomIndex_Server != idx) {
-                this->mSelectedRoomIndex_Server = idx;
-                this->mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
+        if (idx >= 0 && idx < mServerRoomCount) {
+            if (mSelectedRoomIndex_Server != idx) {
+                mSelectedRoomIndex_Server = idx;
+                mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
             }
         }
     }
@@ -2837,23 +2848,23 @@ void NetplayLobbyWidget::ServerSelectRoomByMouse(int x, int y) {
 void NetplayLobbyWidget::ServerSendJoinSelected() {
     if (mReconnectPending)
         return;
-    if (this->mServerSock < 0)
+    if (mServerSock < 0)
         return;
-    if (this->mServerRoomCount <= 0)
+    if (mServerRoomCount <= 0)
         return;
 
-    int idx = this->mSelectedRoomIndex_Server;
+    int idx = mSelectedRoomIndex_Server;
     if (idx < 0)
         idx = 0;
-    if (idx >= this->mServerRoomCount)
-        idx = this->mServerRoomCount - 1;
-    const ServerRoomItem &room = this->mServerRooms[idx];
+    if (idx >= mServerRoomCount)
+        idx = mServerRoomCount - 1;
+    const ServerRoomItem &room = mServerRooms[idx];
     if (room.protocolVersion != 0 && room.protocolVersion != NETPLAY_VERSION) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_ROOM_VERSION_ERR]");
+        mServerStatusText = TodStringTranslate("[STATUS_ROOM_VERSION_ERR]");
         return;
     }
-    std::strncpy(this->mServerJoinedRoomName, room.name, sizeof(this->mServerJoinedRoomName) - 1);
-    this->mServerJoinedRoomName[sizeof(this->mServerJoinedRoomName) - 1] = '\0';
+    std::strncpy(mServerJoinedRoomName, room.name, sizeof(mServerJoinedRoomName) - 1);
+    mServerJoinedRoomName[sizeof(mServerJoinedRoomName) - 1] = '\0';
     int roomId = room.roomId;
     if (room.reconnectPending) {
         if (room.reconnectBusy) {
@@ -2866,7 +2877,7 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
         return;
     }
 
-    const char *playerName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+    const char *playerName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
     int nameLen = (int)std::strlen(playerName);
     if (nameLen > 255)
         nameLen = 255;
@@ -2882,27 +2893,27 @@ void NetplayLobbyWidget::ServerSendJoinSelected() {
 
     const bool wantSpectate = (room.full && room.spectateAllowed);
     buf[0] = wantSpectate ? 0x0F : 0x03; // JOIN_SPECTATE / JOIN
-    if (!SendAll(this->mServerSock, buf, size_t(10 + nameLen))) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
+    if (!SendAll(mServerSock, buf, size_t(10 + nameLen))) {
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
         ServerDisconnect("join send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerSendSetSpectate(bool allow) {
-    if (!this->mServerHosting || !this->mServerConnected || this->mServerConnecting) {
+    if (!mServerHosting || !mServerConnected || mServerConnecting) {
         return;
     }
     uint8_t buf[2];
     buf[0] = 0x0E; // SET_SPECTATE
     buf[1] = allow ? 1 : 0;
-    if (!SendAll(this->mServerSock, buf, sizeof(buf))) {
-        this->mServerStatusText = "set spectate failed";
+    if (!SendAll(mServerSock, buf, sizeof(buf))) {
+        mServerStatusText = "set spectate failed";
         ServerDisconnect("set spectate send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerSendSwitchRole(bool toSpectator) {
-    if (!this->mServerConnected || this->mServerConnecting || this->mServerSock < 0) {
+    if (!mServerConnected || mServerConnecting || mServerSock < 0) {
         return;
     }
     if (toSpectator) {
@@ -2918,56 +2929,56 @@ void NetplayLobbyWidget::ServerSendSwitchRole(bool toSpectator) {
     uint8_t buf[2];
     buf[0] = 0x10; // SWITCH_ROLE
     buf[1] = toSpectator ? 1 : 0;
-    if (!SendAll(this->mServerSock, buf, sizeof(buf))) {
-        this->mServerStatusText = "switch role failed";
+    if (!SendAll(mServerSock, buf, sizeof(buf))) {
+        mServerStatusText = "switch role failed";
         ServerDisconnect("switch role send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerSendReserveSpectate(bool reserve) {
-    int sock = this->mServerSock;
-    if (sock < 0 && this->mServerSpectating && gTcpServerSocket >= 0) {
+    int sock = mServerSock;
+    if (sock < 0 && mServerSpectating && gTcpServerSocket >= 0) {
         sock = gTcpServerSocket;
     }
-    if (sock < 0 || !this->mServerSpectating) {
+    if (sock < 0 || !mServerSpectating) {
         return;
     }
     uint8_t buf[2];
     buf[0] = 0x11; // RESERVE_SPECTATE
     buf[1] = reserve ? 1 : 0;
     if (!SendAll(sock, buf, sizeof(buf))) {
-        this->mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_REQUEST_FAILED]");
+        mServerStatusText = TodStringTranslate("[LIVE_SPECTATE_REQUEST_FAILED]");
         return;
     }
-    this->mServerSpectateReserveTick = 0;
-    this->mServerSpectateReserveWarnTick = 0;
+    mServerSpectateReserveTick = 0;
+    mServerSpectateReserveWarnTick = 0;
 }
 
 void NetplayLobbyWidget::ServerSendRejoinRole(bool toSpectator) {
-    if (!this->mServerConnected || this->mServerConnecting || this->mServerSock < 0 || this->mServerJoinedRoomId == 0) {
-        this->mServerStatusText = "switch role unavailable";
+    if (!mServerConnected || mServerConnecting || mServerSock < 0 || mServerJoinedRoomId == 0) {
+        mServerStatusText = "switch role unavailable";
         return;
     }
     if (toSpectator) {
         if (!Mode3CanSwitchGuestToSpectator(this)) {
-            this->mServerStatusText = "cannot switch to spectator";
+            mServerStatusText = "cannot switch to spectator";
             return;
         }
     } else {
         if (!Mode3CanSwitchSpectatorToGuest(this)) {
-            this->mServerStatusText = "cannot switch to guest";
+            mServerStatusText = "cannot switch to guest";
             return;
         }
     }
 
-    const char *playerName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+    const char *playerName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
     int nameLen = (int)std::strlen(playerName);
     if (nameLen > 255)
         nameLen = 255;
 
     uint8_t buf[1 + 4 + 4 + 1 + 255];
     buf[0] = toSpectator ? 0x0F : 0x03; // JOIN_SPECTATE / JOIN
-    homura::WriteBEI32(buf + 1, this->mServerJoinedRoomId);
+    homura::WriteBEI32(buf + 1, mServerJoinedRoomId);
     homura::WriteBEI32(buf + 5, NETPLAY_VERSION);
     buf[9] = (uint8_t)nameLen;
     if (nameLen > 0) {
@@ -2975,27 +2986,27 @@ void NetplayLobbyWidget::ServerSendRejoinRole(bool toSpectator) {
     }
 
     if (!ServerSendU8(0x07)) { // LEAVE_ROOM
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_LEAVE_FAIL]");
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_LEAVE_FAIL]");
         return;
     }
-    if (!SendAll(this->mServerSock, buf, size_t(10 + nameLen))) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
+    if (!SendAll(mServerSock, buf, size_t(10 + nameLen))) {
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_JOIN_FAIL]");
         return;
     }
-    this->mServerStatusText = toSpectator ? "switching to spectator..." : "switching to guest...";
+    mServerStatusText = toSpectator ? "switching to spectator..." : "switching to guest...";
 }
 
 
 void NetplayLobbyWidget::ServerSendExitRoom() {
     // EXIT_ROOM = 0x06
     if (!ServerSendU8(0x06)) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_EXIT_FAIL]");
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_EXIT_FAIL]");
         ServerDisconnect("exit send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerSendLeaveRoom() {
-    if (this->mServerSpectating && gTcpServerSocket >= 0) {
+    if (mServerSpectating && gTcpServerSocket >= 0) {
         shutdown(gTcpServerSocket, SHUT_RDWR);
         close(gTcpServerSocket);
         gTcpServerSocket = -1;
@@ -3005,58 +3016,58 @@ void NetplayLobbyWidget::ServerSendLeaveRoom() {
     }
     // LEAVE_ROOM = 0x07
     if (!ServerSendU8(0x07)) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_LEAVE_FAIL]");
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_LEAVE_FAIL]");
         ServerDisconnect("leave send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerOnBorrowedSocketClosed(const char *why) {
     ServerDisconnect(why);
-    this->mServerStatusText = TodStringTranslate("[SPECTATE_ROOM_CONNECTION_CLOSED]");
+    mServerStatusText = TodStringTranslate("[SPECTATE_ROOM_CONNECTION_CLOSED]");
     RefreshButtons();
 }
 
 void NetplayLobbyWidget::ServerSendKickGuest() {
     // KICK_GUEST = 0x0C
-    if (!this->mServerHosting || !this->mServerHostHasGuest) {
+    if (!mServerHosting || !mServerHostHasGuest) {
         return;
     }
     if (!ServerSendU8(0x0C)) {
-        this->mServerStatusText = "kick guest failed";
+        mServerStatusText = "kick guest failed";
         ServerDisconnect("kick send fail");
         return;
     }
-    this->mServerClientWantStart = false;
+    mServerClientWantStart = false;
 }
 
 void NetplayLobbyWidget::ServerSendStart() {
     // START = 0x05
     ServerResetP2PState(true);
-    this->mServerGameStarting = true;
-    this->mServerGameStartingTick = 0;
-    if (!this->mServerP2PNatSent) {
-        this->mServerP2PStatusText = "P2P: no local listener, waiting relay";
-    } else if (!this->mServerP2PProbeDone) {
-        this->mServerP2PStatusText = "P2P: start sent, waiting probe/public endpoint";
+    mServerGameStarting = true;
+    mServerGameStartingTick = 0;
+    if (!mServerP2PNatSent) {
+        mServerP2PStatusText = "P2P: no local listener, waiting relay";
+    } else if (!mServerP2PProbeDone) {
+        mServerP2PStatusText = "P2P: start sent, waiting probe/public endpoint";
     } else {
-        this->mServerP2PStatusText = "P2P: start sent, waiting peer info";
+        mServerP2PStatusText = "P2P: start sent, waiting peer info";
     }
     if (!ServerSendU8(0x05)) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_SEND_START_FAIL]");
+        mServerStatusText = TodStringTranslate("[STATUS_SEND_START_FAIL]");
         ServerDisconnect("start send fail");
     }
 }
 
 void NetplayLobbyWidget::ServerSendAskStart() {
-    if (!this->mServerJoined || !this->mServerConnected || this->mServerConnecting) {
+    if (!mServerJoined || !mServerConnected || mServerConnecting) {
         return;
     }
     if (!ServerSendU8(0x0D)) {
-        this->mServerStatusText = "ask start failed";
+        mServerStatusText = "ask start failed";
         ServerDisconnect("ask start send fail");
         return;
     }
-    this->mServerAskedWantStart = true;
+    mServerAskedWantStart = true;
 }
 
 
@@ -3069,13 +3080,13 @@ bool NetplayLobbyWidget::ServerConnectFromInput() {
     std::string ip;
     int port = 0;
     if (!ParseMode3IpPort(input, ip, port)) {
-        this->mServerStatusText = TodStringTranslate("[STATUS_ADDR_FORMAT_ERROR]");
+        mServerStatusText = TodStringTranslate("[STATUS_ADDR_FORMAT_ERROR]");
         return false;
     }
 
-    if (this->mApp && this->mApp->mPlayerInfo) {
+    if (mApp && mApp->mPlayerInfo) {
         const std::string normalizedAddr = ip + ':' + std::to_string(port);
-        Mode3RememberRecentServer(this->mApp->mPlayerInfo, normalizedAddr);
+        Mode3RememberRecentServer(mApp->mPlayerInfo, normalizedAddr);
         // The newly entered endpoint is always moved to recent-server slot 0.
         mSelectedServerListIndex = 3;
     }
@@ -3085,7 +3096,7 @@ bool NetplayLobbyWidget::ServerConnectFromInput() {
 
 void NetplayLobbyWidget::ServerDisconnect([[maybe_unused]] const char *why) {
     const bool hasActiveVsSocket = IsRemoteServer() || IsRemoteClient() || (gTcpServerSocket >= 0);
-    CloseSocketFd(this->mServerSock);
+    CloseSocketFd(mServerSock);
     mReconnectPending = false;
     mReconnectStartedAt = 0;
     mReconnectRoomId = 0;
@@ -3094,42 +3105,42 @@ void NetplayLobbyWidget::ServerDisconnect([[maybe_unused]] const char *why) {
     ServerResetP2PState(false);
 
     gIsConnectedToServer = false;
-    this->mServerConnecting = false;
-    this->mServerConnected = false;
+    mServerConnecting = false;
+    mServerConnected = false;
 
-    this->mServerHosting = false;
-    this->mServerJoined = false;
-    this->mServerSpectating = false;
-    this->mServerCreatePending = false;
-    this->mServerHostProbeDone = false;
-    this->mServerGuestProbeDone = false;
-    this->mServerHostHasGuest = false;
-    this->mServerHostSpectateAllowed = false;
-    this->mServerJoinedSpectateAllowed = false;
-    this->mServerHostForceRelay = false;
-    this->mServerClientWantStart = false;
-    this->mServerAskedWantStart = false;
-    this->mServerJoinedRoomGaming = false;
-    this->mServerSpectateReservationActive = false;
-    this->mServerHostedRoomId = 0;
-    this->mServerJoinedRoomId = 0;
-    this->mServerLatencyMs = -1;
-    this->mServerQuerySentTick = 0;
-    this->mServerQueryPending = false;
+    mServerHosting = false;
+    mServerJoined = false;
+    mServerSpectating = false;
+    mServerCreatePending = false;
+    mServerHostProbeDone = false;
+    mServerGuestProbeDone = false;
+    mServerHostHasGuest = false;
+    mServerHostSpectateAllowed = false;
+    mServerJoinedSpectateAllowed = false;
+    mServerHostForceRelay = false;
+    mServerClientWantStart = false;
+    mServerAskedWantStart = false;
+    mServerJoinedRoomGaming = false;
+    mServerSpectateReservationActive = false;
+    mServerHostedRoomId = 0;
+    mServerJoinedRoomId = 0;
+    mServerLatencyMs = -1;
+    mServerQuerySentTick = 0;
+    mServerQueryPending = false;
     netplay::MetricsResetSettlementEvents();
-    this->mServerHostedRoomName[0] = '\0';
-    this->mServerJoinedRoomName[0] = '\0';
-    this->mServerSpectatorCount = 0;
-    std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
+    mServerHostedRoomName[0] = '\0';
+    mServerJoinedRoomName[0] = '\0';
+    mServerSpectatorCount = 0;
+    std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
 
-    this->mServerRoomCount = 0;
-    this->mSelectedRoomIndex_Server = 0;
-    this->mServerRoomPage = 0;
-    this->mSrvRecvLen = 0;
-    this->mServerP2PTick = 0;
-    this->mServerGameStartingTick = 0;
-    this->mServerSpectateReserveTick = 0;
-    this->mServerSpectateReserveWarnTick = 0;
+    mServerRoomCount = 0;
+    mSelectedRoomIndex_Server = 0;
+    mServerRoomPage = 0;
+    mSrvRecvLen = 0;
+    mServerP2PTick = 0;
+    mServerGameStartingTick = 0;
+    mServerSpectateReserveTick = 0;
+    mServerSpectateReserveWarnTick = 0;
 
     if (!hasActiveVsSocket) {
         gSecondPlayerName[0] = '\0';
@@ -3139,7 +3150,7 @@ void NetplayLobbyWidget::ServerDisconnect([[maybe_unused]] const char *why) {
         gServerModeTransport = ServerModeTransport::NONE;
         gIsServerModeSpectator = false;
     }
-    this->mServerStatusText = TodStringTranslate("[STATUS_NOT_CONNECTED]");
+    mServerStatusText = TodStringTranslate("[STATUS_NOT_CONNECTED]");
 }
 
 namespace {
@@ -3436,20 +3447,20 @@ bool NetplayLobbyWidget::ManualIpConnect() {
     }
 
     // 保存目标
-    this->mManualIp[ip.copy(this->mManualIp, INET_ADDRSTRLEN - 1)] = '\0';
-    this->mManualPort = port;
-    this->mUseManualTarget = true;
-    LOG_DEBUG("target {}:{}", &this->mManualIp[0], this->mManualPort);
+    mManualIp[ip.copy(mManualIp, INET_ADDRSTRLEN - 1)] = '\0';
+    mManualPort = port;
+    mUseManualTarget = true;
+    LOG_DEBUG("target {}:{}", &mManualIp[0], mManualPort);
 
     // 切换到 joining 状态，重置连接状态（避免旧状态干扰）
-    this->mIsJoiningRoom = true;
+    mIsJoiningRoom = true;
     CloseUdpScanSocket();
 
-    this->mCreateRoomButton->mDisabled = true;
-    this->mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
+    mCreateRoomButton->mDisabled = true;
+    mJoinRoomButton->SetLabel("[LEAVE_ROOM_BUTTON]");
 
-    this->mPrimaryActionButton->mDisabled = true;
-    this->mPrimaryActionButton->SetLabel("[PLAY_ONLINE]");
+    mPrimaryActionButton->mDisabled = true;
+    mPrimaryActionButton->SetLabel("[PLAY_ONLINE]");
 
     if (gTcpServerSocket >= 0) {
         shutdown(gTcpServerSocket, SHUT_RDWR);
@@ -3476,7 +3487,7 @@ void NetplayLobbyWidget::UpdateNetplay() {
     // =========================================================
     // 1) 统一处理输入框回填（gInputString）
     //    关键点：
-    //    - 只在“真的消费了输入”时才清 this->mInputPurpose
+    //    - 只在“真的消费了输入”时才清 mInputPurpose
     //    - 若用途/模式不匹配：兜底清掉输入，避免每帧刷屏
     // =========================================================
     if (gHasInputContent) {
@@ -3502,14 +3513,14 @@ void NetplayLobbyWidget::UpdateNetplay() {
                 else
                     mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_VERIFYING]");
             }
-        } else if (this->mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && this->mUIMode == UIMode::MODE2_WIFI) {
-            this->mUseManualTarget = true;
+        } else if (mInputPurpose == InputPurpose::LAN_JOIN_MANUAL && mUIMode == UIMode::MODE2_WIFI) {
+            mUseManualTarget = true;
             ManualIpConnect(); // 内部会消费 gInputString
-            this->mInputPurpose = InputPurpose::NONE;
+            mInputPurpose = InputPurpose::NONE;
             RefreshButtons(); // 状态变化后立即刷新按钮
         }
         // MODE2：WIFI 房主设置房间端口
-        else if (this->mInputPurpose == InputPurpose::HOST_SET_PORT) {
+        else if (mInputPurpose == InputPurpose::HOST_SET_PORT) {
             // 取走输入并清空
             const std::string input = std::move(gInputString);
             gHasInputContent = false;
@@ -3518,24 +3529,24 @@ void NetplayLobbyWidget::UpdateNetplay() {
             // 允许输入 0（随机端口），范围 0~65535
             const int port = std::atoi(input.c_str());
             if (port < 0 || port > 65535) {
-                this->mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[PORT_INVALID_TITLE]", "[PORT_INVALID_DESC]", "[DIALOG_BUTTON_OK]", "", 3);
-                this->mInputPurpose = InputPurpose::NONE;
+                mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[PORT_INVALID_TITLE]", "[PORT_INVALID_DESC]", "[DIALOG_BUTTON_OK]", "", 3);
+                mInputPurpose = InputPurpose::NONE;
                 return;
             }
 
             // 保存设置
-            this->mApp->mPlayerInfo->mVSRoomPort = port;
-            this->mApp->mPlayerInfo->SaveDetails();
+            mApp->mPlayerInfo->mVSRoomPort = port;
+            mApp->mPlayerInfo->SaveDetails();
 
-            this->mInputPurpose = InputPurpose::NONE;
+            mInputPurpose = InputPurpose::NONE;
             // ✅ 关键：重建房间，让 gTcpPort / 广播端口真正改变
             ExitRoom();   // 会关 tcpClient/tcpListen/udpBroadcast
-            CreateRoom(); // 你已改为使用 this->mVSRoomPort bind
+            CreateRoom(); // 你已改为使用 mVSRoomPort bind
 
             // CreateRoom() 失败时：回到扫描模式避免卡死
-            if (!this->mIsCreatingRoom) {
+            if (!mIsCreatingRoom) {
                 InitUdpScanSocket();
-                this->mIsJoiningRoom = false;
+                mIsJoiningRoom = false;
             } else {
                 // 创建成功：不需要扫描
                 CloseUdpScanSocket();
@@ -3543,45 +3554,45 @@ void NetplayLobbyWidget::UpdateNetplay() {
             RefreshButtons();
         }
         // MODE3：连接服务器 IP:PORT
-        else if (this->mInputPurpose == InputPurpose::SERVER_CONNECT_ADDR && this->mUIMode == UIMode::MODE3_SERVER) {
+        else if (mInputPurpose == InputPurpose::SERVER_CONNECT_ADDR && mUIMode == UIMode::MODE3_SERVER) {
             ServerConnectFromInput(); // 内部会消费 gInputString
-            this->mInputPurpose = InputPurpose::NONE;
+            mInputPurpose = InputPurpose::NONE;
             RefreshButtons(); // 状态变化后立即刷新按钮
         } else {
             // 兜底：收到输入但用途/模式不匹配
             // 防止 gInputString 永远不空导致每帧重复触发/刷日志
-            LOG_WARN("[Input] drop input='{}' purpose={} mode={}", gInputString, int(this->mInputPurpose), int(this->mUIMode));
+            LOG_WARN("[Input] drop input='{}' purpose={} mode={}", gInputString, int(mInputPurpose), int(mUIMode));
             gInputString.clear();
             gHasInputContent = false;
             gHasInputContent.notify_one();
-            this->mInputPurpose = InputPurpose::NONE; // 这里不强制清 this->mInputPurpose 也行；清掉更安全
+            mInputPurpose = InputPurpose::NONE; // 这里不强制清 mInputPurpose 也行；清掉更安全
         }
     }
 
     // =========================================================
     // 2) MODE2：WIFI 才跑 UDP 扫描/广播节拍
     // =========================================================
-    if (this->mUIMode == UIMode::MODE2_WIFI) {
-        bool inScanMode = (!this->mIsCreatingRoom && !this->mIsJoiningRoom);
+    if (mUIMode == UIMode::MODE2_WIFI) {
+        bool inScanMode = (!mIsCreatingRoom && !mIsJoiningRoom);
         if (inScanMode) {
             // 扫描模式下：没房间就禁用“加入房间”
-            this->mJoinRoomButton->mDisabled = (gScannedServerCount == 0);
+            mJoinRoomButton->mDisabled = (gScannedServerCount == 0);
 
             // 选中索引修正
-            this->mSelectedServerIndex = std::clamp(this->mSelectedServerIndex, 0, std::max(0, gScannedServerCount - 1));
+            mSelectedServerIndex = std::clamp(mSelectedServerIndex, 0, std::max(0, gScannedServerCount - 1));
         }
 
         // 创建房间时：开始游戏按钮是否可点
-        if (this->mIsCreatingRoom) {
-            this->mPrimaryActionButton->mDisabled = !IsRemoteServer();
+        if (mIsCreatingRoom) {
+            mPrimaryActionButton->mDisabled = !IsRemoteServer();
         }
 
         // UDP 广播/扫描节拍
         gLastBroadcastTime++;
         if (gLastBroadcastTime >= 100) { // ~1秒
-            if (this->mIsCreatingRoom) {
+            if (mIsCreatingRoom) {
                 UdpBroadcastRoom();
-            } else if (!this->mIsJoiningRoom) {
+            } else if (!mIsJoiningRoom) {
                 ScanUdpBroadcastRoom();
             }
         }
@@ -3590,7 +3601,7 @@ void NetplayLobbyWidget::UpdateNetplay() {
         if (gTcpListenSocket >= 0) {
             CheckTcpAccept();
         }
-        if (this->mIsJoiningRoom && !IsRemoteClient()) {
+        if (mIsJoiningRoom && !IsRemoteClient()) {
             TryTcpConnect();
         }
     }
@@ -3598,25 +3609,25 @@ void NetplayLobbyWidget::UpdateNetplay() {
     // =========================================================
     // 3) MODE3：服务器联机 IO（connect 完成检测 + 收包） + 自动 query
     // =========================================================
-    if (this->mUIMode == UIMode::MODE3_SERVER) {
+    if (mUIMode == UIMode::MODE3_SERVER) {
         if (mReconnectEpoch != 0 && mServerSock < 0 && gTcpServerSocket < 0) {
             // A failed snapshot/timeout closes the borrowed raw socket before
             // the lobby itself closes. Release its stale joined-room state.
             ServerDisconnect("reconnect borrowed socket closed");
             mServerStatusText = TodStringTranslate("[STATUS_RECONNECT_FAILED]");
         }
-        if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSock < 0 && gTcpServerSocket < 0) {
+        if (mServerSpectating && mServerJoinedRoomGaming && mServerSock < 0 && gTcpServerSocket < 0) {
             ServerOnBorrowedSocketClosed("borrowed socket missing in update");
         }
-        if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive && this->mServerSock >= 0 && gTcpServerSocket < 0 && this->mServerRelayEpoch == 0) {
-            ++this->mServerSpectateReserveTick;
-            ++this->mServerSpectateReserveWarnTick;
-            if (this->mServerSpectateReserveWarnTick >= kMode3SpectateReserveWarnTicks) {
-                this->mServerSpectateReserveWarnTick = 0;
+        if (mServerSpectating && mServerJoinedRoomGaming && mServerSpectateReservationActive && mServerSock >= 0 && gTcpServerSocket < 0 && mServerRelayEpoch == 0) {
+            ++mServerSpectateReserveTick;
+            ++mServerSpectateReserveWarnTick;
+            if (mServerSpectateReserveWarnTick >= kMode3SpectateReserveWarnTicks) {
+                mServerSpectateReserveWarnTick = 0;
             }
         } else {
-            this->mServerSpectateReserveTick = 0;
-            this->mServerSpectateReserveWarnTick = 0;
+            mServerSpectateReserveTick = 0;
+            mServerSpectateReserveWarnTick = 0;
         }
         // 网络 IO（你实现：包含 connect 完成检测、收包解析等）
         ServerUpdateIO();
@@ -3634,15 +3645,15 @@ void NetplayLobbyWidget::UpdateNetplay() {
         ServerUpdateP2PProbe();
         ServerUpdateP2P();
         Mode3UpdateTargetLatencyProbes(this);
-        if (this->mServerGameStarting) {
-            this->mServerGameStartingTick++;
-            if (this->mServerGameStartingTick >= kMode3StartTimeoutTicks) {
-                const bool wasHosting = this->mServerHosting;
-                const bool wasJoinedOrSpectating = this->mServerJoined || this->mServerSpectating;
-                this->mServerGameStarting = false;
-                this->mServerGameStartingTick = 0;
-                this->mServerP2PStatusText = "P2P: start timeout";
-                this->mServerStatusText = TodStringTranslate("[STATUS_START_TIMEOUT]");
+        if (mServerGameStarting) {
+            mServerGameStartingTick++;
+            if (mServerGameStartingTick >= kMode3StartTimeoutTicks) {
+                const bool wasHosting = mServerHosting;
+                const bool wasJoinedOrSpectating = mServerJoined || mServerSpectating;
+                mServerGameStarting = false;
+                mServerGameStartingTick = 0;
+                mServerP2PStatusText = "P2P: start timeout";
+                mServerStatusText = TodStringTranslate("[STATUS_START_TIMEOUT]");
 
                 // Start timeout always forces local exit from the current room
                 // and returns MODE3 back to the room list.
@@ -3654,51 +3665,51 @@ void NetplayLobbyWidget::UpdateNetplay() {
                     LeaveRoom();
                 }
 
-                this->mServerHosting = false;
-                this->mServerJoined = false;
-                this->mServerSpectating = false;
+                mServerHosting = false;
+                mServerJoined = false;
+                mServerSpectating = false;
                 gIsServerModeSpectator = false;
-                this->mServerCreatePending = false;
-                this->mServerHostProbeDone = false;
-                this->mServerGuestProbeDone = false;
-                this->mServerHostHasGuest = false;
-                this->mServerHostSpectateAllowed = false;
-                this->mServerJoinedSpectateAllowed = false;
-                this->mServerHostForceRelay = false;
-                this->mServerClientWantStart = false;
-                this->mServerAskedWantStart = false;
-                this->mServerJoinedRoomGaming = false;
-                this->mServerSpectateReservationActive = false;
-                this->mServerSpectateReserveTick = 0;
-                this->mServerSpectateReserveWarnTick = 0;
-                this->mServerHostedRoomId = 0;
-                this->mServerJoinedRoomId = 0;
-                this->mServerHostedRoomName[0] = '\0';
-                this->mServerJoinedRoomName[0] = '\0';
-                this->mServerSpectatorCount = 0;
-                std::memset(this->mServerSpectatorNames, 0, sizeof(this->mServerSpectatorNames));
+                mServerCreatePending = false;
+                mServerHostProbeDone = false;
+                mServerGuestProbeDone = false;
+                mServerHostHasGuest = false;
+                mServerHostSpectateAllowed = false;
+                mServerJoinedSpectateAllowed = false;
+                mServerHostForceRelay = false;
+                mServerClientWantStart = false;
+                mServerAskedWantStart = false;
+                mServerJoinedRoomGaming = false;
+                mServerSpectateReservationActive = false;
+                mServerSpectateReserveTick = 0;
+                mServerSpectateReserveWarnTick = 0;
+                mServerHostedRoomId = 0;
+                mServerJoinedRoomId = 0;
+                mServerHostedRoomName[0] = '\0';
+                mServerJoinedRoomName[0] = '\0';
+                mServerSpectatorCount = 0;
+                std::memset(mServerSpectatorNames, 0, sizeof(mServerSpectatorNames));
                 gSecondPlayerName[0] = '\0';
                 gServerHostName[0] = '\0';
                 ServerResetP2PState(true);
-                if (this->mServerConnected) {
+                if (mServerConnected) {
                     ServerSendQuery();
                 }
             }
         }
 
         // 自动 Query：空闲房间列表每秒刷新；进房/观战席也低频发送，避免服务端按应用层空闲断开。
-        this->mServerLastQueryTick++;
-        if (this->mServerConnected && !this->mServerGameStarting && !this->mServerCreatePending && this->mServerSock >= 0) {
-            const bool inRoom = this->mServerHosting || this->mServerJoined || this->mServerSpectating;
+        mServerLastQueryTick++;
+        if (mServerConnected && !mServerGameStarting && !mServerCreatePending && mServerSock >= 0) {
+            const bool inRoom = mServerHosting || mServerJoined || mServerSpectating;
             const int queryInterval = inRoom ? 1500 : 100; // ~15s in-room keepalive, ~1s room-list refresh.
-            if (this->mServerLastQueryTick >= queryInterval) {
-                this->mServerLastQueryTick = 0;
+            if (mServerLastQueryTick >= queryInterval) {
+                mServerLastQueryTick = 0;
                 ServerSendQuery();
             }
         } else {
             // 不在空闲态就不刷列表，tick 防溢出
-            if (this->mServerLastQueryTick > 1000000)
-                this->mServerLastQueryTick = 0;
+            if (mServerLastQueryTick > 1000000)
+                mServerLastQueryTick = 0;
         }
     }
 
@@ -3714,7 +3725,7 @@ void NetplayLobbyWidget::ProcessClientEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_CLIENT_WAITFORSECONDPALYER_PLAYER_NAME: {
             auto *nameEvent = static_cast<const CHARx32_Event *>(event);
-            const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+            const char *localName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
             std::strncpy(gServerHostName, localName, sizeof(gServerHostName) - 1);
             gServerHostName[sizeof(gServerHostName) - 1] = '\0';
             std::strncpy(gSecondPlayerName, nameEvent->charx32_0, sizeof(gSecondPlayerName) - 1);
@@ -3722,7 +3733,7 @@ void NetplayLobbyWidget::ProcessClientEvent(const BaseEvent *event) {
 
             CHARx32_Event nameEventReply{};
             nameEventReply.type = EVENT_SERVER_WAITFORSECONDPALYER_PLAYER_NAME;
-            strncpy(nameEventReply.charx32_0, this->mApp->mPlayerInfo->mName, sizeof(nameEventReply.charx32_0) - 1);
+            strncpy(nameEventReply.charx32_0, mApp->mPlayerInfo->mName, sizeof(nameEventReply.charx32_0) - 1);
             netplay::PutEvent(nameEventReply);
         } break;
         default:
@@ -3735,24 +3746,24 @@ void NetplayLobbyWidget::ProcessServerEvent(const BaseEvent *event) {
     switch (event->type) {
         case EVENT_SERVER_WAITFORSECONDPALYER_VERSION_CHECK: {
             auto *event1 = static_cast<const U16_Event *>(event);
-            const uint16_t expectedProtocol = GetLanRoomProtocol(this->mIsCoopLobby);
+            const uint16_t expectedProtocol = GetLanRoomProtocol(mIsCoopLobby);
             if (event1->u16_0 != expectedProtocol) {
                 LOG_ERROR("Room Version Mismatch!");
                 // 弹出提示并断开连接
                 LeaveRoom();
                 InitUdpScanSocket();
-                this->mApp->LawnMessageBox(
+                mApp->LawnMessageBox(
                     Dialogs::DIALOG_MESSAGE, "[VERSION_ERROR_TITLE]", event1->u16_0 > expectedProtocol ? "[VERSION_ERROR_HIGN_DESC]" : "[VERSION_ERROR_LOW_DESC]", "[DIALOG_BUTTON_OK]", "", 3);
             } else {
                 CHARx32_Event nameEvent{};
                 nameEvent.type = EVENT_CLIENT_WAITFORSECONDPALYER_PLAYER_NAME;
-                strncpy(nameEvent.charx32_0, this->mApp->mPlayerInfo->mName, sizeof(nameEvent.charx32_0) - 1);
+                strncpy(nameEvent.charx32_0, mApp->mPlayerInfo->mName, sizeof(nameEvent.charx32_0) - 1);
                 netplay::PutEvent(nameEvent);
             }
         } break;
         case EVENT_SERVER_WAITFORSECONDPALYER_PLAYER_NAME: {
             auto *nameEvent = static_cast<const CHARx32_Event *>(event);
-            const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+            const char *localName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
             std::strncpy(gServerHostName, nameEvent->charx32_0, sizeof(gServerHostName) - 1);
             gServerHostName[sizeof(gServerHostName) - 1] = '\0';
             std::strncpy(gSecondPlayerName, localName, sizeof(gSecondPlayerName) - 1);
@@ -3764,18 +3775,18 @@ void NetplayLobbyWidget::ProcessServerEvent(const BaseEvent *event) {
             RequestClose(NetplayLobbyWidget::NetplayLobbyWidget_Enter);
             break;
         case EVENT_SERVER_VSSETUPMENU_SYNC_VS_MODE: {
-            if (this->mServerSpectating && this->mServerJoinedRoomGaming && this->mServerSpectateReservationActive) {
+            if (mServerSpectating && mServerJoinedRoomGaming && mServerSpectateReservationActive) {
                 auto *syncEvent = static_cast<const U8U8_Event *>(event);
                 Challenge::msVSShuffleMode = syncEvent->u8_0 == 1;
                 Challenge::msVSLegacyMode = syncEvent->u8_0 == 2;
                 gVSBackground = BackgroundType(syncEvent->u8_1);
-                this->mServerJoinedRoomGaming = false;
-                this->mServerSpectateReservationActive = false;
-                this->mServerSpectateReserveTick = 0;
-                this->mServerSpectateReserveWarnTick = 0;
+                mServerJoinedRoomGaming = false;
+                mServerSpectateReservationActive = false;
+                mServerSpectateReserveTick = 0;
+                mServerSpectateReserveWarnTick = 0;
                 RequestClose(NetplayLobbyWidget::NetplayLobbyWidget_Enter);
-                this->mApp->KillChallengeScreen();
-                this->mApp->PreNewGame(GAMEMODE_MP_VS, false);
+                mApp->KillChallengeScreen();
+                mApp->PreNewGame(GAMEMODE_MP_VS, false);
             } else {
             }
         } break;
@@ -3903,7 +3914,7 @@ bool NetplayLobbyWidget::GetActiveBroadcast(sockaddr_in &out_bcast, std::string 
 
 
 void NetplayLobbyWidget::CreateRoom() {
-    const char *localName = (this->mApp && this->mApp->mPlayerInfo && this->mApp->mPlayerInfo->mName) ? this->mApp->mPlayerInfo->mName : "";
+    const char *localName = (mApp && mApp->mPlayerInfo && mApp->mPlayerInfo->mName) ? mApp->mPlayerInfo->mName : "";
     std::strncpy(gServerHostName, localName, sizeof(gServerHostName) - 1);
     gServerHostName[sizeof(gServerHostName) - 1] = '\0';
     gSecondPlayerName[0] = '\0';
@@ -3912,7 +3923,7 @@ void NetplayLobbyWidget::CreateRoom() {
     gTcpListenSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (gTcpListenSocket < 0) {
         LOG_DEBUG("TCP socket failed errno={}", errno);
-        this->mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", "[CREATE_ROOM_FAIL_SOCKET]", "[DIALOG_BUTTON_OK]", "", 3);
+        mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", "[CREATE_ROOM_FAIL_SOCKET]", "[DIALOG_BUTTON_OK]", "", 3);
         return;
     }
 
@@ -3921,7 +3932,7 @@ void NetplayLobbyWidget::CreateRoom() {
 
     sockaddr_in addr{
         .sin_family = AF_INET,
-        .sin_port = htons(this->mApp->mPlayerInfo->mVSRoomPort), // 允许0
+        .sin_port = htons(mApp->mPlayerInfo->mVSRoomPort), // 允许0
         .sin_addr{.s_addr = INADDR_ANY},
     };
     int opt = 1;
@@ -3937,10 +3948,9 @@ void NetplayLobbyWidget::CreateRoom() {
 
         pvzstl::string strFmt = TodStringTranslate("[CREATE_ROOM_FAIL_BIND]");
 
-        int result =
-            this->mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", StrFormat(strFmt.c_str(), this->mApp->mPlayerInfo->mVSRoomPort).c_str(), "[DIALOG_BUTTON_OK]", "", 3);
+        int result = mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", StrFormat(strFmt.c_str(), mApp->mPlayerInfo->mVSRoomPort).c_str(), "[DIALOG_BUTTON_OK]", "", 3);
         if (result == 1000) {
-            this->mInputPurpose = InputPurpose::HOST_SET_PORT;
+            mInputPurpose = InputPurpose::HOST_SET_PORT;
             ShowTextInput("[INPUT_TITLE_SET_PORT]", "[HINT_PORT]");
         }
         return;
@@ -3952,7 +3962,7 @@ void NetplayLobbyWidget::CreateRoom() {
         close(gTcpListenSocket);
         gTcpListenSocket = -1;
 
-        this->mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", "[CREATE_ROOM_FAIL_LISTEN]", "[DIALOG_BUTTON_OK]", "", 3);
+        mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[CREATE_ROOM_FAIL_TITLE]", "[CREATE_ROOM_FAIL_LISTEN]", "[DIALOG_BUTTON_OK]", "", 3);
         return;
     }
 
@@ -3962,7 +3972,7 @@ void NetplayLobbyWidget::CreateRoom() {
 
     gUdpBroadcastSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (gUdpBroadcastSocket < 0) {
-        this->mIsCreatingRoom = true;
+        mIsCreatingRoom = true;
         LOG_DEBUG("UDP socket failed errno={}", errno);
         return;
     }
@@ -3998,12 +4008,12 @@ void NetplayLobbyWidget::CreateRoom() {
     LOG_DEBUG("[Host] Room created. TCP port={}, UDP port={}", gTcpPort, UDP_PORT);
 
     UdpBroadcastRoom();
-    this->mIsCreatingRoom = true;
+    mIsCreatingRoom = true;
 }
 
 void NetplayLobbyWidget::ExitRoom() {
 
-    this->mIsCreatingRoom = false;
+    mIsCreatingRoom = false;
 
     if (gTcpClientSocket >= 0) {
         shutdown(gTcpClientSocket, SHUT_RDWR); // 关闭读写
@@ -4028,11 +4038,11 @@ void NetplayLobbyWidget::ExitRoom() {
 
 
 void NetplayLobbyWidget::JoinRoom() {
-    this->mIsJoiningRoom = true;
+    mIsJoiningRoom = true;
 }
 
 void NetplayLobbyWidget::LeaveRoom() {
-    this->mIsJoiningRoom = false;
+    mIsJoiningRoom = false;
     if (gTcpServerSocket >= 0) {
         shutdown(gTcpServerSocket, SHUT_RDWR); // 关闭读写
         close(gTcpServerSocket);
@@ -4041,9 +4051,9 @@ void NetplayLobbyWidget::LeaveRoom() {
         gTcpConnected = false;
     }
 
-    this->mUseManualTarget = false;
-    this->mManualIp[0] = '\0';
-    this->mManualPort = 0;
+    mUseManualTarget = false;
+    mManualIp[0] = '\0';
+    mManualPort = 0;
     gSecondPlayerName[0] = '\0';
     gServerHostName[0] = '\0';
 }
@@ -4068,7 +4078,7 @@ void NetplayLobbyWidget::UdpBroadcastRoom() {
 
         memcpy(send_buf, message, msg_len);
         memcpy(send_buf + msg_len, &gTcpPort, sizeof(gTcpPort));
-        send_buf[msg_len + sizeof(gTcpPort)] = this->mIsCoopLobby ? 1 : 0;
+        send_buf[msg_len + sizeof(gTcpPort)] = mIsCoopLobby ? 1 : 0;
 
         bool sent_any = false;
         if (!gBroadcastTargets.empty()) {
@@ -4136,7 +4146,7 @@ bool NetplayLobbyWidget::CheckTcpAccept() {
     LOG_DEBUG("[TCP] Client connected: {}", ip);
 
     // 检查version
-    U16_Event event = {{EVENT_SERVER_WAITFORSECONDPALYER_VERSION_CHECK}, GetLanRoomProtocol(this->mIsCoopLobby)};
+    U16_Event event = {{EVENT_SERVER_WAITFORSECONDPALYER_VERSION_CHECK}, GetLanRoomProtocol(mIsCoopLobby)};
     netplay::PutEvent(event);
     return true;
 }
@@ -4161,7 +4171,7 @@ void NetplayLobbyWidget::ScanUdpBroadcastRoom() {
             int tcpPort = 0;
             memcpy(&tcpPort, buffer + msg_len, sizeof(tcpPort));
             const bool roomIsCoop = n >= (ssize_t)(msg_len + sizeof(int) + 1) && buffer[msg_len + sizeof(int)] != 0;
-            if (roomIsCoop != this->mIsCoopLobby)
+            if (roomIsCoop != mIsCoopLobby)
                 continue;
 
             char serverIp[INET_ADDRSTRLEN];
@@ -4213,13 +4223,13 @@ void NetplayLobbyWidget::ScanUdpBroadcastRoom() {
 
             // 1) 如果选中项就是被删除的 i：
             //    删除后，当前位置会被 last 覆盖，所以让选中保持在 i（继续指向“被搬过来的那一项”）
-            if (this->mSelectedServerIndex == i) {
+            if (mSelectedServerIndex == i) {
                 // 选中保持 i，不变
             }
             // 2) 如果选中项是 last，而 last 要被搬到 i：
             //    选中项应该跟着搬到 i（否则你会“莫名丢选中”）
-            else if (this->mSelectedServerIndex == last) {
-                this->mSelectedServerIndex = i;
+            else if (mSelectedServerIndex == last) {
+                mSelectedServerIndex = i;
             }
             // 3) 其他情况不用改
 
@@ -4228,9 +4238,9 @@ void NetplayLobbyWidget::ScanUdpBroadcastRoom() {
 
             // 删除后防越界
             if (gScannedServerCount <= 0) {
-                this->mSelectedServerIndex = 0;
-            } else if (this->mSelectedServerIndex >= gScannedServerCount) {
-                this->mSelectedServerIndex = gScannedServerCount - 1;
+                mSelectedServerIndex = 0;
+            } else if (mSelectedServerIndex >= gScannedServerCount) {
+                mSelectedServerIndex = gScannedServerCount - 1;
             }
 
             continue;
@@ -4244,18 +4254,18 @@ void NetplayLobbyWidget::TryTcpConnect() {
         return;
 
     // 既不是手动目标，也没有扫描到房间，就没法连
-    if (!this->mUseManualTarget && gScannedServerCount == 0)
+    if (!mUseManualTarget && gScannedServerCount == 0)
         return;
 
     // 统一得到目标 ip/port（用于 connect + 日志）
     char targetIp[INET_ADDRSTRLEN] = {0};
     int targetPort = 0;
 
-    if (this->mUseManualTarget) {
-        strncpy(targetIp, this->mManualIp, INET_ADDRSTRLEN - 1);
-        targetPort = this->mManualPort;
+    if (mUseManualTarget) {
+        strncpy(targetIp, mManualIp, INET_ADDRSTRLEN - 1);
+        targetPort = mManualPort;
     } else {
-        int idx = this->mSelectedServerIndex;
+        int idx = mSelectedServerIndex;
         if (idx < 0)
             idx = 0;
         if (idx >= gScannedServerCount)
