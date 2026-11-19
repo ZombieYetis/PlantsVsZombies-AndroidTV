@@ -6353,7 +6353,8 @@ void Zombie::EatPlant(Plant *thePlant) {
             return true;
         }
         if (mApp->IsVSMode() && !Challenge::msVSLegacyMode) {
-            return mZombieType != ZombieType::ZOMBIE_NORMAL && mZombieType != ZombieType::ZOMBIE_BOBSLED && mZombieType != ZombieType::ZOMBIE_PEA_HEAD && mZombieType != ZombieType::ZOMBIE_DOG;
+            return mZombieType != ZombieType::ZOMBIE_NORMAL && mZombieType != ZombieType::ZOMBIE_BOBSLED && mZombieType != ZombieType::ZOMBIE_PEA_HEAD && mZombieType != ZombieType::ZOMBIE_DOG
+                && mZombieType != ZombieType::ZOMBIE_PIGEON;
         }
         return false;
     };
