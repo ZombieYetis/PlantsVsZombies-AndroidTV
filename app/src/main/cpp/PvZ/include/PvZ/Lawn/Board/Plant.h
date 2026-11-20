@@ -102,7 +102,8 @@ enum PlantState // Prefix: STATE
     STATE_CELERY_STALKER_ATTACKING,
     STATE_CELERY_STALKER_PUNCHING,
     STATE_CELERY_STALKER_STOPPING,
-    STATE_BONK_CHOY_PUNCHING,
+    STATE_BONK_CHOY_PUNCHING_RIGHT,
+    STATE_BONK_CHOY_PUNCHING_LEFT,
     STATE_BONK_CHOY_UPPERCUTTING,
     STATE_ENDURIAN_STARTING,
     STATE_ENDURIAN_ATTACKING,
@@ -381,6 +382,8 @@ public:
     void UpdateCeleryStalker();
     void SetCeleryStalkerState(PlantState theState);
     void UpdateBonkChoy();
+    void BonkChoyHit(bool theFightRight, bool theUppercut);
+    int GetBonkChoyUppercutDamage(Zombie *theZombie, GridItem *theGridItem, bool theFightRight);
     void UpdateSweetPotato();
     void UpdateEndurian();
     void UpdateBloomerang();

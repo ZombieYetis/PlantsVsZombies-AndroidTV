@@ -121,7 +121,8 @@ namespace {
             case STATE_ENDURIAN_STARTING:
             case STATE_ENDURIAN_ATTACKING:
                 return {"anim_start"};
-            case STATE_BONK_CHOY_PUNCHING:
+            case STATE_BONK_CHOY_PUNCHING_RIGHT:
+            case STATE_BONK_CHOY_PUNCHING_LEFT:
                 return {"anim_rightpunch"};
             case STATE_BONK_CHOY_UPPERCUTTING:
                 return {"anim_rightuppercut"};

@@ -564,7 +564,7 @@ void Plant::Update() {
     // 用于修复植物受击闪光、生产发光、铲子下方植物发光，同时实现技能无冷却
 
     if (abilityFastCoolDown && !IsOnlineServerModeActive() && !gIsReplayMode && mSeedType != SeedType::SEED_SPIKEWEED && mSeedType != SeedType::SEED_SPIKEROCK
-        && mSeedType != SeedType::SEED_ENDURIAN) { // 保留地刺、地刺王和榴莲的正常攻击间隔
+        && mSeedType != SeedType::SEED_ENDURIAN && mSeedType != SeedType::SEED_BONK_CHOY) { // 保留近战植物的攻击时序
         if (mStateCountdown > 10) {
             mStateCountdown = 10;
         }
@@ -630,6 +630,9 @@ void Plant::Update() {
             break;
         case SeedType::SEED_CELERY_STALKER:
             aSyncState = aPreviousState == PlantState::STATE_NOTREADY || mState == PlantState::STATE_CELERY_STALKER_RISING || mState == PlantState::STATE_CELERY_STALKER_LOWERING;
+            break;
+        case SeedType::SEED_BONK_CHOY:
+            aSyncState = mState == PlantState::STATE_BONK_CHOY_UPPERCUTTING;
             break;
         default:
             break;
@@ -1849,7 +1852,7 @@ void Plant::SyncPlantState() {
     aEvent.u16_1 = uint16_t(mState);
     aEvent.u16_2 = uint16_t(mStateCountdown);
     // 附加数据按植物类型解释，沿用通用事件结构。
-    if (mSeedType == SeedType::SEED_SQUASH) {
+    if (mSeedType == SeedType::SEED_SQUASH || mSeedType == SeedType::SEED_BONK_CHOY) {
         aEvent.uni32_0.i32 = mTargetX;
     } else if (mSeedType == SeedType::SEED_COBCANNON) {
         aEvent.uni32_0.i32 = mShootingCounter;
@@ -1895,6 +1898,11 @@ void Plant::SetPlantState(PlantState theState, int theCountdown, int theStateDat
     } else if (mSeedType == SeedType::SEED_CELERY_STALKER) {
         mStateCountdown = theCountdown;
         SetCeleryStalkerState(theState);
+    } else if (mSeedType == SeedType::SEED_BONK_CHOY) {
+        mState = theState;
+        mStateCountdown = theCountdown;
+        mTargetX = theStateData;
+        PlayBodyReanim("anim_rightuppercut", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 30.0f);
     }
 }
 
@@ -2321,6 +2329,13 @@ bool Plant::CanTargetRow(int theTargetRow, int theSingleRow) const {
 Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
     int aDamageRangeFlags = GetDamageRangeFlags(thePlantWeapon);
     Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
+    if (mSeedType == SeedType::SEED_BONK_CHOY) {
+        // 菜问分别检查左右半区：主武器向右，副武器向左。
+        aAttackRect.mWidth /= 2;
+        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
+            aAttackRect.mX += aAttackRect.mWidth;
+        }
+    }
     int aHighestWeight = 0;
     Zombie *aBestZombie = nullptr;
 
@@ -2453,18 +2468,8 @@ Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
                 if (aZombie->mZombieType == ZombieType::ZOMBIE_EXPLORER) {
                     aWeight += 10000; // 优先攻击探险家僵尸
                 }
-            } else if (mSeedType == SeedType::SEED_BONK_CHOY) {
-                const float aPlantCenterX = static_cast<float>(mX) + 40.0f;
-                const auto aZombieLeft = static_cast<float>(aZombieRect.mX);
-                const auto aZombieRight = static_cast<float>(aZombieRect.mX + aZombieRect.mWidth);
-                const float aNearestTargetX = std::clamp(aPlantCenterX, aZombieLeft, aZombieRight);
-                const float aDistance = std::abs(aNearestTargetX - aPlantCenterX);
-                const bool aZombieIsBehind = aZombieLeft + static_cast<float>(aZombieRect.mWidth) * 0.5f < aPlantCenterX;
-
-                aWeight = -static_cast<int>(aDistance * 100.0f);
-                if (!aZombieIsBehind) {
-                    ++aWeight; // 距离相同时优先右侧。
-                }
+            } else if (mSeedType == SeedType::SEED_BONK_CHOY && thePlantWeapon == PlantWeapon::WEAPON_SECONDARY) {
+                aWeight = aZombieRect.mX + aZombieRect.mWidth;
             } else if (mSeedType == SEED_LIGHTNING_REED) {
                 aWeight = -int(Distance2D(aPosX, aPosY, aZombieCenterX, aZombieCenterY));
             }
@@ -2667,12 +2672,15 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
 
     if (mSeedType == SeedType::SEED_BONK_CHOY) {
         static constexpr int kBonkChoyGridItemRange = 2;
-        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
+        Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
+        aAttackRect.mWidth /= 2;
+        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
+            aAttackRect.mX += aAttackRect.mWidth;
+        }
         const int aPlantCenterX = mX + 40;
 
         GridItem *aBestGridItem = nullptr;
         int aBestDistance = (kBonkChoyGridItemRange + 1) * 80;
-        bool aBestIsBehind = true;
 
         GridItem *aGridItem = nullptr;
         while (mBoard->IterateGridItems(aGridItem)) {
@@ -2694,26 +2702,24 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
             }
 
             int aDistance;
-            bool aGridItemIsBehind;
             if (aGridItem->IsSkeletonPile()) {
                 const Rect aPileRect = aGridItem->GetItemRect();
                 if (GetRectOverlap(aAttackRect, aPileRect) < 0) {
                     continue;
                 }
-                aDistance = std::abs(std::clamp(aPlantCenterX, aPileRect.mX, aPileRect.mX + aPileRect.mWidth) - aPlantCenterX);
-                aGridItemIsBehind = aPileRect.mX + aPileRect.mWidth / 2 < aPlantCenterX;
+                aDistance = std::max(0, thePlantWeapon == PlantWeapon::WEAPON_PRIMARY ? aPileRect.mX - aPlantCenterX : aPlantCenterX - aPileRect.mX - aPileRect.mWidth);
             } else {
                 aDistance = std::abs(aGridItem->mGridX - mPlantCol) * 80;
                 if (aDistance < 80 || aDistance > kBonkChoyGridItemRange * 80) {
                     continue;
                 }
-                aGridItemIsBehind = aGridItem->mGridX < mPlantCol;
+                if ((aGridItem->mGridX < mPlantCol) != (thePlantWeapon == PlantWeapon::WEAPON_SECONDARY)) {
+                    continue;
+                }
             }
-
-            if (aBestGridItem == nullptr || aDistance < aBestDistance || (aDistance == aBestDistance && !aGridItemIsBehind && aBestIsBehind)) {
+            if (aBestGridItem == nullptr || aDistance < aBestDistance) {
                 aBestGridItem = aGridItem;
                 aBestDistance = aDistance;
-                aBestIsBehind = aGridItemIsBehind;
             }
         }
 
@@ -5233,115 +5239,132 @@ void Plant::UpdateCeleryStalker() {
 
 void Plant::UpdateBonkChoy() {
     static constexpr int kBonkChoyAttackInterval = 40;
+    static constexpr int kBonkChoyPunchHitCountdown = kBonkChoyAttackInterval - 12;
+    static constexpr int kBonkChoyUppercutHitCountdown = kBonkChoyAttackInterval - 17;
+    static constexpr int kBonkChoyPunchEndCountdown = kBonkChoyAttackInterval - 25;
+    static constexpr int kBonkChoyUppercutEndCountdown = kBonkChoyAttackInterval - 30;
+
+    // 倒计时覆盖整个攻击周期，收招后继续等待归零再出拳。
+    if (mState == PlantState::STATE_BONK_CHOY_PUNCHING_RIGHT) {
+        if (mStateCountdown == kBonkChoyPunchHitCountdown) {
+            BonkChoyHit(true, false);
+            mApp->PlayFoley(FoleyType::FOLEY_BONK_CHOY_PUNCH);
+        }
+    } else if (mState == PlantState::STATE_BONK_CHOY_PUNCHING_LEFT) {
+        if (mStateCountdown == kBonkChoyPunchHitCountdown) {
+            BonkChoyHit(false, false);
+            mApp->PlayFoley(FoleyType::FOLEY_BONK_CHOY_PUNCH);
+        }
+    } else if (mState == PlantState::STATE_BONK_CHOY_UPPERCUTTING) {
+        if (mStateCountdown == kBonkChoyUppercutHitCountdown) {
+            BonkChoyHit(mTargetX > 0, true);
+            mApp->PlayFoley(FoleyType::FOLEY_BONK_CHOY_UPPERCUT);
+        }
+    } else if (mState == PlantState::STATE_NOTREADY) {
+        if (mStateCountdown > 0) {
+            return;
+        }
+
+        bool aFightRight = true;
+        Zombie *aZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
+        if (aZombie == nullptr) {
+            aZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_SECONDARY);
+            aFightRight = false;
+        }
+        GridItem *aGridItem = nullptr;
+        if (aZombie == nullptr) {
+            aGridItem = FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY);
+            aFightRight = true;
+            if (aGridItem == nullptr) {
+                aGridItem = FindTargetGridItem(mRow, PlantWeapon::WEAPON_SECONDARY);
+                aFightRight = false;
+            }
+        }
+        if (aZombie == nullptr && aGridItem == nullptr) {
+            mTargetX = 1;
+            return;
+        }
+
+        const bool aUseUppercut = GetBonkChoyUppercutDamage(aZombie, aGridItem, aFightRight) > 0;
+        if (aUseUppercut && IsRemoteClientOrViewer()) {
+            return;
+        }
+        const char *anAttackTrack = aUseUppercut ? "anim_rightuppercut" : "anim_rightpunch";
+        const float aAnimRate = aUseUppercut ? 30.0f : 45.0f;
+        // 左侧攻击也播放右侧动画，并在 Draw() 中水平镜像。
+        mTargetX = aFightRight ? 1 : -1;
+        PlayBodyReanim(anAttackTrack, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, aAnimRate);
+        mState = aUseUppercut ? PlantState::STATE_BONK_CHOY_UPPERCUTTING
+                             : (aFightRight ? PlantState::STATE_BONK_CHOY_PUNCHING_RIGHT : PlantState::STATE_BONK_CHOY_PUNCHING_LEFT);
+        mStateCountdown = kBonkChoyAttackInterval;
+        return;
+    }
+
+    const int anEndCountdown = mState == PlantState::STATE_BONK_CHOY_UPPERCUTTING ? kBonkChoyUppercutEndCountdown : kBonkChoyPunchEndCountdown;
+    if (mStateCountdown == anEndCountdown) {
+        PlayIdleAnim(12.0f);
+        mState = PlantState::STATE_NOTREADY;
+    }
+}
+
+void Plant::BonkChoyHit(bool theFightRight, bool theUppercut) {
     static constexpr int kBonkChoyPunchDamage = 15;
     static constexpr int kBonkChoyUppercutDamage = 35;
 
-    Reanimation *aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
-    if (aBodyReanim == nullptr) {
+    const PlantWeapon aWeapon = theFightRight ? PlantWeapon::WEAPON_PRIMARY : PlantWeapon::WEAPON_SECONDARY;
+    Zombie *aZombie = FindTargetZombie(mRow, aWeapon);
+    GridItem *aGridItem = aZombie == nullptr ? FindTargetGridItem(mRow, aWeapon) : nullptr;
+    if (aZombie == nullptr && aGridItem == nullptr) {
         return;
     }
 
-    if (mLaunchCounter > 0) {
-        --mLaunchCounter;
-    }
-
-    const bool anAttackAnimationPlaying = mState == PlantState::STATE_BONK_CHOY_PUNCHING || mState == PlantState::STATE_BONK_CHOY_UPPERCUTTING;
-    if (anAttackAnimationPlaying) {
-        if (aBodyReanim->mLoopCount > 0) {
-            PlayIdleAnim(12.0f);
-            mState = PlantState::STATE_NOTREADY;
+    int aDamage = kBonkChoyPunchDamage;
+    if (theUppercut) {
+        aDamage = GetBonkChoyUppercutDamage(aZombie, aGridItem, theFightRight);
+        if (aDamage == 0) {
+            aDamage = kBonkChoyUppercutDamage;
         }
-        return;
-    }
-
-    if (mLaunchCounter > 0) {
-        return;
-    }
-
-    const float aPlantCenterX = static_cast<float>(mX) + 40.0f;
-    Zombie *aBestZombie = FindTargetZombie(mRow, PlantWeapon::WEAPON_PRIMARY);
-
-    GridItem *aBestGridItem = aBestZombie == nullptr ? FindTargetGridItem(mRow, PlantWeapon::WEAPON_PRIMARY) : nullptr;
-    bool aBestTargetIsBehind = false;
-
-    if (aBestZombie != nullptr) {
-        const Rect aZombieRect = aBestZombie->GetZombieRect();
-        const auto aZombieLeft = static_cast<float>(aZombieRect.mX);
-
-        aBestTargetIsBehind = aZombieLeft + static_cast<float>(aZombieRect.mWidth) * 0.5f < aPlantCenterX;
-    } else if (aBestGridItem != nullptr) {
-        const Rect aTargetRect = aBestGridItem->GetItemRect();
-        aBestTargetIsBehind = aBestGridItem->IsSkeletonPile() ? aTargetRect.mX + aTargetRect.mWidth * 0.5f < aPlantCenterX : aBestGridItem->mGridX < mPlantCol;
-    }
-
-    if (aBestZombie == nullptr && aBestGridItem == nullptr) {
-        return;
-    }
-
-    if (aBestGridItem != nullptr) {
-        const int aGridItemHealth = aBestGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE ? aBestGridItem->mVSTargetZombieHealth : aBestGridItem->mVSGraveStoneHealth;
-        const Rect aTargetRect = aBestGridItem->GetItemRect();
-        const bool aWithinUppercutRange = aBestGridItem->IsSkeletonPile()
-            ? std::abs(std::clamp(aPlantCenterX, float(aTargetRect.mX), float(aTargetRect.mX + aTargetRect.mWidth)) - aPlantCenterX) <= 80.0f
-            : std::abs(aBestGridItem->mGridX - mPlantCol) == 1;
-        const bool aUseUppercut = aWithinUppercutRange && aGridItemHealth > 0 && aGridItemHealth <= kBonkChoyUppercutDamage;
-
-        const char *anAttackTrack = aUseUppercut ? "anim_rightuppercut" : "anim_rightpunch";
-        const float aAnimRate = aUseUppercut ? 30.0f : 45.0f;
-        FoleyType aFoleyType = aUseUppercut ? FoleyType::FOLEY_BONK_CHOY_UPPERCUT : FoleyType::FOLEY_BONK_CHOY_PUNCH;
-
-        // 左侧攻击也播放右侧动画，并在 Draw() 中水平镜像。
-        mTargetX = aBestTargetIsBehind ? -1 : 1;
-        PlayBodyReanim(anAttackTrack, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, aAnimRate);
-
-        mState = aUseUppercut ? PlantState::STATE_BONK_CHOY_UPPERCUTTING : PlantState::STATE_BONK_CHOY_PUNCHING;
-        mLaunchCounter = kBonkChoyAttackInterval;
-
-        aBestGridItem->TakeDamage(aUseUppercut ? aGridItemHealth : kBonkChoyPunchDamage, 0U);
-        mApp->PlayFoley(aFoleyType);
-        return;
     }
 
     unsigned int aDamageFlags = 0U;
-    if (aBestTargetIsBehind) {
+    if (!theFightRight) {
         SetBit(aDamageFlags, int(DamageFlags::DAMAGE_BYPASSES_SHIELD), true);
     }
-
-    const bool aShieldBlocksBody = !aBestTargetIsBehind && aBestZombie->mShieldType != ShieldType::SHIELDTYPE_NONE && aBestZombie->mShieldHealth > 0;
-    const bool aHelmBlocksBody = aBestZombie->mHelmType != HelmType::HELMTYPE_NONE && aBestZombie->mHelmHealth > 0;
-    const bool aDamageReachesBody = !aShieldBlocksBody && !aHelmBlocksBody;
-
-    bool aUseUppercut = false;
-    bool anUppercutExecutesTarget = false;
-    if (aDamageReachesBody) {
-        if (aBestZombie->CanLoseBodyParts() && aBestZombie->mHasHead && aBestZombie->mBodyMaxHealth > 0) {
-            const int aHeadDropThreshold = aBestZombie->mBodyMaxHealth / 3;
-            const int aDamageNeededToDropHead = aBestZombie->mBodyHealth - aHeadDropThreshold + 1;
-            if (aDamageNeededToDropHead > 0 && aDamageNeededToDropHead <= kBonkChoyUppercutDamage) {
-                aUseUppercut = true;
-                anUppercutExecutesTarget = true;
-            }
-        } else if (!aBestZombie->CanLoseBodyParts() && aBestZombie->mBodyHealth <= kBonkChoyUppercutDamage) {
-            aUseUppercut = true;
-        }
-    }
-
-    const char *anAttackTrack = aUseUppercut ? "anim_rightuppercut" : "anim_rightpunch";
-    const float aAnimRate = aUseUppercut ? 30.0f : 45.0f;
-    FoleyType aFoleyType = aUseUppercut ? FoleyType::FOLEY_BONK_CHOY_UPPERCUT : FoleyType::FOLEY_BONK_CHOY_PUNCH;
-
-    mTargetX = aBestTargetIsBehind ? -1 : 1;
-    PlayBodyReanim(anAttackTrack, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, aAnimRate);
-
-    mState = aUseUppercut ? PlantState::STATE_BONK_CHOY_UPPERCUTTING : PlantState::STATE_BONK_CHOY_PUNCHING;
-    mLaunchCounter = kBonkChoyAttackInterval;
-
-    if (anUppercutExecutesTarget) {
-        aBestZombie->TakeDamage(aBestZombie->mBodyHealth, aDamageFlags);
+    if (aZombie != nullptr) {
+        aZombie->TakeDamage(aDamage, aDamageFlags);
     } else {
-        aBestZombie->TakeDamage(aUseUppercut ? kBonkChoyUppercutDamage : kBonkChoyPunchDamage, aDamageFlags);
+        aGridItem->TakeDamage(aDamage, 0U);
     }
-    mApp->PlayFoley(aFoleyType);
+}
+
+int Plant::GetBonkChoyUppercutDamage(Zombie *theZombie, GridItem *theGridItem, bool theFightRight) {
+    static constexpr int kBonkChoyUppercutDamage = 35;
+
+    if (theGridItem != nullptr) {
+        const int aGridItemHealth = theGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE ? theGridItem->mVSTargetZombieHealth : theGridItem->mVSGraveStoneHealth;
+        const Rect aTargetRect = theGridItem->GetItemRect();
+        const float aPlantCenterX = static_cast<float>(mX) + 40.0f;
+        const bool aWithinUppercutRange = theGridItem->IsSkeletonPile()
+            ? std::abs(std::clamp(aPlantCenterX, float(aTargetRect.mX), float(aTargetRect.mX + aTargetRect.mWidth)) - aPlantCenterX) <= 80.0f
+            : std::abs(theGridItem->mGridX - mPlantCol) == 1;
+        return aWithinUppercutRange && aGridItemHealth > 0 && aGridItemHealth <= kBonkChoyUppercutDamage ? aGridItemHealth : 0;
+    }
+
+    const bool aShieldBlocksBody = theFightRight && theZombie->mShieldType != ShieldType::SHIELDTYPE_NONE && theZombie->mShieldHealth > 0;
+    const bool aHelmBlocksBody = theZombie->mHelmType != HelmType::HELMTYPE_NONE && theZombie->mHelmHealth > 0;
+    if (aShieldBlocksBody || aHelmBlocksBody) {
+        return 0;
+    }
+
+    if (theZombie->CanLoseBodyParts() && theZombie->mHasHead && theZombie->mBodyMaxHealth > 0) {
+        const int aHeadDropThreshold = theZombie->mBodyMaxHealth / 3;
+        const int aDamageNeededToDropHead = theZombie->mBodyHealth - aHeadDropThreshold + 1;
+        return aDamageNeededToDropHead > 0 && aDamageNeededToDropHead <= kBonkChoyUppercutDamage ? theZombie->mBodyHealth : 0;
+    }
+    if (!theZombie->CanLoseBodyParts() && theZombie->mBodyHealth <= kBonkChoyUppercutDamage) {
+        return kBonkChoyUppercutDamage;
+    }
+    return 0;
 }
 
 int Plant::CalcRenderOrder() {
