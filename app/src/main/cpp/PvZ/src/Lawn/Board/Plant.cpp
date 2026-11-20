@@ -563,8 +563,8 @@ void Plant::AnimateLightningReed() {
 void Plant::Update() {
     // 用于修复植物受击闪光、生产发光、铲子下方植物发光，同时实现技能无冷却
 
-    if (abilityFastCoolDown && !IsOnlineServerModeActive() && !gIsReplayMode && mSeedType != SeedType::SEED_SPIKEWEED && mSeedType != SeedType::SEED_SPIKEROCK
-        && mSeedType != SeedType::SEED_ENDURIAN && mSeedType != SeedType::SEED_BONK_CHOY) { // 保留近战植物的攻击时序
+    if (abilityFastCoolDown && !IsOnlineServerModeActive() && !gIsReplayMode && mSeedType != SeedType::SEED_SPIKEWEED && mSeedType != SeedType::SEED_SPIKEROCK && mSeedType != SeedType::SEED_ENDURIAN
+        && mSeedType != SeedType::SEED_BONK_CHOY && (mSeedType != SeedType::SEED_CELERY_STALKER || mState != PlantState::STATE_CELERY_STALKER_ATTACKING)) { // 保留近战植物的攻击时序
         if (mStateCountdown > 10) {
             mStateCountdown = 10;
         }
@@ -2329,13 +2329,6 @@ bool Plant::CanTargetRow(int theTargetRow, int theSingleRow) const {
 Zombie *Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon) {
     int aDamageRangeFlags = GetDamageRangeFlags(thePlantWeapon);
     Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
-    if (mSeedType == SeedType::SEED_BONK_CHOY) {
-        // 菜问分别检查左右半区：主武器向右，副武器向左。
-        aAttackRect.mWidth /= 2;
-        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
-            aAttackRect.mX += aAttackRect.mWidth;
-        }
-    }
     int aHighestWeight = 0;
     Zombie *aBestZombie = nullptr;
 
@@ -2651,36 +2644,13 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
         return aBestPile;
     }
 
-    if (mSeedType == SeedType::SEED_CELERY_STALKER) {
-        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
-        GridItem *aGridItem = nullptr;
-        GridItem *aBestGridItem = nullptr;
-        while (mBoard->IterateGridItems(aGridItem)) {
-            if (!aGridItem->IsPlantAttackTarget() || aGridItem->mGridY != theRow) {
-                continue;
-            }
-            // 骨堆按实际碰撞框判断身后的攻击范围，其他场地物仍按相邻格判断。
-            if (aGridItem->IsSkeletonPile() ? GetRectOverlap(aAttackRect, aGridItem->GetItemRect()) < 0 : aGridItem->mGridX != mPlantCol - 1) {
-                continue;
-            }
-            if (aBestGridItem == nullptr || aGridItem->GetItemRect().mX > aBestGridItem->GetItemRect().mX) {
-                aBestGridItem = aGridItem;
-            }
-        }
-        return aBestGridItem;
-    }
-
-    if (mSeedType == SeedType::SEED_BONK_CHOY) {
+    if (mSeedType == SeedType::SEED_CELERY_STALKER || mSeedType == SeedType::SEED_BONK_CHOY) {
         static constexpr int kBonkChoyGridItemRange = 2;
-        Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
-        aAttackRect.mWidth /= 2;
-        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
-            aAttackRect.mX += aAttackRect.mWidth;
-        }
+        const Rect aAttackRect = GetPlantAttackRect(thePlantWeapon);
         const int aPlantCenterX = mX + 40;
 
         GridItem *aBestGridItem = nullptr;
-        int aBestDistance = (kBonkChoyGridItemRange + 1) * 80;
+        int aHighestWeight = 0;
 
         GridItem *aGridItem = nullptr;
         while (mBoard->IterateGridItems(aGridItem)) {
@@ -2688,38 +2658,36 @@ GridItem *Plant::FindTargetGridItem(int theRow, PlantWeapon thePlantWeapon) {
                 continue;
             }
 
-            int aGridItemHealth = 0;
-            if (aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_TARGET_ZOMBIE) {
-                aGridItemHealth = aGridItem->mVSTargetZombieHealth;
-            } else if (aGridItem->mGridItemType == GridItemType::GRIDITEM_GRAVESTONE || aGridItem->mGridItemType == GridItemType::GRIDITEM_MP_BURIAL_MOUND || aGridItem->IsSkeletonPile()) {
-                aGridItemHealth = aGridItem->mVSGraveStoneHealth;
-            } else {
-                continue;
-            }
-
-            if (aGridItemHealth <= 0) {
-                continue;
-            }
-
-            int aDistance;
+            int aWeight;
             if (aGridItem->IsSkeletonPile()) {
                 const Rect aPileRect = aGridItem->GetItemRect();
                 if (GetRectOverlap(aAttackRect, aPileRect) < 0) {
                     continue;
                 }
-                aDistance = std::max(0, thePlantWeapon == PlantWeapon::WEAPON_PRIMARY ? aPileRect.mX - aPlantCenterX : aPlantCenterX - aPileRect.mX - aPileRect.mWidth);
-            } else {
-                aDistance = std::abs(aGridItem->mGridX - mPlantCol) * 80;
+                aWeight = mSeedType == SeedType::SEED_BONK_CHOY
+                    ? -std::max(0, thePlantWeapon == PlantWeapon::WEAPON_PRIMARY ? aPileRect.mX - aPlantCenterX : aPlantCenterX - aPileRect.mX - aPileRect.mWidth)
+                    : aPileRect.mX;
+            } else if (mSeedType == SeedType::SEED_BONK_CHOY) {
+                if (aGridItem->mGridItemType != GridItemType::GRIDITEM_MP_TARGET_ZOMBIE && aGridItem->mVSGraveStoneHealth <= 0) {
+                    continue;
+                }
+                const int aDistance = std::abs(aGridItem->mGridX - mPlantCol) * 80;
                 if (aDistance < 80 || aDistance > kBonkChoyGridItemRange * 80) {
                     continue;
                 }
                 if ((aGridItem->mGridX < mPlantCol) != (thePlantWeapon == PlantWeapon::WEAPON_SECONDARY)) {
                     continue;
                 }
+                aWeight = -aDistance;
+            } else {
+                if (aGridItem->mGridX != mPlantCol - 1) {
+                    continue;
+                }
+                aWeight = aGridItem->GetItemRect().mX;
             }
-            if (aBestGridItem == nullptr || aDistance < aBestDistance) {
+            if (aBestGridItem == nullptr || aWeight > aHighestWeight) {
                 aBestGridItem = aGridItem;
-                aBestDistance = aDistance;
+                aHighestWeight = aWeight;
             }
         }
 
@@ -3416,6 +3384,14 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon) {
                 aRect = Rect(mX + 60, mY, BOARD_WIDTH, mHeight);
                 break;
         }
+
+    if (mSeedType == SeedType::SEED_BONK_CHOY) {
+        // 菜问分别检查左右半区：主武器向右，副武器向左。
+        aRect.mWidth /= 2;
+        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
+            aRect.mX += aRect.mWidth;
+        }
+    }
 
     return aRect;
 }
@@ -5165,7 +5141,6 @@ void Plant::UpdateCeleryStalker() {
     }
     if (mState == PlantState::STATE_CELERY_STALKER_RISING) {
         if (aBodyReanim->mLoopCount > 0) {
-            mLaunchCounter = 0;
             mStateCountdown = 0;
             SetCeleryStalkerState(aHasTarget ? PlantState::STATE_CELERY_STALKER_PUNCHING : PlantState::STATE_CELERY_STALKER_HIGH);
         }
@@ -5175,7 +5150,7 @@ void Plant::UpdateCeleryStalker() {
         if (!aHasTarget) {
             SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_STOPPING);
         } else if (aBodyReanim->mLoopCount > 0) {
-            mLaunchCounter = 0;
+            mStateCountdown = 0;
             SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_ATTACKING);
         }
         return;
@@ -5185,7 +5160,7 @@ void Plant::UpdateCeleryStalker() {
             SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_STOPPING);
             return;
         }
-        if (mLaunchCounter <= 0) {
+        if (mStateCountdown <= 0) {
             unsigned int aDamageFlags = 0U;
             SetBit(aDamageFlags, int(DamageFlags::DAMAGE_BYPASSES_SHIELD), true);
             if (aZombie != nullptr) {
@@ -5194,15 +5169,12 @@ void Plant::UpdateCeleryStalker() {
                 aGridItem->TakeDamage(kCeleryAttackDamage, aDamageFlags);
             }
             mApp->PlayFoley(FoleyType::FOLEY_CELERY_STALKER_ATTACK);
-            mLaunchCounter = kCeleryHitInterval;
-        } else {
-            mLaunchCounter--;
+            mStateCountdown = kCeleryHitInterval;
         }
         return;
     }
     if (mState == PlantState::STATE_CELERY_STALKER_STOPPING) {
         if (aBodyReanim->mLoopCount > 0) {
-            mLaunchCounter = 0;
             mStateCountdown = kCeleryRetreatDelay;
             SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_HIGH);
         }
@@ -5221,7 +5193,6 @@ void Plant::UpdateCeleryStalker() {
             return;
         }
         mStateCountdown = 0;
-        mLaunchCounter = 0;
         SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_PUNCHING);
         return;
     }
@@ -5229,7 +5200,6 @@ void Plant::UpdateCeleryStalker() {
         return;
     }
     if (aHasTarget) {
-        mLaunchCounter = 0;
         mStateCountdown = 0;
         SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_HIGH);
     } else {
@@ -5294,8 +5264,7 @@ void Plant::UpdateBonkChoy() {
         // 左侧攻击也播放右侧动画，并在 Draw() 中水平镜像。
         mTargetX = aFightRight ? 1 : -1;
         PlayBodyReanim(anAttackTrack, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, aAnimRate);
-        mState = aUseUppercut ? PlantState::STATE_BONK_CHOY_UPPERCUTTING
-                             : (aFightRight ? PlantState::STATE_BONK_CHOY_PUNCHING_RIGHT : PlantState::STATE_BONK_CHOY_PUNCHING_LEFT);
+        mState = aUseUppercut ? PlantState::STATE_BONK_CHOY_UPPERCUTTING : (aFightRight ? PlantState::STATE_BONK_CHOY_PUNCHING_RIGHT : PlantState::STATE_BONK_CHOY_PUNCHING_LEFT);
         mStateCountdown = kBonkChoyAttackInterval;
         return;
     }
