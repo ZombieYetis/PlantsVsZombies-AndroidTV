@@ -628,6 +628,9 @@ void Plant::Update() {
         case SeedType::SEED_ICEBERG_LETTUCE:
             aSyncState = aPreviousState == PlantState::STATE_NOTREADY && mState == PlantState::STATE_READY;
             break;
+        case SeedType::SEED_CELERY_STALKER:
+            aSyncState = aPreviousState == PlantState::STATE_NOTREADY || mState == PlantState::STATE_CELERY_STALKER_RISING || mState == PlantState::STATE_CELERY_STALKER_LOWERING;
+            break;
         default:
             break;
     }
@@ -1889,6 +1892,9 @@ void Plant::SetPlantState(PlantState theState, int theCountdown, int theStateDat
         mStateCountdown = theCountdown;
         mApp->PlayFoley(FoleyType::FOLEY_ICEBERG);
         PlayBodyReanim("anim_explode", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 12.0f);
+    } else if (mSeedType == SeedType::SEED_CELERY_STALKER) {
+        mStateCountdown = theCountdown;
+        SetCeleryStalkerState(theState);
     }
 }
 
@@ -5146,7 +5152,7 @@ void Plant::UpdateCeleryStalker() {
         return;
     }
     if (mState == PlantState::STATE_CELERY_STALKER_LOW) {
-        if (aHasTarget) {
+        if (aHasTarget && !IsRemoteClientOrViewer()) {
             SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_RISING);
         }
         return;
@@ -5198,6 +5204,9 @@ void Plant::UpdateCeleryStalker() {
     }
     if (mState == PlantState::STATE_CELERY_STALKER_HIGH) {
         if (!aHasTarget) {
+            if (IsRemoteClientOrViewer()) {
+                return;
+            }
             if (mStateCountdown == 1) {
                 SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_LOWERING);
             } else if (mStateCountdown <= 0) {
@@ -5208,6 +5217,9 @@ void Plant::UpdateCeleryStalker() {
         mStateCountdown = 0;
         mLaunchCounter = 0;
         SetCeleryStalkerState(PlantState::STATE_CELERY_STALKER_PUNCHING);
+        return;
+    }
+    if (IsRemoteClientOrViewer()) {
         return;
     }
     if (aHasTarget) {
