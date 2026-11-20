@@ -4888,13 +4888,9 @@ void Zombie::BurnRow(int theRow) {
     while (mBoard->IterateZombies(aZombie)) {
         if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mRow == theRow) {
             if (aZombie->mMindControlled != mMindControlled) {
-                if (aZombie->mMindControlled) {
-                    aZombie->TakeDamage(1800, 18U);
-                } else {
-                    if (aZombie->EffectedByDamage(127)) {
-                        aZombie->RemoveColdEffects();
-                        aZombie->ApplyBurn();
-                    }
+                if (aZombie->EffectedByDamage(mMindControlled ? 127 : 255)) {
+                    aZombie->RemoveColdEffects();
+                    aZombie->ApplyBurn();
                 }
             } else if (aZombie->mZombieType == ZombieType::ZOMBIE_EXPLORER && !aZombie->mHasObject) {
                 aZombie->ExplorerTorchConvert(true);
