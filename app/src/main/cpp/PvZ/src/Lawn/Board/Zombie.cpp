@@ -799,16 +799,18 @@ void Zombie::UpdateActions() {
     }
 }
 
-void Zombie::SyncZombiePhase() {
+void Zombie::SyncZombiePhase(int thePhaseData, float thePosX) {
     if (!IsRemoteServer()) {
         return;
     }
 
-    U16U16U16UNI32UNI32_Event event{};
+    U16x3UNI32x2_Event event{};
     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PHASE;
     event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
     event.u16_1 = uint16_t(mZombiePhase);
+    event.u16_2 = uint16_t(thePhaseData);
     event.uni32_0.i32 = -1;
+    event.uni32_1.f32 = thePosX;
     switch (mZombieType) {
         case ZombieType::ZOMBIE_YETI:
         case ZombieType::ZOMBIE_TELEPORTATION:
@@ -879,6 +881,11 @@ void Zombie::SetZombiePhase(ZombiePhase thePhase, int thePhaseCounter, int thePh
     }
     if (mZombieType == ZombieType::ZOMBIE_YETI && mZombiePhase == ZombiePhase::PHASE_YETI_RUNNING) {
         mHasObject = false;
+    }
+    if (mZombieType == ZombieType::ZOMBIE_POGO && mZombiePhase == ZombiePhase::PHASE_ZOMBIE_NORMAL) {
+        mApp->PlayFoley(FoleyType::FOLEY_BONK);
+        mApp->AddTodParticle(thePosX, thePhaseData, mRenderOrder + 1, ParticleEffect::PARTICLE_TALL_NUT_BLOCK);
+        PogoBreak(0U);
     }
     if (mZombieType == ZombieType::ZOMBIE_LADDER) {
         if (mZombiePhase == ZombiePhase::PHASE_LADDER_CARRYING) {
@@ -1106,7 +1113,7 @@ void Zombie::SummonPigeons() {
         aPositionsX[aChoice] = aPositionsX[aCount];
         aRows[aChoice] = aRows[aCount];
         if (IsRemoteServer()) {
-            U16U16U16UNI32UNI32_Event event{};
+            U16x3UNI32x2_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PIGEON_SUMMON;
             event.u16_0 = uint16_t(mBoard->ZombieGetID(aPigeon));
             event.u16_1 = uint16_t(mMindControlled);
@@ -3812,7 +3819,7 @@ void Zombie::UpdateGigaGargantuar() {
         aGigaImp->mTargetCol = mSummonCounter - 1;
 
         if (IsRemoteServer()) {
-            U16U16U16UNI32UNI32_Event event{};
+            U16x3UNI32x2_Event event{};
             event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN;
             event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
             event.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(aGigaImp));
@@ -4563,7 +4570,7 @@ void Zombie::UpdateZombieGargantuar() {
             }
 
             if (IsRemoteServer()) {
-                U16U16U16UNI32UNI32_Event event{};
+                U16x3UNI32x2_Event event{};
                 event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_IMP_THROWN;
                 event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
                 event.u16_1 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombieImp));
@@ -6508,11 +6515,17 @@ void Zombie::UpdateZombiePogo() {
     if (mZombiePhase == ZombiePhase::PHASE_POGO_FORWARD_BOUNCE_2 && mPhaseCounter == 70) {
         Plant *aPlant = FindPlantTarget(ZombieAttackType::ATTACKTYPE_VAULT);
         if (aPlant && aPlant->mSeedType == SeedType::SEED_TALLNUT) {
+            if (IsRemoteClientOrViewer()) {
+                return;
+            }
+
             mApp->PlayFoley(FoleyType::FOLEY_BONK);
             mApp->AddTodParticle(aPlant->mX + 60, aPlant->mY - 20, mRenderOrder + 1, ParticleEffect::PARTICLE_TALL_NUT_BLOCK);
 
             mShieldType = ShieldType::SHIELDTYPE_NONE;
             PogoBreak(0U);
+            // 复用状态附加数据和位置字段传递撞击粒子的 Y、X 坐标。
+            SyncZombiePhase(aPlant->mY - 20, aPlant->mX + 60);
             return;
         }
     }
@@ -9503,7 +9516,7 @@ void Zombie::PickRandomSpeed() {
     UpdateAnimSpeed();
 
     if (IsRemoteServer()) {
-        U16U16U16UNI32UNI32_Event event{};
+        U16x3UNI32x2_Event event{};
         event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED;
         event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
         event.u16_1 = uint16_t(mAnimTicksPerFrame);

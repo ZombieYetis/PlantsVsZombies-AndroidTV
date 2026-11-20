@@ -906,7 +906,7 @@ void Projectile::UpdateLobMotion() {
                 aZombie->mVariant = false;
 
                 if (IsRemoteServer()) {
-                    U16U16U16UNI32UNI32_Event event{};
+                    U16x3UNI32x2_Event event{};
                     event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED;
                     event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
                     event.u16_1 = uint16_t(aZombie->mAnimTicksPerFrame);

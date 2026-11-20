@@ -496,7 +496,7 @@ struct U16x12_Event : BaseEvent {
 };
 
 
-struct U16U16U16UNI32UNI32_Event : BaseEvent {
+struct U16x3UNI32x2_Event : BaseEvent {
     uint16_t u16_0;
     uint16_t u16_1;
     uint16_t u16_2;

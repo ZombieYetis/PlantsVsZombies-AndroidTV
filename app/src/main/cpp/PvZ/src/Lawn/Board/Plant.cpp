@@ -1840,7 +1840,7 @@ void Plant::SyncPlantState() {
         return;
     }
 
-    U16U16U16UNI32UNI32_Event aEvent{};
+    U16x3UNI32x2_Event aEvent{};
     aEvent.type = EventType::EVENT_SERVER_BOARD_PLANT_STATE;
     aEvent.u16_0 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
     aEvent.u16_1 = uint16_t(mState);
@@ -1918,7 +1918,7 @@ void Plant::Fire(Zombie *theTargetZombie, int theRow, PlantWeapon thePlantWeapon
     }
 
     if (IsRemoteServer()) {
-        U16U16U16UNI32UNI32_Event event{};
+        U16x3UNI32x2_Event event{};
 
         event.type = EventType::EVENT_SERVER_BOARD_PLANT_FIRE;
         event.u16_0 = uint16_t(mBoard->mPlants.DataArrayGetID(this));
@@ -4461,7 +4461,7 @@ ReanimationID Plant::GetPlantReanimationIDByIndex(int index) const {
 void Plant::SyncPingPongAnimationToClient() {
     uint16_t id = mBoard->mPlants.DataArrayGetID(this);
 
-    U16U16U16UNI32UNI32_Event event{};
+    U16x3UNI32x2_Event event{};
     event.type = EventType::EVENT_SERVER_BOARD_PLANT_PINGPONG_ANIMATION;
     event.u16_0 = id;
     event.u16_1 = mFrameLength;
@@ -4483,7 +4483,7 @@ void Plant::SyncAnimationToClient() {
             continue;
         }
 
-        U16U16U16UNI32UNI32_Event event2{};
+        U16x3UNI32x2_Event event2{};
         event2.type = EventType::EVENT_SERVER_BOARD_PLANT_OTHER_ANIMATION;
         event2.u16_0 = id;
         event2.u16_1 = i;
