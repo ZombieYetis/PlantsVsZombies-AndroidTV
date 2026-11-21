@@ -3138,33 +3138,22 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD: {
-            auto *eventRaiseDead = static_cast<const U16UNI32U8x16U16x15UNI32x15_Event *>(event);
+            auto *eventRaiseDead = static_cast<const U16UNI32U8_U16U8x3UNI32x18_Event *>(event);
             uint16_t serverZombieID = eventRaiseDead->u16_0;
             uint16_t clientZombieID = 0;
             if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->mPosX = eventRaiseDead->uni32_0.f32;
 
-                int count = std::min<int>(15, eventRaiseDead->u8x16_0[0]);
+                int count = std::min<int>(18, eventRaiseDead->u8_0);
                 for (int i = 0; i < count; ++i) {
-                    int aRow = 0, aCol = 0;
-                    if (i < 5) {
-                        aRow = i;
-                        aCol = aZombie->mMindControlled ? 4 : 6;
-                    } else if (i < 10) {
-                        aRow = i - 5;
-                        aCol = aZombie->mMindControlled ? 3 : 7;
-                    } else {
-                        aRow = i - 10;
-                        aCol = aZombie->mMindControlled ? 2 : 8;
-                    }
-
-                    ZombieID revivedClientID = aZombie->RaiseDeadZombie(ZombieType(eventRaiseDead->u8x16_0[i + 1]), aRow, aCol);
+                    const auto &aRevived = eventRaiseDead->data[i];
+                    ZombieID revivedClientID = aZombie->RaiseDeadZombie(ZombieType(aRevived.u8x3_0[0]), aRevived.u8x3_0[1], aRevived.u8x3_0[2]);
                     if (revivedClientID != ZombieID::ZOMBIEID_NULL) {
-                        serverZombieIDMap[eventRaiseDead->u16x15_0[i]] = uint16_t(revivedClientID);
+                        serverZombieIDMap[aRevived.u16_0] = uint16_t(revivedClientID);
                         Zombie *revivedZombie = ZombieTryToGet(revivedClientID);
                         if (revivedZombie) {
-                            revivedZombie->ApplySyncedSpeed(eventRaiseDead->uni32x15_0[i].f32, short(revivedZombie->mAnimTicksPerFrame));
+                            revivedZombie->ApplySyncedSpeed(aRevived.uni32_0.f32, short(revivedZombie->mAnimTicksPerFrame));
                         }
                     }
                 }
@@ -5147,7 +5136,7 @@ Zombie *Board::GetLiveZombieByType(ZombieType theZombieType) {
 bool Board::GetAliveJacksonZombie() {
     Zombie *aZombie = nullptr;
     while (IterateZombies(aZombie)) {
-        if (aZombie->mZombieType == ZombieType::ZOMBIE_JACKSON && !aZombie->mDead && aZombie->mHasHead && aZombie->IsOnBoard() && !aZombie->IsDeadOrDying()) {
+        if (aZombie->mZombieType == ZombieType::ZOMBIE_JACKSON && !aZombie->mMindControlled && !aZombie->mDead && aZombie->mHasHead && aZombie->IsOnBoard() && !aZombie->IsDeadOrDying()) {
             return true;
         }
     }
@@ -8482,11 +8471,12 @@ GridItem *Board::AddAMound(int theGridX, int theGridY, int theMoundLevel) {
     aMound->mGridY = theGridY;
     aMound->mGridItemType = GridItemType::GRIDITEM_MP_BURIAL_MOUND;
     aMound->mGridItemCounter = -Rand(50);
+    aMound->mLaunchRate = 2500;
     aMound->mLaunchCounter = RandRangeInt(aMound->mLaunchRate - 150, aMound->mLaunchRate);
     if (vsai::HasEnhancedAIProduction(this, vsai::VSSide::Zombies)) {
         aMound->mLaunchCounter = vsai::ScaleEnhancedAIProductionCooldown(aMound->mLaunchCounter);
     }
-    aMound->mSummonCounter = RandRangeInt(1000, 1500);
+    aMound->mSummonCounter = RandRangeInt(aMound->mLaunchRate / 3, aMound->mLaunchRate / 2);
     aMound->mRenderOrder = MakeRenderOrder(RenderLayer::RENDER_LAYER_GRAVE_STONE, theGridY, 3);
 
     if (mApp->IsVSMode()) {

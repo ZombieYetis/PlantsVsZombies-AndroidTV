@@ -120,7 +120,11 @@ public:
         ZOMBIE_WAVE_VS = -5,
     };
 
-    static std::vector<ZombieType> msDeadFollowers;
+    struct DeadFollower {
+        ZombieType mZombieType;
+        int mRow;
+    };
+    static std::vector<DeadFollower> msDeadFollowers;
 
     ZombieType mZombieType;                           // 13
     ZombiePhase mZombiePhase;                         // 14
@@ -417,6 +421,7 @@ public:
     void UpdateZombieBackupDancer();
     void UpdateZombieJackson();
     bool CanRevived() const;
+    void AddDeadFollower();
     ZombieID RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol);
     void RaiseDeadZombies();
     void JacksonDie();

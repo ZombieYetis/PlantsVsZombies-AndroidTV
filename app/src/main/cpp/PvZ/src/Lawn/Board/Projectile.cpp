@@ -1015,19 +1015,20 @@ void Projectile::UpdateLobMotion() {
             }
             return;
         }
-        Plant *aBloomerang = mBoard->FindBloomerangPlant(aPlantTarget->mPlantCol, aPlantTarget->mRow);
-        if (aBloomerang) {
-            if (aBloomerang->mState == PlantState::STATE_UMBRELLA_REFLECTING) {
-                mApp->PlayFoley(FoleyType::FOLEY_SPLAT);
-                int aRenderPos = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 1);
-                mApp->AddTodParticle(mPosX + 20.0f, mPosY + 20.0f, aRenderPos, ParticleEffect::PARTICLE_UMBRELLA_REFLECT);
-                Die();
-            } else if (aBloomerang->mState != PlantState::STATE_UMBRELLA_TRIGGERED) {
-                mApp->PlayFoley(FoleyType::FOLEY_UMBRELLA);
-                aBloomerang->DoSpecial();
-            }
-            return;
-        }
+        // 取消回旋镖射手弹反篮球
+        //        Plant *aBloomerang = mBoard->FindBloomerangPlant(aPlantTarget->mPlantCol, aPlantTarget->mRow);
+        //        if (aBloomerang) {
+        //            if (aBloomerang->mState == PlantState::STATE_UMBRELLA_REFLECTING) {
+        //                mApp->PlayFoley(FoleyType::FOLEY_SPLAT);
+        //                int aRenderPos = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 1);
+        //                mApp->AddTodParticle(mPosX + 20.0f, mPosY + 20.0f, aRenderPos, ParticleEffect::PARTICLE_UMBRELLA_REFLECT);
+        //                Die();
+        //            } else if (aBloomerang->mState != PlantState::STATE_UMBRELLA_TRIGGERED) {
+        //                mApp->PlayFoley(FoleyType::FOLEY_UMBRELLA);
+        //                aBloomerang->DoSpecial();
+        //            }
+        //            return;
+        //        }
 
         aPlantTarget->mPlantHealth -= GetProjectileDef().mDamage;
         aPlantTarget->mEatenFlashCountdown = std::max(aPlantTarget->mEatenFlashCountdown, 25);

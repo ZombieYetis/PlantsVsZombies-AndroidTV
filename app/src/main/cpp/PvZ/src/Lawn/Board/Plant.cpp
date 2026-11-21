@@ -225,7 +225,7 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon) const {
         case SeedType::SEED_PEANUT:
             return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 9 : 1; // 下方的头可攻击地面僵尸和僵尸狗
         case SeedType::SEED_RED_STINGER:
-            return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? 13 : 1;
+            return thePlantWeapon == PlantWeapon::WEAPON_SECONDARY ? (mApp->IsVSMode() ? 15 : 13) : 1;
         case SeedType::SEED_LIGHTNING_REED:
             return 11; // 地面、飞行目标及僵尸狗。
         case SeedType::SEED_CHERRYBOMB:
@@ -240,7 +240,7 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon) const {
         case SeedType::SEED_WINTERMELON:
         case SeedType::SEED_SPORESHROOM:
         case SeedType::SEED_AKEE:
-            return 13;
+            return mApp->IsVSMode() ? 15 : 13; // 对战投手可索敌和命中高空飞行目标。
         case SeedType::SEED_POTATOMINE:
             return 77;
         case SeedType::SEED_SQUASH:
@@ -2982,7 +2982,6 @@ static int GetVSCost(SeedType theSeedType) {
             aCost = 100;
             break;
         case SeedType::SEED_SNOWPEA: // 150 -> 125
-        case SeedType::SEED_BLOOMERANG:
         case SeedType::SEED_BONK_CHOY:
         case SeedType::SEED_PEANUT:
         case SeedType::SEED_ZOMBIE_DANCER: // 150 -> 125
@@ -2995,6 +2994,7 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_GATLINGPEA_HEAD:
             aCost = 125;
             break;
+        case SeedType::SEED_BLOOMERANG:
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
         case SeedType::SEED_ZOMBIE_JACKSON:
@@ -3005,11 +3005,9 @@ static int GetVSCost(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_FLAG: // 300 -> 175
             aCost = 175;
             break;
-        case SeedType::SEED_MELONPULT: // 300 -> 200
+        case SeedType::SEED_MELONPULT:         // 300 -> 200
+        case SeedType::SEED_ZOMBIE_GARGANTUAR: // 250 -> 200
             aCost = 200;
-            break;
-        case SeedType::SEED_ZOMBIE_GARGANTUAR: // 250 -> 225
-            aCost = 225;
             break;
         case SeedType::SEED_ZOMBIE_SUPER_NOVA_GARGANTUAR:
             aCost = 250;
@@ -3062,15 +3060,20 @@ static int GetVSCostShuffle(SeedType theSeedType) {
 
 static int GetVSRefreshTime(SeedType theSeedType) {
     switch (theSeedType) {
-        case SeedType::SEED_REPEATER:               // 7.5 -> 15
-        case SeedType::SEED_PUFFSHROOM:             // 7.5 -> 15
-        case SeedType::SEED_CACTUS:                 // 7.5 -> 15
-        case SeedType::SEED_CABBAGEPULT:            // 7.5 -> 15
-        case SeedType::SEED_KERNELPULT:             // 7.5 -> 15
-        case SeedType::SEED_SPORESHROOM:            // 7.5 -> 15
+        case SeedType::SEED_REPEATER:    // 7.5 -> 15
+        case SeedType::SEED_PUFFSHROOM:  // 7.5 -> 15
+        case SeedType::SEED_CACTUS:      // 7.5 -> 15
+        case SeedType::SEED_CABBAGEPULT: // 7.5 -> 15
+        case SeedType::SEED_KERNELPULT:  // 7.5 -> 15
+        case SeedType::SEED_BLOOMERANG:
+        case SeedType::SEED_SPORESHROOM:
+        case SeedType::SEED_RED_STINGER:
+        case SeedType::SEED_LIGHTNING_REED:
         case SeedType::SEED_ZOMBIE_NORMAL:          // 7.5 -> 15
         case SeedType::SEED_ZOMBIE_JACK_IN_THE_BOX: // 30 -> 15
         case SeedType::SEED_ZOMBIE_SNORKEL:         // 7.5 -> 15
+        case SeedType::SEED_ZOMBIE_GATLINGPEA_HEAD:
+        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_MOUND:
         case SeedType::SEED_ZOMBIE_SUPER_FAN_IMP:
         case SeedType::SEED_ZOMBIE_SUNDAY_EDITION:
@@ -3084,11 +3087,8 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_BALLOON:
         case SeedType::SEED_ZOMBIE_WALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_JALAPENO_HEAD:
-        case SeedType::SEED_ZOMBIE_GATLINGPEA_HEAD:
-        case SeedType::SEED_ZOMBIE_SQUASH_HEAD:
         case SeedType::SEED_ZOMBIE_TALLNUT_HEAD:
         case SeedType::SEED_ZOMBIE_GIGA_FOOTBALL:
-        case SeedType::SEED_ZOMBIE_JACKSON:
         case SeedType::SEED_ZOMBIE_GIGA_POLEVAULTER:
         case SeedType::SEED_ZOMBIE_EXPLORER:
         case SeedType::SEED_ZOMBIE_ZOMBLOB:
@@ -3100,9 +3100,10 @@ static int GetVSRefreshTime(SeedType theSeedType) {
         case SeedType::SEED_ZOMBIE_SKELETON:
         case SeedType::SEED_ZOMBIE_PIGEON_FEEDER:
             return 3000;
+        case SeedType::SEED_CHILLY_PEPPER:
+        case SeedType::SEED_ZOMBIE_JACKSON:
         case SeedType::SEED_ZOMBIE_GIGA_GARGANTUAR:
         case SeedType::SEED_ZOMBIE_SUPER_NOVA_GARGANTUAR:
-        case SeedType::SEED_CHILLY_PEPPER:
             return 6000;
         default:
             return GetVSRefreshTimeLegacy(theSeedType);
@@ -3370,7 +3371,8 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon) {
                 aRect = Rect(mX - 80, mY, 70, mHeight);
                 break;
             case SeedType::SEED_BONK_CHOY:
-                aRect = Rect(mX - 95, mY, 270, mHeight);
+                // 主武器向右，副武器向左。
+                aRect = Rect(thePlantWeapon == PlantWeapon::WEAPON_PRIMARY ? mX + 40 : mX - 95, mY, 135, mHeight);
                 break;
             case SeedType::SEED_SWEET_POTATO:
                 aRect = Rect(mX + 60, mY, 100, mHeight);
@@ -3384,14 +3386,6 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon) {
                 aRect = Rect(mX + 60, mY, BOARD_WIDTH, mHeight);
                 break;
         }
-
-    if (mSeedType == SeedType::SEED_BONK_CHOY) {
-        // 菜问分别检查左右半区：主武器向右，副武器向左。
-        aRect.mWidth /= 2;
-        if (thePlantWeapon == PlantWeapon::WEAPON_PRIMARY) {
-            aRect.mX += aRect.mWidth;
-        }
-    }
 
     return aRect;
 }
@@ -4041,7 +4035,7 @@ void Plant::LightningReedFire() {
         }
         const int aDamage = i == 0 ? 15 : 5;
         if (aTarget.mZombie != nullptr) {
-            aTarget.mZombie->TakeDamage(aDamage, (1U << DamageFlags::DAMAGE_HITS_SHIELD_AND_BODY) | (1U << DamageFlags::DAMAGE_ELECTRIC));
+            aTarget.mZombie->TakeDamage(aDamage, 1U << DamageFlags::DAMAGE_ELECTRIC);
         } else {
             aTarget.mGridItem->TakeDamage(aDamage, 0U);
         }

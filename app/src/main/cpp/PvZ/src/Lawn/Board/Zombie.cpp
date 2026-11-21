@@ -64,7 +64,7 @@ void SendBossAttackEvent(Zombie *theBoss, EventType theType, int theRow, int the
 
 } // namespace
 
-std::vector<ZombieType> Zombie::msDeadFollowers;
+std::vector<Zombie::DeadFollower> Zombie::msDeadFollowers;
 
 ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
     {ZOMBIE_NORMAL, REANIM_ZOMBIE, 1, 1, 1, 4000, "ZOMBIE"},
@@ -2706,22 +2706,47 @@ bool Zombie::CanRevived() const {
         return false;
     }
 
-    return mZombieType != ZombieType::ZOMBIE_DANCER && mZombieType != ZombieType::ZOMBIE_SNORKEL && mZombieType != ZombieType::ZOMBIE_ZAMBONI && mZombieType != ZombieType::ZOMBIE_BOBSLED
-        && mZombieType != ZombieType::ZOMBIE_DOLPHIN_RIDER && mZombieType != ZombieType::ZOMBIE_BALLOON && mZombieType != ZombieType::ZOMBIE_DIGGER && mZombieType != ZombieType::ZOMBIE_POGO
-        && mZombieType != ZombieType::ZOMBIE_BUNGEE && mZombieType != ZombieType::ZOMBIE_CATAPULT && !IsGargantuar() && mZombieType != ZombieType::ZOMBIE_BOSS
-        && mZombieType != ZombieType::ZOMBIE_JACKSON && mZombieType != ZombieType::ZOMBIE_DOGWALKER && mZombieType != ZombieType::ZOMBIE_DOG && mZombieType != ZombieType::ZOMBIE_SKELETON
+    return mZombieType != ZombieType::ZOMBIE_SNORKEL && mZombieType != ZombieType::ZOMBIE_ZAMBONI && mZombieType != ZombieType::ZOMBIE_BOBSLED && mZombieType != ZombieType::ZOMBIE_DOLPHIN_RIDER
+        && mZombieType != ZombieType::ZOMBIE_BALLOON && mZombieType != ZombieType::ZOMBIE_DIGGER && mZombieType != ZombieType::ZOMBIE_BUNGEE && mZombieType != ZombieType::ZOMBIE_CATAPULT
+        && !IsGargantuar() && mZombieType != ZombieType::ZOMBIE_BOSS && mZombieType != ZombieType::ZOMBIE_JACKSON && mZombieType != ZombieType::ZOMBIE_DOG && mZombieType != ZombieType::ZOMBIE_SKELETON
         && mZombieType != ZombieType::ZOMBIE_PIGEON && !IsZomblob(mZombieType);
 }
 
+void Zombie::AddDeadFollower() {
+    if (!mCanRevived || !CanRevived()) {
+        return;
+    }
+    mCanRevived = false;
+
+    int aRowCount = 0;
+    for (const DeadFollower &aFollower : msDeadFollowers) {
+        if (aFollower.mRow == mRow) {
+            ++aRowCount;
+        }
+    }
+    if (aRowCount < 3) {
+        msDeadFollowers.push_back({mZombieType, mRow});
+    }
+}
+
 ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol) {
-    if (!mBoard->RowCanHaveZombieType(theRow, theZombieType))
-        return ZombieID::ZOMBIEID_NULL;
+    // 允许边路复活舞者僵尸
+    //    if (!mBoard->RowCanHaveZombieType(theRow, theZombieType))
+    //        return ZombieID::ZOMBIEID_NULL;
 
     Zombie *aZombie = mBoard->AddZombie_Origin(theZombieType, mFromWave, false);
     if (aZombie == nullptr)
         return ZombieID::ZOMBIEID_NULL;
 
     aZombie->mIsRevived = true;
+    aZombie->mMindControlled = mMindControlled;
+    if (theZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+        if (Zombie *aDog = mBoard->ZombieTryToGet(aZombie->mRelatedZombieID)) {
+            aDog->mIsRevived = true;
+            aDog->mMindControlled = mMindControlled;
+            aDog->mBodyHealth -= aDog->mBodyMaxHealth / 2;
+        }
+    }
     aZombie->RiseFromGrave(theCol, theRow);
     aZombie->mBodyHealth -= aZombie->mBodyMaxHealth / 3;
     if (aZombie->mHelmHealth > 0) {
@@ -2732,7 +2757,6 @@ ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCo
     }
     aZombie->mHasArm = false;
     aZombie->SetupLostArmReanim();
-    aZombie->mMindControlled = mMindControlled;
     return mBoard->ZombieGetID(aZombie);
 }
 
@@ -2740,43 +2764,29 @@ void Zombie::RaiseDeadZombies() {
     if (IsRemoteClientOrViewer())
         return;
 
-    std::vector<ZombieType> deadFollowers = msDeadFollowers;
-    std::vector<uint16_t> revivedServerIDs;
-    std::vector<float> revivedVelXs;
+    std::vector<DeadFollower> deadFollowers = msDeadFollowers;
+    msDeadFollowers.clear();
+    int aRowCounts[MAX_GRID_SIZE_Y] = {};
+    U16UNI32U8_U16U8x3UNI32x18_Event event{};
+    event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD;
+    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
+    event.uni32_0.f32 = mPosX;
 
-    for (int i = 0; i < msDeadFollowers.size(); i++) {
-        if (!msDeadFollowers.empty()) {
-            int aRow = 0, aCol = 0;
-            if (i < 5) {
-                aRow = i;
-                aCol = mMindControlled ? 4 : 6;
-            } else if (i < 10) {
-                aRow = i - 5;
-                aCol = mMindControlled ? 3 : 7;
-            } else {
-                aRow = i - 10;
-                aCol = mMindControlled ? 2 : 8;
-            }
-
-            ZombieID revivedID = RaiseDeadZombie(msDeadFollowers[i], aRow, aCol);
-            Zombie *revivedZombie = mBoard->ZombieTryToGet(revivedID);
-            revivedServerIDs.push_back(uint16_t(revivedID));
-            revivedVelXs.push_back(revivedZombie ? revivedZombie->mVelX : 0.0f);
+    for (const DeadFollower &aFollower : deadFollowers) {
+        int aColumnIndex = aRowCounts[aFollower.mRow]++;
+        int aCol = mMindControlled ? 4 - aColumnIndex : 6 + aColumnIndex;
+        ZombieID revivedID = RaiseDeadZombie(aFollower.mZombieType, aFollower.mRow, aCol);
+        if (Zombie *revivedZombie = mBoard->ZombieTryToGet(revivedID)) {
+            auto &aRevived = event.data[event.u8_0++];
+            aRevived.u16_0 = uint16_t(revivedID);
+            aRevived.u8x3_0[0] = uint8_t(aFollower.mZombieType);
+            aRevived.u8x3_0[1] = uint8_t(aFollower.mRow);
+            aRevived.u8x3_0[2] = uint8_t(aCol);
+            aRevived.uni32_0.f32 = revivedZombie->mVelX;
         }
     }
-    msDeadFollowers.clear();
 
     if (IsRemoteServer()) {
-        U16UNI32U8x16U16x15UNI32x15_Event event{};
-        event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD;
-        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.uni32_0.f32 = mPosX;
-        event.u8x16_0[0] = uint8_t(std::min<size_t>(15, std::min(deadFollowers.size(), revivedServerIDs.size())));
-        for (int i = 0; i < event.u8x16_0[0]; ++i) {
-            event.u8x16_0[i + 1] = uint8_t(deadFollowers[i]);
-            event.u16x15_0[i] = revivedServerIDs[i];
-            event.uni32x15_0[i].f32 = revivedVelXs[i];
-        }
         netplay::PutEvent(event);
     }
 }
@@ -5233,7 +5243,7 @@ void Zombie::UpdateZombieRiseFromGrave() {
                 mZombiePhase = PHASE_FOOTBALL_PRE_CHARGE;
                 break;
             case ZOMBIE_DOG:
-                mZombiePhase = PHASE_DOG_RUNNING;
+                mZombiePhase = mRelatedZombieID != ZombieID::ZOMBIEID_NULL ? PHASE_DOG_WALKING : PHASE_DOG_RUNNING;
                 break;
             case ZOMBIE_TELEPORTATION:
                 mZombiePhase = PHASE_TELEPORTATION_PRE_SHOOT;
@@ -5309,12 +5319,8 @@ void Zombie::UpdateDamageStates(unsigned int theDamageFlags) {
             DieNoLoot();
         }
 
-        if (mApp->IsVSMode() && mBoard->GetAliveJacksonZombie() && CanRevived()) {
-            mCanRevived = false;
-            if (msDeadFollowers.size() >= 15) {
-                msDeadFollowers.erase(msDeadFollowers.begin());
-            }
-            msDeadFollowers.push_back(mZombieType);
+        if (mApp->IsVSMode() && mBoard->GetAliveJacksonZombie()) {
+            AddDeadFollower();
         }
     }
 }
@@ -5945,9 +5951,18 @@ Rect Zombie::GetZombieRect() {
 }
 
 void Zombie::RiseFromGrave(int theCol, int theRow) {
-    mPosX = mBoard->GridToPixelX(theCol, mRow) - 25;
+    float aPosX = mBoard->GridToPixelX(theCol, mRow) - 25;
+    Zombie *aDogWalker = mZombieType == ZombieType::ZOMBIE_DOG ? mBoard->ZombieTryToGet(mRelatedZombieID) : nullptr;
+    if (aDogWalker != nullptr) {
+        aPosX = aDogWalker->mPosX + (aDogWalker->IsWalkingBackwards() ? 80.0f : -80.0f);
+    }
+    mPosX = aPosX;
     mPosY = GetPosYBasedOnRow(theRow);
     SetRow(theRow);
+    if (aDogWalker != nullptr) {
+        mTargetRow = theRow;
+        mRenderOrder = aDogWalker->mRenderOrder + 1;
+    }
     mX = int(mPosX);
     mY = int(mPosY);
     mAltitude = CLIP_HEIGHT_OFF;
@@ -6010,7 +6025,15 @@ void Zombie::RiseFromGrave(int theCol, int theRow) {
         }
     }
 
-    if (IsRemoteServer()) {
+    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+        Zombie *aDog = mBoard->ZombieTryToGet(mRelatedZombieID);
+        if (aDog != nullptr) {
+            aDog->RiseFromGrave(theCol, theRow);
+        }
+    }
+
+    // 牵绳中的狗由主人的出土事件一并处理。
+    if (IsRemoteServer() && aDogWalker == nullptr) {
         U8U8U16_Event event = {{EventType::EVENT_SERVER_BOARD_ZOMBIE_RIZE_FORM_GRAVE}, uint8_t(theCol), uint8_t(theRow), uint16_t(mBoard->mZombies.DataArrayGetID(this))};
         netplay::PutEvent(event);
     }
@@ -7008,12 +7031,8 @@ void Zombie::DieNoLoot() {
     DieNoLoot_Origin();
 
     if (mApp->IsVSMode()) {
-        if (mBoard && mBoard->GetAliveJacksonZombie() && CanRevived() && mCanRevived) {
-            mCanRevived = false;
-            if (msDeadFollowers.size() >= 15) {
-                msDeadFollowers.erase(msDeadFollowers.begin());
-            }
-            msDeadFollowers.push_back(mZombieType);
+        if (mBoard && mBoard->GetAliveJacksonZombie()) {
+            AddDeadFollower();
         }
 
         if (mZombieType == ZombieType::ZOMBIE_JACKSON) {
@@ -9286,6 +9305,10 @@ void Zombie::SetupLostArmReanim() {
         case ZombieType::ZOMBIE_GIGA_IMP:
             ReanimShowTrack("Zombie_giga_outerarm_lower", RENDER_GROUP_HIDDEN);
             break;
+        case ZombieType::ZOMBIE_DOGWALKER:
+            ReanimShowTrack("Zombie_dogwalker_outerarm_lower", RENDER_GROUP_HIDDEN);
+            ReanimShowTrack("Zombie_dogwalker_outerarm_hand", RENDER_GROUP_HIDDEN);
+            break;
         case ZombieType::ZOMBIE_TELEPORTATION:
             ReanimShowPrefix("Zombie_teleportation_outerarm_lower", RENDER_GROUP_HIDDEN);
             ReanimShowPrefix("Zombie_teleportation_outerarm_hand", RENDER_GROUP_HIDDEN);
@@ -9378,6 +9401,9 @@ void Zombie::SetupLostArmReanim() {
                 break;
             case ZombieType::ZOMBIE_YETI:
                 aBodyReanim->SetImageOverride("Zombie_yeti_outerarm_upper", Sexy::IMAGE_REANIM_ZOMBIE_YETI_OUTERARM_UPPER2);
+                break;
+            case ZombieType::ZOMBIE_DOGWALKER:
+                aBodyReanim->SetImageOverride("Zombie_dogwalker_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_DOGWALKER_OUTERARM_UPPER2);
                 break;
             case ZombieType::ZOMBIE_TELEPORTATION:
                 aBodyReanim->SetImageOverride("Zombie_teleportation_outerarm_upper", addonImages.IMAGE_REANIM_ZOMBIE_TELEPORTATION_OUTERARM_UPPER2);
@@ -9565,12 +9591,6 @@ void Zombie::ApplyBurn() {
 }
 
 void Zombie::ApplyBurn_Origin() {
-    //    if (mZombieType == ZombieType::ZOMBIE_SKELETON) {
-    //        SettleSunBeanSun();
-    //        DieWithLoot();
-    //        return;
-    //    }
-
     if (mBodyHealth >= 1800 || mZombieType == ZombieType::ZOMBIE_BOSS) {
         TakeDamage(1800, 18U);
         return;
@@ -9609,11 +9629,6 @@ void Zombie::ApplyAshDeath(bool theElectrocuted) {
 
     AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_ZAMBONI_SMOKE, nullptr);
     BungeeDropPlant();
-
-    // 被灰烬炸死的僵尸禁止复活
-    if (CanRevived()) {
-        mCanRevived = false;
-    }
 
     if (mZombieType == ZombieType::ZOMBIE_SKELETON) {
         mApp->AddTodParticle(mPosX + mWidth / 2, mPosY + mHeight / 2, mRenderOrder + 1, ParticleEffect::PARTICLE_SKELETON_PILE_BREAK);
