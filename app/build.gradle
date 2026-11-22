@@ -23,7 +23,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.trans.pvztv"
     ndkVersion = "27.3.13750724"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         def gitBranch = "git rev-parse --abbrev-ref HEAD".execute().text.trim()
@@ -34,7 +34,7 @@ android {
 
         applicationId = "com.trans.pvztv"
         minSdk = 21
-        targetSdk = 33
+        targetSdk = 35
         versionCode = 2
         versionName = "0.0.0"
         versionNameSuffix = "-" + gitCommitDate

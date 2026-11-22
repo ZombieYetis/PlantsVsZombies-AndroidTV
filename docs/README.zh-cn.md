@@ -14,7 +14,7 @@
 ## 构建
 
 - 确保已安装下列组件:
-    * Android SDK Platform 34
+    * Android SDK Platform 35
     * NDK v27.3.13750724 (r27d)
     * CMake v3.20+
 
