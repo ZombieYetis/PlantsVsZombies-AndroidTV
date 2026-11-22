@@ -1333,7 +1333,7 @@ public class SetActivity extends Activity {
         buttonExportLog.setTextSize(15f);
         buttonExportLog.setTypeface(Typeface.DEFAULT_BOLD);
         buttonExportLog.setOnClickListener(view -> {
-            var intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
                     .addCategory(Intent.CATEGORY_OPENABLE)
                     .setType("text/plain")
                     .putExtra(Intent.EXTRA_TITLE, "log.txt");
@@ -1886,7 +1886,7 @@ public class SetActivity extends Activity {
                         .setTitle(R.string.about)
                         .setMessage(aboutMsg)
                         .setNegativeButton(android.R.string.copy, (dialogInterface, n) -> {
-                            var clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                             clipboard.setPrimaryClip(
                                     ClipData.newPlainText(getString(R.string.about), aboutMsg)
                             );

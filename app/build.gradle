@@ -115,8 +115,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     externalNativeBuild {
@@ -138,6 +138,12 @@ android {
         variant.outputs.configureEach { output ->
             outputFileName = "PvZ-TV-v${variant.versionName}-${variant.buildType.name}.apk"
         }
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
