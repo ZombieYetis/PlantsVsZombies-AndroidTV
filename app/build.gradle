@@ -115,7 +115,7 @@ android {
     }
 
     compileOptions {
-        // Java 8 for compatibility of low APL level
+        // Java 8 for compatibility of low API level
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
