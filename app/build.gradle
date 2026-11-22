@@ -82,7 +82,7 @@ android {
                     arguments "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
-            /* Uncommenting will cause a crash. */
+            /* TODO: Use `@Keep` and uncomment below */
             // minifyEnabled = true
             // shrinkResources = true
         }
@@ -115,6 +115,7 @@ android {
     }
 
     compileOptions {
+        // Java 8 for compatibility of low APL level
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
@@ -143,6 +144,7 @@ android {
 
 java {
     toolchain {
+        // Java toolchain version under 21 for source/target version 8
         languageVersion = JavaLanguageVersion.of(17)
     }
 }
