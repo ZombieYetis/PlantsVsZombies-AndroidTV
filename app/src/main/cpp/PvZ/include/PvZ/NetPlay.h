@@ -34,7 +34,7 @@
 #include <utility>
 #include <vector>
 
-inline constexpr uint32_t NETPLAY_VERSION = 3227;
+inline constexpr uint32_t NETPLAY_VERSION = 3228;
 
 // 联机事件只传输 DataArray ID 的低 16 位；slot/index 0 是合法对象 ID，
 // 因此不能使用游戏内部值为 0 的 PLANTID_NULL / ZOMBIEID_NULL / GRIDITEMID_NULL 作为网络空值。
@@ -162,9 +162,7 @@ enum EventType : uint8_t {
     EVENT_SERVER_BOARD_ZOMBIE_MIND_CONTROLLED,
     EVENT_SERVER_BOARD_ZOMBIE_CONVERT_TO_IMP,
     EVENT_SERVER_BOARD_ZOMBIE_ADD,                   // AddZombieInRow触发的同步
-    EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD,           // 单独同步雪橇小队
-    EVENT_SERVER_BOARD_ZOMBIE_DOGWALKER_ADD,         // 单独同步遛狗僵尸和僵尸狗
-    EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID, // 蹦极僵尸在AddZombieInRow之后还会设置靶标位置，所以单独同步
+    EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID, // 蹦极创建后还需设置靶标位置
     EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_LIFT_TARGET,
     EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE,
     EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_HIT_UMBRELLA,
@@ -504,28 +502,20 @@ struct U16x3UNI32x2_Event : BaseEvent {
     Union32Bit uni32_1;
 };
 
-struct U8x4U16UNI32x2_Event : BaseEvent {
+struct U8x4U16UNI32x2_U16UNI32x2x3_Event : BaseEvent {
     uint8_t u8x4_0[4];
     uint16_t u16_0;
     Union32Bit uni32x2_0[2];
-};
-
-struct U16x5UNI32x5_Event : BaseEvent {
-    uint16_t u16_0;
-    Union32Bit uni32_0;
-    uint16_t u16x4_0[4];
-    Union32Bit uni32x4_0[4];
-};
-
-struct U16UNI32U8_U16U8x3UNI32x18_Event : BaseEvent {
-    uint16_t u16_0;
-    Union32Bit uni32_0;
-    uint8_t u8_0;
     struct {
         uint16_t u16_0;
-        uint8_t u8x3_0[3];
-        Union32Bit uni32_0;
-    } data[18];
+        Union32Bit uni32x2_0[2];
+    } data[3];
+};
+
+struct U16U16UNI32_Event : BaseEvent {
+    uint16_t u16_0;
+    uint16_t u16_1;
+    Union32Bit uni32_0;
 };
 
 struct CHARx32_Event : BaseEvent {

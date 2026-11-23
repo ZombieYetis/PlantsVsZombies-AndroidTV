@@ -422,6 +422,9 @@ public:
     void UpdateZombieJackson();
     bool CanRevived() const;
     void AddDeadFollower();
+    int GetSpawnGroup(Zombie *theZombies[4]);
+    void SyncZombieAdd(bool theIsRustle);
+    void ApplyRevive(bool theMindControlled);
     ZombieID RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol);
     void RaiseDeadZombies();
     void JacksonDie();
@@ -608,8 +611,8 @@ public:
     void UpdateZombieDolphinRider();
     ZombiePhase GetDancerPhase();
     ZombieID SummonBackupDancer(int theRow, int thePosX);
+    void PlaceSummonedDancer(Zombie *theLeader, int thePosX);
     void SummonBackupDancers();
-    void SummonBackupDancers_Origin();
     bool NeedsMoreBackupDancers();
     void UpdateYuckyFace();
     void UpdateZombieBobsled();

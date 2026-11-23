@@ -2729,34 +2729,84 @@ void Zombie::AddDeadFollower() {
     }
 }
 
-ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol) {
-    // 允许边路复活舞者僵尸
-    //    if (!mBoard->RowCanHaveZombieType(theRow, theZombieType))
-    //        return ZombieID::ZOMBIEID_NULL;
+int Zombie::GetSpawnGroup(Zombie *theZombies[4]) {
+    theZombies[0] = this;
+    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+        theZombies[1] = mBoard->mZombies.DataArrayGet(mRelatedZombieID);
+        return 2;
+    }
+    if (mZombieType == ZombieType::ZOMBIE_BOBSLED) {
+        for (int i = 0; i < 3; ++i) {
+            theZombies[i + 1] = mBoard->mZombies.DataArrayGet(mFollowerZombieID[i]);
+        }
+        return 4;
+    }
+    return 1;
+}
 
-    Zombie *aZombie = mBoard->AddZombie_Origin(theZombieType, mFromWave, false);
-    if (aZombie == nullptr)
-        return ZombieID::ZOMBIEID_NULL;
+void Zombie::SyncZombieAdd(bool theIsRustle) {
+    U8x4U16UNI32x2_U16UNI32x2x3_Event event{};
+    event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
+    event.u8x4_0[0] = uint8_t(mZombieType);
+    event.u8x4_0[1] = uint8_t(mRow);
+    event.u8x4_0[2] = int8_t(mFromWave);
+    // 标志位：bit 0 为草丛摇晃，bit 1 为非水路普僵的 mBloated。
+    event.u8x4_0[3] = uint8_t(theIsRustle);
+    if (mZombieType == ZombieType::ZOMBIE_NORMAL && !mInPool) {
+        event.u8x4_0[3] |= uint8_t(mBloated) << 1;
+    }
+    // 仅发送实际生成的伴生僵尸。
+    Zombie *aZombies[4];
+    int aCount = GetSpawnGroup(aZombies);
+    for (int i = 0; i < aCount; ++i) {
+        Zombie *aZombie = aZombies[i];
+        auto &aID = i == 0 ? event.u16_0 : event.data[i - 1].u16_0;
+        auto *aState = i == 0 ? event.uni32x2_0 : event.data[i - 1].uni32x2_0;
+        aID = uint16_t(mBoard->ZombieGetID(aZombie));
+        aState[0].f32 = aZombie->mVelX;
+        aState[1].f32 = aZombie->mPosX;
+    }
+    event.size = uint8_t(sizeof(event) - (4 - aCount) * sizeof(event.data[0]));
+    netplay::detail::PutEventData(reinterpret_cast<const std::byte *>(&event), event.size);
+}
 
-    aZombie->mIsRevived = true;
-    aZombie->mMindControlled = mMindControlled;
-    if (theZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-        if (Zombie *aDog = mBoard->ZombieTryToGet(aZombie->mRelatedZombieID)) {
+void Zombie::ApplyRevive(bool theMindControlled) {
+    mIsRevived = true;
+    mMindControlled = theMindControlled;
+    if (mZombieType == ZombieType::ZOMBIE_DOGWALKER) {
+        if (Zombie *aDog = mBoard->ZombieTryToGet(mRelatedZombieID)) {
             aDog->mIsRevived = true;
-            aDog->mMindControlled = mMindControlled;
+            aDog->mMindControlled = theMindControlled;
             aDog->mBodyHealth -= aDog->mBodyMaxHealth / 2;
         }
     }
+    mBodyHealth -= mBodyMaxHealth / 3;
+    if (mHelmHealth > 0) {
+        TakeHelmDamage(mHelmMaxHealth / 2, 0U);
+    }
+    if (mShieldHealth > 0) {
+        TakeShieldDamage(mShieldMaxHealth / 2, 0U);
+    }
+    mHasArm = false;
+    SetupLostArmReanim();
+}
+
+ZombieID Zombie::RaiseDeadZombie(ZombieType theZombieType, int theRow, int theCol) {
+    Zombie *aZombie = mBoard->AddZombie(theZombieType, mFromWave, false);
+    if (aZombie == nullptr) {
+        return ZombieID::ZOMBIEID_NULL;
+    }
+
+    if (IsRemoteServer()) {
+        U16U16UNI32_Event event{};
+        event.type = EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD;
+        event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+        event.u16_1 = uint16_t(mBoard->ZombieGetID(aZombie));
+        event.uni32_0.f32 = mPosX;
+        netplay::PutEvent(event);
+    }
+    aZombie->ApplyRevive(mMindControlled);
     aZombie->RiseFromGrave(theCol, theRow);
-    aZombie->mBodyHealth -= aZombie->mBodyMaxHealth / 3;
-    if (aZombie->mHelmHealth > 0) {
-        aZombie->TakeHelmDamage(aZombie->mHelmMaxHealth / 2, 0U);
-    }
-    if (aZombie->mShieldHealth > 0) {
-        aZombie->TakeShieldDamage(aZombie->mShieldMaxHealth / 2, 0U);
-    }
-    aZombie->mHasArm = false;
-    aZombie->SetupLostArmReanim();
     return mBoard->ZombieGetID(aZombie);
 }
 
@@ -2767,27 +2817,10 @@ void Zombie::RaiseDeadZombies() {
     std::vector<DeadFollower> deadFollowers = msDeadFollowers;
     msDeadFollowers.clear();
     int aRowCounts[MAX_GRID_SIZE_Y] = {};
-    U16UNI32U8_U16U8x3UNI32x18_Event event{};
-    event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD;
-    event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-    event.uni32_0.f32 = mPosX;
-
     for (const DeadFollower &aFollower : deadFollowers) {
         int aColumnIndex = aRowCounts[aFollower.mRow]++;
         int aCol = mMindControlled ? 4 - aColumnIndex : 6 + aColumnIndex;
-        ZombieID revivedID = RaiseDeadZombie(aFollower.mZombieType, aFollower.mRow, aCol);
-        if (Zombie *revivedZombie = mBoard->ZombieTryToGet(revivedID)) {
-            auto &aRevived = event.data[event.u8_0++];
-            aRevived.u16_0 = uint16_t(revivedID);
-            aRevived.u8x3_0[0] = uint8_t(aFollower.mZombieType);
-            aRevived.u8x3_0[1] = uint8_t(aFollower.mRow);
-            aRevived.u8x3_0[2] = uint8_t(aCol);
-            aRevived.uni32_0.f32 = revivedZombie->mVelX;
-        }
-    }
-
-    if (IsRemoteServer()) {
-        netplay::PutEvent(event);
+        RaiseDeadZombie(aFollower.mZombieType, aFollower.mRow, aCol);
     }
 }
 
@@ -5961,7 +5994,6 @@ void Zombie::RiseFromGrave(int theCol, int theRow) {
     SetRow(theRow);
     if (aDogWalker != nullptr) {
         mTargetRow = theRow;
-        mRenderOrder = aDogWalker->mRenderOrder + 1;
     }
     mX = int(mPosX);
     mY = int(mPosY);
@@ -9095,8 +9127,15 @@ void Zombie::SetRow(int theRow) {
     }
 
     Zombie *aPartner = mBoard->ZombieTryToGet(mRelatedZombieID);
-    if (aPartner != nullptr && !aPartner->IsDeadOrDying() && aPartner->mRow != theRow) {
-        aPartner->SetRow(theRow);
+    if (aPartner != nullptr && !aPartner->IsDeadOrDying()) {
+        if (aPartner->mRow != theRow) {
+            aPartner->SetRow(theRow);
+        }
+        if (mZombieType == ZombieType::ZOMBIE_DOG) {
+            mRenderOrder = aPartner->mRenderOrder + 1;
+        } else {
+            aPartner->mRenderOrder = mRenderOrder + 1;
+        }
     }
 }
 
@@ -10186,60 +10225,40 @@ ZombieID Zombie::SummonBackupDancer(int theRow, int thePosX) {
     if (thePosX < -80)
         return ZombieID::ZOMBIEID_NULL;
 
-    Zombie *aZombie = mBoard->AddZombie_Origin(aZombieType, mFromWave, false);
+    Zombie *aZombie = mBoard->AddZombieInRow(aZombieType, theRow, mFromWave, false);
     if (aZombie == nullptr)
         return ZombieID::ZOMBIEID_NULL;
 
-    aZombie->mPosX = thePosX;
-    aZombie->mPosY = GetPosYBasedOnRow(theRow);
-    aZombie->SetRow(theRow);
-    aZombie->mX = (int)aZombie->mPosX;
-    aZombie->mY = (int)aZombie->mPosY;
-
-    aZombie->mAltitude = ZOMBIE_BACKUP_DANCER_RISE_HEIGHT;
-    aZombie->mZombiePhase = ZombiePhase::PHASE_DANCER_RISING;
-    aZombie->mPhaseCounter = 150;
-    aZombie->mRelatedZombieID = mBoard->ZombieGetID(this);
-
-    aZombie->SetAnimRate(0.0f);
-    aZombie->mMindControlled = mMindControlled;
-
-    int aParticleX = (int)aZombie->mPosX + 60;
-    int aParticleY = (int)aZombie->mPosY + 110;
-    if (aZombie->IsOnHighGround()) {
-        aParticleY -= HIGH_GROUND_HEIGHT;
-    }
-    int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, theRow, 0);
-    mApp->AddTodParticle(aParticleX, aParticleY, aRenderOrder, ParticleEffect::PARTICLE_DANCER_RISE);
-    mApp->PlayFoley(FoleyType::FOLEY_GRAVESTONE_RUMBLE);
-
+    aZombie->PlaceSummonedDancer(this, thePosX);
     return mBoard->ZombieGetID(aZombie);
 }
 
-void Zombie::SummonBackupDancers() {
-    if (IsRemoteClientOrViewer())
-        return;
+void Zombie::PlaceSummonedDancer(Zombie *theLeader, int thePosX) {
+    mPosX = thePosX;
+    mPosY = theLeader->GetPosYBasedOnRow(mRow);
+    mX = int(mPosX);
+    mY = int(mPosY);
 
-    SummonBackupDancers_Origin();
+    mAltitude = ZOMBIE_BACKUP_DANCER_RISE_HEIGHT;
+    mZombiePhase = ZombiePhase::PHASE_DANCER_RISING;
+    mPhaseCounter = 150;
+    mRelatedZombieID = mBoard->ZombieGetID(theLeader);
 
-    if (IsRemoteServer()) {
-        U16x5UNI32x5_Event event{};
-        event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_SUMMON_BACKUP_DANCERS;
-        event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(this));
-        event.uni32_0.f32 = mPosX;
-        for (int i = 0; i < NUM_BACKUP_DANCERS; i++) {
-            event.u16x4_0[i] = uint16_t(mFollowerZombieID[i]);
-            Zombie *aZombie = mBoard->ZombieTryToGet(mFollowerZombieID[i]);
-            if (aZombie) {
-                event.uni32x4_0[i].f32 = aZombie->mVelX;
-            }
-        }
-        netplay::PutEvent(event);
+    SetAnimRate(0.0f);
+    mMindControlled = theLeader->mMindControlled;
+
+    int aParticleX = int(mPosX) + 60;
+    int aParticleY = int(mPosY) + 110;
+    if (theLeader->IsOnHighGround()) {
+        aParticleY -= HIGH_GROUND_HEIGHT;
     }
+    int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
+    mApp->AddTodParticle(aParticleX, aParticleY, aRenderOrder, ParticleEffect::PARTICLE_DANCER_RISE);
+    mApp->PlayFoley(FoleyType::FOLEY_GRAVESTONE_RUMBLE);
 }
 
-void Zombie::SummonBackupDancers_Origin() {
-    if (!mHasHead)
+void Zombie::SummonBackupDancers() {
+    if (IsRemoteClientOrViewer() || !mHasHead)
         return;
 
     for (int i = 0; i < NUM_BACKUP_DANCERS; i++) {
@@ -10265,6 +10284,16 @@ void Zombie::SummonBackupDancers_Origin() {
                 break;
         }
         mFollowerZombieID[i] = SummonBackupDancer(aRow, aPosX);
+        if (IsRemoteServer() && mFollowerZombieID[i] != ZombieID::ZOMBIEID_NULL) {
+            U16x3UNI32x2_Event event{};
+            event.type = EVENT_SERVER_BOARD_ZOMBIE_SUMMON_BACKUP_DANCERS;
+            event.u16_0 = uint16_t(mBoard->ZombieGetID(this));
+            event.u16_1 = uint16_t(mFollowerZombieID[i]);
+            event.u16_2 = uint16_t(i);
+            event.uni32_0.f32 = mPosX;
+            event.uni32_1.f32 = float(aPosX);
+            netplay::PutEvent(event);
+        }
     }
 }
 
@@ -11652,19 +11681,7 @@ void Zombie::BossSpawnContact() {
         Zombie *aZombie = mBoard->AddZombieInRow_Origin(aZombieType, mTargetRow, 0, true);
         aZombie->mPosX = 600.0f;
         if (IsRemoteServer() && mApp->mGameScene == GameScenes::SCENE_PLAYING) {
-            U8x4U16UNI32x2_Event event{};
-            event.type = EVENT_SERVER_BOARD_ZOMBIE_ADD;
-            event.u8x4_0[0] = uint8_t(aZombieType);
-            event.u8x4_0[1] = uint8_t(mTargetRow);
-            event.u8x4_0[2] = 0;
-            event.u8x4_0[3] = 1;
-            if (aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                event.u8x4_0[3] |= uint8_t(aZombie->mBloated) << 1;
-            }
-            event.u16_0 = uint16_t(mBoard->mZombies.DataArrayGetID(aZombie));
-            event.uni32x2_0[0].f32 = aZombie->mVelX;
-            event.uni32x2_0[1].f32 = aZombie->mPosX;
-            netplay::PutEvent(event);
+            aZombie->SyncZombieAdd(true);
             netplay::MetricsRecordZombieUsed(int(aZombieType));
         }
     }

@@ -2110,43 +2110,6 @@ void Board::DrawFog(Sexy::Graphics *g) {
 }
 
 Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromWave, bool theIsRustle) {
-
-    //    if (theZombieType == ZOMBIE_BOBSLED && (IsRemoteClient() || IsRemoteServer())) {
-    //
-    //        // 不允许客户端通过AddZombieInRow来添加雪橇小队僵尸
-    //        if (IsRemoteClient())
-    //            return nullptr;
-    //
-    //
-    //        bool theUnkBool = Sexy::Rand(5) == 0;
-    //        Zombie *bobsledZombies[4];
-    //        bobsledZombies[0] = mZombies.DataArrayAlloc();
-    //        bobsledZombies[0]->ZombieInitialize(theRow, theZombieType, theUnkBool, nullptr, theFromWave, true);
-    //
-    //        for (int i = 1; i < 4; ++i) {
-    //            bobsledZombies[i] = mZombies.DataArrayAlloc();
-    //            bobsledZombies[i]->ZombieInitialize(theRow, theZombieType, theUnkBool, bobsledZombies[0], theFromWave, true);
-    //        }
-    //
-    //
-    //        if (IsRemoteServer()) {
-    //
-    //            U8x2U16x4UNI32x8_Event event{};
-    //            event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD;
-    //            event.u8x2_0[0] = uint8_t(theRow);
-    //            event.u8x2_0[1] = int8_t(theFromWave);
-    //
-    //            for (int i = 0; i < 4; ++i) {
-    //                event.u16x4_0[i] = mZombies.DataArrayGetID(bobsledZombies[i]);
-    //                event.uni32x4_0[i].f32 = bobsledZombies[i]->mVelX;
-    //                event.uni32x4_1[i].f32 = bobsledZombies[i]->mPosX;
-    //            }
-    //            netplay::PutEvent(event);
-    //        }
-    //        return bobsledZombies[0];
-    //    }
-
-
     if (IsRemoteClientOrViewer() && mApp->mGameScene != SCENE_LEVEL_INTRO)
         return nullptr;
 
@@ -2168,56 +2131,10 @@ Zombie *Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
                     netplay::PutEvent(event);
                 } else {
                     // theFromWave == -5代表是放僵尸的蹦极，在屋顶模式专属。
-                    // 此处我们直接不处理，由专门的EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE事件处理
-                }
-            } else if (theZombieType == ZombieType::ZOMBIE_BOBSLED) {
-                U8x2U16x4UNI32x8_Event event{};
-                event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD;
-                event.u8x2_0[0] = uint8_t(theRow);
-                event.u8x2_0[1] = int8_t(theFromWave);
-                event.u16x4_0[0] = mZombies.DataArrayGetID(aZombie);
-                event.uni32x4_0[0].f32 = aZombie->mVelX;
-                event.uni32x4_1[0].f32 = aZombie->mPosX;
-
-                for (int i = 0; i < 3; ++i) {
-                    Zombie *aFollowerZombie = mZombies.DataArrayGet(aZombie->mFollowerZombieID[i]);
-                    event.u16x4_0[i + 1] = aZombie->mFollowerZombieID[i];
-                    event.uni32x4_0[i + 1].f32 = aFollowerZombie->mVelX;
-                    event.uni32x4_1[i + 1].f32 = aFollowerZombie->mPosX;
-                }
-                netplay::PutEvent(event);
-            } else if (theZombieType == ZombieType::ZOMBIE_DOGWALKER) {
-                Zombie *aZombieDog = mZombies.DataArrayGet(aZombie->mRelatedZombieID);
-                if (aZombieDog != nullptr) {
-                    U8x2U16x4UNI32x8_Event event{};
-                    event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_DOGWALKER_ADD;
-                    event.u8x2_0[0] = uint8_t(theRow);
-                    event.u8x2_0[1] = int8_t(theFromWave);
-                    event.u16x4_0[0] = uint16_t(mZombies.DataArrayGetID(aZombie));
-                    event.u16x4_0[1] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
-                    event.u16x4_0[2] = uint16_t(theIsRustle);
-                    event.uni32x4_0[0].f32 = aZombie->mVelX;
-                    event.uni32x4_0[1].f32 = aZombieDog->mVelX;
-                    event.uni32x4_1[0].f32 = aZombie->mPosX;
-                    event.uni32x4_1[1].f32 = aZombieDog->mPosX;
-                    netplay::PutEvent(event);
+                    // 此处我们直接不处理，由专门的 EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_DROP_ZOMBIE 事件处理
                 }
             } else {
-                U8x4U16UNI32x2_Event event{};
-                event.type = EventType::EVENT_SERVER_BOARD_ZOMBIE_ADD;
-                event.u8x4_0[0] = uint8_t(theZombieType);
-                event.u8x4_0[1] = uint8_t(theRow);
-                event.u8x4_0[2] = int8_t(theFromWave);
-                // 标志位：bit 0 为 theIsRustle，bit 1 为非水路普僵的 mBloated。
-                event.u8x4_0[3] = uint8_t(theIsRustle);
-                if (theZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
-                    event.u8x4_0[3] |= uint8_t(aZombie->mBloated) << 1;
-                }
-
-                event.u16_0 = uint16_t(mZombies.DataArrayGetID(aZombie));
-                event.uni32x2_0[0].f32 = aZombie->mVelX;
-                event.uni32x2_0[1].f32 = aZombie->mPosX;
-                netplay::PutEvent(event);
+                aZombie->SyncZombieAdd(theIsRustle);
             }
             // 僵尸放置数量
             netplay::MetricsRecordZombieUsed(int(theZombieType));
@@ -2963,63 +2880,26 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_ADD: {
-            auto *eventZombieAdd = static_cast<const U8x4U16UNI32x2_Event *>(event);
+            const auto *eventZombieAdd = static_cast<const U8x4U16UNI32x2_U16UNI32x2x3_Event *>(event);
             auto aZombieType = ZombieType(eventZombieAdd->u8x4_0[0]);
-            uint8_t aRow = eventZombieAdd->u8x4_0[1];
-            auto aFromWave = int8_t(eventZombieAdd->u8x4_0[2]);
-            const bool aIsRustle = (eventZombieAdd->u8x4_0[3] & 1) != 0;
-            if (aZombieType == ZombieType::ZOMBIE_BACKUP_DANCER) // 移除主机生成时向客机同步传递的舞伴
-                return;
+            int aRow = eventZombieAdd->u8x4_0[1];
+            int aFromWave = int8_t(eventZombieAdd->u8x4_0[2]);
+            bool aIsRustle = (eventZombieAdd->u8x4_0[3] & 1) != 0;
             Zombie *aZombie = AddZombieInRow_Origin(aZombieType, aRow, aFromWave, aIsRustle);
-            serverZombieIDMap[eventZombieAdd->u16_0] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            float aVelX = eventZombieAdd->uni32x2_0[0].f32;
-            aZombie->ApplySyncedSpeed(aVelX, short(aZombie->mAnimTicksPerFrame));
-            aZombie->mPosX = eventZombieAdd->uni32x2_0[1].f32;
-            if (aZombie->mZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
+            Zombie *aZombies[4];
+            int aCount = aZombie->GetSpawnGroup(aZombies);
+            for (int i = 0; i < aCount; ++i) {
+                Zombie *aSpawned = aZombies[i];
+                uint16_t aServerID = i == 0 ? eventZombieAdd->u16_0 : eventZombieAdd->data[i - 1].u16_0;
+                const auto *aState = i == 0 ? eventZombieAdd->uni32x2_0 : eventZombieAdd->data[i - 1].uni32x2_0;
+                serverZombieIDMap[aServerID] = uint16_t(ZombieGetID(aSpawned));
+                aSpawned->ApplySyncedSpeed(aState[0].f32, short(aSpawned->mAnimTicksPerFrame));
+                aSpawned->mPosX = aState[1].f32;
+                aSpawned->mX = int(aSpawned->mPosX);
+            }
+            if (aZombieType == ZombieType::ZOMBIE_NORMAL && !aZombie->mInPool) {
                 aZombie->mBloated = (eventZombieAdd->u8x4_0[3] & 2) != 0;
             }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_BOBSELD_ADD: {
-            auto *eventZombieBobseldAdd = static_cast<const U8x2U16x4UNI32x8_Event *>(event);
-            uint8_t aRow = eventZombieBobseldAdd->u8x2_0[0];
-            auto aFromWave = int8_t(eventZombieBobseldAdd->u8x2_0[1]);
-            Zombie *aZombie = AddZombieInRow_Origin(ZOMBIE_BOBSLED, aRow, aFromWave, true);
-            serverZombieIDMap[eventZombieBobseldAdd->u16x4_0[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            aZombie->ApplySyncedSpeed(eventZombieBobseldAdd->uni32x4_0[0].f32, short(aZombie->mAnimTicksPerFrame));
-            aZombie->mPosX = eventZombieBobseldAdd->uni32x4_1[0].f32;
-            for (int i = 0; i < 3; ++i) {
-                Zombie *aFollowerZombie = mZombies.DataArrayGet(aZombie->mFollowerZombieID[i]);
-                serverZombieIDMap[eventZombieBobseldAdd->u16x4_0[i + 1]] = uint16_t(aZombie->mFollowerZombieID[i]);
-                aFollowerZombie->ApplySyncedSpeed(eventZombieBobseldAdd->uni32x4_0[i + 1].f32, short(aFollowerZombie->mAnimTicksPerFrame));
-                aFollowerZombie->mPosX = eventZombieBobseldAdd->uni32x4_1[i + 1].f32;
-            }
-        } break;
-        case EVENT_SERVER_BOARD_ZOMBIE_DOGWALKER_ADD: {
-            auto *eventDogWalkerAdd = static_cast<const U8x2U16x4UNI32x8_Event *>(event);
-            const int aRow = eventDogWalkerAdd->u8x2_0[0];
-            const int aFromWave = int8_t(eventDogWalkerAdd->u8x2_0[1]);
-            const bool aIsRustle = eventDogWalkerAdd->u16x4_0[2] != 0;
-
-            Zombie *aZombie = AddZombieInRow_Origin(ZombieType::ZOMBIE_DOGWALKER, aRow, aFromWave, aIsRustle);
-            if (aZombie == nullptr) {
-                break;
-            }
-
-            Zombie *aZombieDog = mZombies.DataArrayGet(aZombie->mRelatedZombieID);
-            if (aZombieDog == nullptr) {
-                break;
-            }
-
-            serverZombieIDMap[eventDogWalkerAdd->u16x4_0[0]] = uint16_t(mZombies.DataArrayGetID(aZombie));
-            serverZombieIDMap[eventDogWalkerAdd->u16x4_0[1]] = uint16_t(mZombies.DataArrayGetID(aZombieDog));
-
-            aZombie->ApplySyncedSpeed(eventDogWalkerAdd->uni32x4_0[0].f32, short(aZombie->mAnimTicksPerFrame));
-            aZombieDog->ApplySyncedSpeed(eventDogWalkerAdd->uni32x4_0[1].f32, short(aZombieDog->mAnimTicksPerFrame));
-
-            aZombie->mPosX = eventDogWalkerAdd->uni32x4_1[0].f32;
-            aZombieDog->mPosX = eventDogWalkerAdd->uni32x4_1[1].f32;
-            aZombie->mX = int(aZombie->mPosX);
-            aZombieDog->mX = int(aZombieDog->mPosX);
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_BUNGEE_SET_STEAL_GRID: {
             auto *eventZombieBungeeAdd = static_cast<const U16UNI32UNI32_Event *>(event);
@@ -3119,44 +2999,25 @@ void Board::processServerEvent(const BaseEvent *event) {
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_SUMMON_BACKUP_DANCERS: {
-            auto *eventSummonBackupDancers = static_cast<const U16x5UNI32x5_Event *>(event);
-            uint16_t serverZombieID = eventSummonBackupDancers->u16_0;
+            const auto *eventSummonBackupDancers = static_cast<const U16x3UNI32x2_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
+            uint16_t backupClientID = 0;
+            if (homura::FindInMap(serverZombieIDMap, eventSummonBackupDancers->u16_0, clientZombieID) && homura::FindInMap(serverZombieIDMap, eventSummonBackupDancers->u16_1, backupClientID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->mPosX = eventSummonBackupDancers->uni32_0.f32;
-                aZombie->SummonBackupDancers_Origin();
-
-                for (int i = 0; i < NUM_BACKUP_DANCERS; ++i) {
-                    Zombie *backupZombie = ZombieTryToGet(aZombie->mFollowerZombieID[i]);
-                    if (backupZombie) {
-                        serverZombieIDMap[uint16_t(eventSummonBackupDancers->u16x4_0[i])] = uint16_t(aZombie->mFollowerZombieID[i]);
-                        float aVelX = eventSummonBackupDancers->uni32x4_0[i].f32;
-                        backupZombie->ApplySyncedSpeed(aVelX, short(aZombie->mAnimTicksPerFrame));
-                    }
-                }
+                Zombie *aBackupZombie = mZombies.DataArrayGet(backupClientID);
+                aZombie->mFollowerZombieID[eventSummonBackupDancers->u16_2] = ZombieGetID(aBackupZombie);
+                aBackupZombie->PlaceSummonedDancer(aZombie, int(eventSummonBackupDancers->uni32_1.f32));
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_RAISE_DEAD: {
-            auto *eventRaiseDead = static_cast<const U16UNI32U8_U16U8x3UNI32x18_Event *>(event);
-            uint16_t serverZombieID = eventRaiseDead->u16_0;
+            const auto *eventRaiseDead = static_cast<const U16U16UNI32_Event *>(event);
             uint16_t clientZombieID = 0;
-            if (homura::FindInMap(serverZombieIDMap, serverZombieID, clientZombieID)) {
+            uint16_t revivedClientID = 0;
+            if (homura::FindInMap(serverZombieIDMap, eventRaiseDead->u16_0, clientZombieID) && homura::FindInMap(serverZombieIDMap, eventRaiseDead->u16_1, revivedClientID)) {
                 Zombie *aZombie = mZombies.DataArrayGet(clientZombieID);
                 aZombie->mPosX = eventRaiseDead->uni32_0.f32;
-
-                int count = std::min<int>(18, eventRaiseDead->u8_0);
-                for (int i = 0; i < count; ++i) {
-                    const auto &aRevived = eventRaiseDead->data[i];
-                    ZombieID revivedClientID = aZombie->RaiseDeadZombie(ZombieType(aRevived.u8x3_0[0]), aRevived.u8x3_0[1], aRevived.u8x3_0[2]);
-                    if (revivedClientID != ZombieID::ZOMBIEID_NULL) {
-                        serverZombieIDMap[aRevived.u16_0] = uint16_t(revivedClientID);
-                        Zombie *revivedZombie = ZombieTryToGet(revivedClientID);
-                        if (revivedZombie) {
-                            revivedZombie->ApplySyncedSpeed(aRevived.uni32_0.f32, short(revivedZombie->mAnimTicksPerFrame));
-                        }
-                    }
-                }
+                mZombies.DataArrayGet(revivedClientID)->ApplyRevive(aZombie->mMindControlled);
             }
         } break;
         case EVENT_SERVER_BOARD_ZOMBIE_PICK_SPEED: {
