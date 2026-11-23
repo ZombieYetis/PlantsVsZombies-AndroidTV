@@ -36,14 +36,14 @@ public:
 
 class Attachment {
 public:
-    int unk[4];                    // 0 ~ 3
-    AttachEffect mEffectArray[16]; // 4 ~ 195
-    int mNumEffects;               // 196
-    bool mDead;                    //
+    void **vTable;                                           // 0
+    homura::Storage<std::vector<SyncBlockInfo>> mSyncBlocks; // 1 ~ 3
+    AttachEffect mEffectArray[16];                           // 4 ~ 195
+    int mNumEffects;                                         // 196
+    bool mDead;                                              //
     bool mActive;
     bool mUsesClipping;
-    int mAttachmentID;
-}; // 大小199个整数
+}; // 大小198个整数
 
 inline AttachEffect *AttachReanim(AttachmentID &theAttachmentID, Reanimation *theReanimation, float theOffsetX, float theOffsetY) {
     return reinterpret_cast<AttachEffect *(*)(AttachmentID &, Reanimation *, float, float)>(AttachReanimAddr)(theAttachmentID, theReanimation, theOffsetX, theOffsetY);
