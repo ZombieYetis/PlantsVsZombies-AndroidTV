@@ -28,6 +28,7 @@
 #include "PvZ/Symbols.h"
 
 inline constexpr int MAX_SEEDS_IN_POOL = 9;
+inline constexpr int NUM_VS_SHUFFLE_CARDS = 5;
 
 enum VSSetupMode {
     VS_SETUP_MODE_QUICK_PLAY = 0,    // 快速游戏
@@ -212,6 +213,9 @@ protected:
     void _constructor();
     void _destructor();
 
+    void StartRandomBattle(const U16x12_Event *theRandomPick);
+    void PrepareSeedBanks();
+    void UpdateSeedPacketPositions();
     void PickRandomZombies(std::vector<SeedType> &theZombieSeeds) const;
     void PickRandomPlants(std::vector<SeedType> &thePlantSeeds, std::vector<SeedType> const &theZombieSeeds) const;
 

@@ -408,15 +408,14 @@ void VSSetupAddonWidget::CloseAISettings() {
 void PickMPRandomSeeds(LawnApp *theApp, std::vector<SeedType> &thePlantSeeds, std::vector<SeedType> &theZombieSeeds, bool theIsZombie, bool theAllowCoffee) {
     std::vector<SeedType> &aSeeds = theIsZombie ? theZombieSeeds : thePlantSeeds;
 
-    int alreadyPicked = 0;
-    if (!theIsZombie && theAllowCoffee && Sexy::Rand(5) == 1) {
+    const bool mushroomPool = !theIsZombie && theAllowCoffee && Sexy::Rand(5) == 1;
+    if (mushroomPool && !theApp->mBoard->StageIsNight()) {
         aSeeds.push_back(SEED_INSTANT_COFFEE);
-        alreadyPicked = 1;
     }
 
-    const int poolGroupOffset = 3 * alreadyPicked;
+    const int poolGroupOffset = mushroomPool ? 3 : 0;
 
-    for (int num_possible = alreadyPicked; num_possible < theApp->mBoard->GetNumSeedsInBank(true) - 1; ++num_possible) {
+    for (int num_possible = static_cast<int>(aSeeds.size()); num_possible < NUM_VS_SHUFFLE_CARDS; ++num_possible) {
         int pool = 0;
         if (num_possible == 2 || num_possible == 3)
             pool = 1;
@@ -489,16 +488,10 @@ void PickMPRandomSeeds(LawnApp *theApp, std::vector<SeedType> &thePlantSeeds, st
     }
 }
 
-void PickShuffleSeeds(LawnApp *theApp, std::vector<SeedType> &thePlantSeeds, std::vector<SeedType> &theZombieSeeds, bool theIsZombie) {
+void PickShuffleSeeds(LawnApp *theApp, std::vector<SeedType> &thePlantSeeds, std::vector<SeedType> &theZombieSeeds, bool theIsZombie, bool theOpeningDeal) {
     PickMPRandomSeeds(theApp, thePlantSeeds, theZombieSeeds, theIsZombie);
 
     if (theIsZombie) {
-        if (NeedSeedZombieImp(theApp)) {
-            auto it = std::ranges::find(theZombieSeeds, SeedType::SEED_ZOMBIE_NORMAL);
-            if (it != theZombieSeeds.end()) {
-                *it = SeedType::SEED_ZOMBIE_IMP;
-            }
-        }
         if (NeedSeedZombieSuperFanImp(theApp, theZombieSeeds, true)) {
             if (!theZombieSeeds.empty()) {
                 theZombieSeeds[0] = SeedType::SEED_ZOMBIE_SUPER_FAN_IMP;
@@ -514,6 +507,19 @@ void PickShuffleSeeds(LawnApp *theApp, std::vector<SeedType> &thePlantSeeds, std
             auto it = std::ranges::find(thePlantSeeds, SeedType::SEED_SPIKEWEED);
             if (it != thePlantSeeds.end()) {
                 *it = SeedType::SEED_TORCHWOOD;
+            }
+        }
+    }
+
+    // 开局先发僵尸牌，等植物首牌确定后再配土豆雷的反制卡。
+    const bool needsImp = theOpeningDeal ? !theIsZombie && std::ranges::contains(thePlantSeeds, SEED_POTATOMINE) : theIsZombie && NeedSeedZombieImp(theApp);
+    if (needsImp) {
+        auto normal = std::ranges::find(theZombieSeeds, SEED_ZOMBIE_NORMAL);
+        if (normal != theZombieSeeds.end()) {
+            *normal = SEED_ZOMBIE_IMP;
+            if (theOpeningDeal) {
+                const auto slot = 1 + (normal - theZombieSeeds.begin());
+                theApp->mBoard->mSeedBank[1]->mSeedPackets[slot].SetPacketType(SEED_ZOMBIE_IMP, SEED_NONE);
             }
         }
     }
@@ -540,14 +546,15 @@ SeedType PickNextRandomSeed(LawnApp *theApp, std::vector<SeedType> &thePlantSeed
 }
 
 bool NeedSeedInstantCoffee(LawnApp *theApp, const std::vector<SeedType> &thePlantSeeds, bool theIsShuffle) {
-    if (theIsShuffle) {
+    const bool mushroomsSleep = !theApp->mBoard->StageIsNight();
+    if (mushroomsSleep && theIsShuffle) {
         // 刷出的新卡组中有蘑菇
         for (SeedType aSeedType : thePlantSeeds) {
             if (Plant::IsNocturnal(aSeedType)) {
                 return true;
             }
         }
-    } else {
+    } else if (mushroomsSleep) {
         // 种子栏存在可用的蘑菇
         for (int i = 1; i < 6; ++i) {
             SeedPacket &aSeedPacket = theApp->mBoard->mSeedBank[0]->mSeedPackets[i];

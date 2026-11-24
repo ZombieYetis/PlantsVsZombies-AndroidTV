@@ -32,6 +32,7 @@
 #include "PvZ/Lawn/Widget/NetplayLobbyWidget.h"
 #include "PvZ/NetPlay.h"
 #include "PvZ/ReplaySystem.h"
+#include "PvZ/SexyAppFramework/Graphics/Font.h"
 #include "PvZ/SexyAppFramework/Widget/ButtonListener.h"
 #include "PvZ/SexyAppFramework/Widget/ScrollWidget.h"
 #include "PvZ/TodLib/Common/TodCommon.h"
@@ -155,6 +156,7 @@ public:
             const pvzstl::string timeText = StrFormat(TodStringTranslate("[REPLAY_TIME_FMT]").c_str(), item.createdAt.c_str(), mm, ss);
 
             pvzstl::string bgText;
+            Font *bgFont = FONT_HOUSEOFTERROR16;
             switch (item.vsBackground) {
                 case 0:
                     bgText = TodStringTranslate("[MP_VS_DAY]");
@@ -176,13 +178,14 @@ public:
                     break;
                 case -2:
                     bgText = TodStringTranslate("[MP_VS_LEGACY_MODE]");
+                    bgFont = addonFonts.JN_BOBO_HEI20;
                     break;
                 default:
                     bgText = "Unknown";
                     break;
             };
             TodDrawString(g, timeText, centerX, rowTop + 35, FONT_DWARVENTODCRAFT18, Color(255, 244, 130), DrawStringJustification::DS_ALIGN_CENTER);
-            TodDrawString(g, bgText, centerX, rowTop + 62, FONT_HOUSEOFTERROR16, Color(220, 220, 220), DrawStringJustification::DS_ALIGN_CENTER);
+            TodDrawString(g, bgText, centerX, rowTop + 62, bgFont, Color(220, 220, 220), DrawStringJustification::DS_ALIGN_CENTER);
             if (plantWin) {
                 g->DrawImage(IMAGE_MP_PLANT_TROPHY, centerX - 30, rowMidY - 10, 60, 60);
             } else if (zombieWin) {

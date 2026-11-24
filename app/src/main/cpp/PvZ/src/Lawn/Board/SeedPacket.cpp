@@ -325,15 +325,16 @@ void DrawSeedPacket(Sexy::Graphics *g,
         g->SetColor(theColor);
         g->SetColorizeImages(true);
     }
+    const bool isShuffleCard = theSeedType == SEED_BEGHOULED_BUTTON_SHUFFLE || theSeedType == SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE;
     int celToDraw = 0;
     if (theSeedType == SeedType::SEED_IMITATER) {
         celToDraw = 0;
+    } else if (isShuffleCard) {
+        celToDraw = 4;
     } else if (Plant::IsUpgrade(realSeedType)) {
         celToDraw = 1;
     } else if (theSeedType == SeedType::SEED_BEGHOULED_BUTTON_CRATER) {
         celToDraw = 3;
-    } else if (theSeedType == SeedType::SEED_BEGHOULED_BUTTON_SHUFFLE || theSeedType == SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE) {
-        celToDraw = 4;
     } else if (theSeedType == SeedType::SEED_SLOT_MACHINE_SUN) {
         celToDraw = 5;
     } else if (theSeedType == SeedType::SEED_SLOT_MACHINE_DIAMOND) {
@@ -354,7 +355,7 @@ void DrawSeedPacket(Sexy::Graphics *g,
             } else {
                 TodDrawImageCelScaledF(g, Sexy::IMAGE_SEEDS, x, y, celToDraw, 0, g->mScaleX, g->mScaleY);
             }
-        } else if (theIsZombieSeed && theSeedType != SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE) {
+        } else if (theIsZombieSeed && !isShuffleCard) {
             float heightOffset = g->mScaleX > 1.2 ? -1.5f : 0.0f;
             TodDrawImageScaledF(g, Sexy::IMAGE_ZOMBIE_SEEDPACKET, x, y + heightOffset, g->mScaleX, g->mScaleY);
             if (theSeedType == SeedType::SEED_ZOMBIE_MOUND) {
@@ -364,7 +365,7 @@ void DrawSeedPacket(Sexy::Graphics *g,
             TodDrawImageCelScaledF(g, Sexy::IMAGE_SEEDS, x, y, celToDraw, 0, g->mScaleX, g->mScaleY);
         }
     }
-    bool isPlant = theSeedType < SeedType::SEED_BEGHOULED_BUTTON_SHUFFLE || theSeedType > SeedType::SEED_ZOMBIQUARIUM_TROPHY;
+    const bool drawSeedModel = theIsPacketSelected && !isShuffleCard && (theSeedType < SEED_BEGHOULED_BUTTON_SHUFFLE || theSeedType > SEED_ZOMBIQUARIUM_TROPHY);
     float offsetY = NAN, offsetX = NAN, theDrawScale = NAN;
     switch (realSeedType) {
         case SeedType::SEED_TALLNUT:
@@ -626,7 +627,7 @@ void DrawSeedPacket(Sexy::Graphics *g,
         v28 = 52.0f;
     }
 
-    if (isPlant && theIsPacketSelected)
+    if (drawSeedModel)
         DrawSeedType(g, x, y, realSeedType, theImitaterType, v28, v29, theDrawScale);
 
     if (thePercentDark > 0.0f) {
@@ -646,7 +647,7 @@ void DrawSeedPacket(Sexy::Graphics *g,
                 TodDrawImageCelScaledF(&aPlantG, Sexy::IMAGE_SEEDS, x, y, celToDraw, 0, g->mScaleX, g->mScaleY);
             }
         }
-        if (isPlant && theIsPacketSelected)
+        if (drawSeedModel)
             DrawSeedType(&aPlantG, x, y, theSeedType, theImitaterType, v28, v29, theDrawScale);
     }
     if (theDrawCost) {

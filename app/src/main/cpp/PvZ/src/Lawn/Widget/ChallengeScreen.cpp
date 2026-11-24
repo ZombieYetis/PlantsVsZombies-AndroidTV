@@ -53,7 +53,6 @@ bool IsValidVsMode(int mode) {
         case GAMEMODE_MP_VS_POOL_DAY:
         case GAMEMODE_MP_VS_POOL_NIGHT:
         case GAMEMODE_MP_VS_ROOF:
-        case GAMEMODE_MP_VS_SHUFFLE_MODE:
         case GAMEMODE_MP_VS_LEGACY_MODE:
             return true;
         default:
@@ -114,8 +113,6 @@ pvzstl::string GetNetplayModeName(int mode) {
             return TodStringTranslate("[MP_VS_POOL_NIGHT]");
         case GAMEMODE_MP_VS_ROOF:
             return TodStringTranslate("[MP_VS_ROOF]");
-        case GAMEMODE_MP_VS_SHUFFLE_MODE:
-            return TodStringTranslate("[MP_VS_SHUFFLE_MODE]");
         case GAMEMODE_MP_VS_LEGACY_MODE:
             return TodStringTranslate("[MP_VS_LEGACY_MODE]");
         default:
@@ -258,7 +255,6 @@ ChallengeDefinition gChallengeDefs[] = {
     {GameMode::GAMEMODE_MP_VS, 2, ChallengePage::CHALLENGE_PAGE_VS, 0, 2, "[MP_VS_POOL_DAY]"},
     {GameMode::GAMEMODE_MP_VS, 3, ChallengePage::CHALLENGE_PAGE_VS, 0, 3, "[MP_VS_POOL_NIGHT]"},
     {GameMode::GAMEMODE_MP_VS, 4, ChallengePage::CHALLENGE_PAGE_LIMBO, 0, 4, "[MP_VS_ROOF]"},
-    {GameMode::GAMEMODE_MP_VS, 0, ChallengePage::CHALLENGE_PAGE_VS, 1, 0, "[MP_VS_SHUFFLE_MODE]"},
     {GameMode::GAMEMODE_TWO_PLAYER_COOP_BOSS_HARD, 19, ChallengePage::CHALLENGE_PAGE_COOP, 2, 1, "[COOP_FINAL_BOSS_HARD]"},
     {GameMode::GAMEMODE_MP_VS, 0, ChallengePage::CHALLENGE_PAGE_VS, 1, 1, "[MP_VS_LEGACY_MODE]"},
 };
@@ -719,6 +715,7 @@ void ChallengeScreen::Draw(Sexy::Graphics *g) {
         }
 
         if (!gIsServerModeSpectator && !gIsReplayMode && gChallengeScreenRequestState != 0) {
+            Font *requestFont = gChallengeScreenRequestState == GAMEMODE_MP_VS_LEGACY_MODE ? static_cast<Font *>(addonFonts.JN_BOBO_HEI32) : Sexy::FONT_HOUSEOFTERROR28;
             // ======================
             // 我是 guest：已提醒房主...
             // (gTcpConnected == true 代表我作为 client 连接到 host)
@@ -730,7 +727,7 @@ void ChallengeScreen::Draw(Sexy::Graphics *g) {
                 pvzstl::string name = GetNetplayModeName(gChallengeScreenRequestState);
 
 
-                TodDrawString(g, StrFormat(fmt.c_str(), name.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153, 255), DrawStringJustification::DS_ALIGN_LEFT);
+                TodDrawString(g, StrFormat(fmt.c_str(), name.c_str()), 140, 620, requestFont, Color(255, 255, 153, 255), DrawStringJustification::DS_ALIGN_LEFT);
             }
 
             // ======================
@@ -740,7 +737,7 @@ void ChallengeScreen::Draw(Sexy::Graphics *g) {
             if (IsRemoteServer()) {
                 pvzstl::string fmt = TodStringTranslate("[CHALLENGESCREEN_TIP_OPPONENT_WANTS_PLAY_FMT]");
                 pvzstl::string name = GetNetplayModeName(gChallengeScreenRequestState);
-                TodDrawString(g, StrFormat(fmt.c_str(), name.c_str()), 140, 620, Sexy::FONT_HOUSEOFTERROR28, Color(255, 255, 153, 255), DrawStringJustification::DS_ALIGN_LEFT);
+                TodDrawString(g, StrFormat(fmt.c_str(), name.c_str()), 140, 620, requestFont, Color(255, 255, 153, 255), DrawStringJustification::DS_ALIGN_LEFT);
             }
         }
     }
@@ -918,6 +915,9 @@ void ChallengeScreen::DrawButton(Graphics *g, int theChallengeIndex, int theChal
     g->SetColorizeImages(false);
     g->DrawImage(Sexy::IMAGE_CHALLENGE_NAME_BACK, aPosX - 6, aPosY - 2, 720, 118);
     Font *aFont = Sexy::FONT_DWARVENTODCRAFT24;
+    if (SelectionToNetplayMode(mPage, theChallengeIndex) == GAMEMODE_MP_VS_LEGACY_MODE) {
+        aFont = addonFonts.JN_BOBO_HEI32;
+    }
     Color aTextColor = mSelectedChallengeIndex == theChallengeIndex && theChallengeIndex != mUnlockChallengeIndex ? Color(22, 221, 45) : Color::White;
     pvzstl::string aName = TodStringTranslate(aDef.mChallengeName);
     const bool aShaking = theChallengeIndex == mUnlockChallengeIndex && mUnlockState == UnlockingState::UNLOCK_SHAKING;
@@ -1159,7 +1159,6 @@ void ChallengeScreen::KeyDown_Origin(Sexy::KeyCode theKey) {
         // 更新对战战场选择
         if (mPage == ChallengePage::CHALLENGE_PAGE_VS) {
             const int aMode = SelectionToNetplayMode(mPage, mSelectedChallengeIndex);
-            Challenge::msVSShuffleMode = aMode == GAMEMODE_MP_VS_SHUFFLE_MODE;
             Challenge::msVSLegacyMode = aMode == GAMEMODE_MP_VS_LEGACY_MODE;
             if (gChallengeScreenRequestState == aMode) {
                 gChallengeScreenRequestState = 0;
@@ -1181,10 +1180,6 @@ void ChallengeScreen::KeyDown_Origin(Sexy::KeyCode theKey) {
                     break;
                 case GAMEMODE_MP_VS_ROOF:
                     gVSBackground = BackgroundType::BACKGROUND_5_ROOF;
-                    break;
-                case GAMEMODE_MP_VS_SHUFFLE_MODE:
-                    gVSBackground = BackgroundType::BACKGROUND_1_DAY;
-                    Challenge::msVSShuffleMode = true;
                     break;
                 default:
                     break;
@@ -1264,7 +1259,6 @@ void ChallengeScreen::processServerEvent(const BaseEvent *event) {
                 return;
             }
 
-            Challenge::msVSShuffleMode = theId == GAMEMODE_MP_VS_SHUFFLE_MODE;
             Challenge::msVSLegacyMode = theId == GAMEMODE_MP_VS_LEGACY_MODE;
             switch (theId) {
                 case GAMEMODE_MP_VS_DAY:
@@ -1282,10 +1276,6 @@ void ChallengeScreen::processServerEvent(const BaseEvent *event) {
                     break;
                 case GAMEMODE_MP_VS_ROOF:
                     gVSBackground = BackgroundType::BACKGROUND_5_ROOF;
-                    break;
-                case GAMEMODE_MP_VS_SHUFFLE_MODE:
-                    gVSBackground = BackgroundType::BACKGROUND_1_DAY;
-                    Challenge::msVSShuffleMode = true;
                     break;
                 default:
                     break;

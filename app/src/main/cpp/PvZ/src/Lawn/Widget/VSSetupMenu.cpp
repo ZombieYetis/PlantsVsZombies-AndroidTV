@@ -37,6 +37,14 @@
 using namespace Sexy;
 
 namespace {
+void StartOpeningEncounter(EncounterType type) {
+    if (!gOpeningEncounter) {
+        gOpeningEncounter = new OpeningEncounter();
+    }
+    gOpeningEncounter->mType = type;
+    gOpeningEncounter->OpeningEncounterInitialize(type);
+}
+
 static int GetPrioritySidePickSlot(const VSSetupMenu *menu) {
     if (menu == nullptr || VSSetupAddonWidget::msGlobalBpMode == VSSetupAddonWidget::GLOBALBP_CLOSED) {
         return -1;
@@ -1022,17 +1030,7 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
             seedChooser->ClickedSeedInChooser_Orgin(chosenSeed, ownerPlayerIndex);
         } break;
         case EVENT_VSSETUPMENU_RANDOM_PICK: {
-            auto *eventRandPick = static_cast<const U16x12_Event *>(event);
-            ButtonDepress_Origin(VSSetupMenu::VSSetupMenu_Random_Battle);
-
-            for (int i = 0; i < mApp->mBoard->GetNumSeedsInBank(false); ++i) {
-                mApp->mBoard->mSeedBank[0]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->u16x12_0[i]), SeedType::SEED_NONE);
-                mApp->mBoard->mSeedBank[1]->mSeedPackets[i + 1].SetPacketType(SeedType(eventRandPick->u16x12_0[i + 6]), SeedType::SEED_NONE);
-            }
-            if (Challenge::msVSShuffleMode) {
-                mApp->mBoard->mSeedBank[0]->mSeedPackets[6].SetPacketType(SEED_BEGHOULED_BUTTON_SHUFFLE, SeedType::SEED_NONE);
-                mApp->mBoard->mSeedBank[1]->mSeedPackets[6].SetPacketType(SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE, SeedType::SEED_NONE);
-            }
+            StartRandomBattle(static_cast<const U16x12_Event *>(event));
         } break;
         case EVENT_SERVER_VSSETUPMENU_MOVE_CONTROLLER: {
             auto *event1 = static_cast<const U16_Event *>(event);
@@ -1106,9 +1104,8 @@ void VSSetupMenu::processServerEvent(const BaseEvent *event) {
         } break;
         case EVENT_SERVER_ENCOUNTER_PICK: {
             auto *eventEncounterPick = static_cast<const U16_Event *>(event);
-            if (gOpeningEncounter) {
-                gOpeningEncounter->mType = EncounterType(eventEncounterPick->u16_0);
-                gOpeningEncounter->OpeningEncounterInitialize(gOpeningEncounter->mType);
+            if (eventEncounterPick->u16_0 < NUM_ENCOUNTER) {
+                StartOpeningEncounter(EncounterType(eventEncounterPick->u16_0));
             }
         } break;
         default:
@@ -1200,18 +1197,6 @@ void VSSetupMenu::OnStateEnter(VSSetupState theState) {
             (*aButton->mColors)[ButtonWidget::COLOR_LABEL_HILITE] = Color(277, 225, 108);
         }
         gGamepad1ToPlayerIndex = mSides[0];
-
-        if (Challenge::msVSShuffleMode) {
-            if (gOpeningEncounter && Rand(10) == 0 && !IsRemoteClientOrViewer()) {
-                gOpeningEncounter->mType = EncounterType(Rand(NUM_ENCOUNTER));
-                gOpeningEncounter->OpeningEncounterInitialize(gOpeningEncounter->mType);
-                if (IsRemoteServer()) {
-                    U16_Event event = {{EventType::EVENT_SERVER_ENCOUNTER_PICK}, uint16_t(gOpeningEncounter->mType)};
-                    netplay::PutEvent(event);
-                }
-            }
-            ButtonDepress(VSSetupMenu_Random_Battle);
-        }
     }
 
     old_VSSetupMenu_OnStateEnter(this, theState);
@@ -1257,20 +1242,100 @@ void VSSetupMenu::ButtonDepress(int theId) {
     ButtonDepress_Origin(theId);
 }
 
-void VSSetupMenu::ButtonDepress_Origin(int theId) {
-    // 拓展功能开启情况
+void VSSetupMenu::PrepareSeedBanks() {
     if (mAddonWidget) {
         netplay::MetricsSetAddonFlags(mAddonWidget->mExtraPacketMode, mAddonWidget->mBanMode);
     }
+    Board *aBoard = mApp->mBoard;
+    const int aNumPackets = aBoard->GetNumSeedsInBank(false);
+    aBoard->mSeedBank[0]->mNumPackets = aBoard->mSeedBank[1]->mNumPackets = aNumPackets;
+}
 
-    int aNumPackets = mApp->mBoard->GetNumSeedsInBank(false);
-
+void VSSetupMenu::UpdateSeedPacketPositions() {
     SeedBank *aPlantBank = mApp->mBoard->mSeedBank[0];
     SeedBank *aZombieBank = mApp->mBoard->mSeedBank[1];
+    // 修复“额外卡槽”开启后卡槽位置不正确
+    for (int i = 0; i < SEEDBANK_MAX; i++) {
+        SeedPacket *aPlantPacket = &aPlantBank->mSeedPackets[i];
+        SeedPacket *aZombiePacket = &aZombieBank->mSeedPackets[i];
+        aPlantPacket->mIndex = i;
+        aZombiePacket->mIndex = i;
+        aPlantPacket->mX = mApp->mBoard->GetSeedPacketPositionX(i, 0, false);
+        aZombiePacket->mX = mApp->mBoard->GetSeedPacketPositionX(i, 1, true);
+    }
+}
 
-    aPlantBank->mNumPackets = aZombieBank->mNumPackets = aNumPackets;
+void VSSetupMenu::StartRandomBattle(const U16x12_Event *theRandomPick) {
+    if (mState != VS_SETUP_STATE_SELECT_BATTLE) {
+        return;
+    }
+    PrepareSeedBanks();
+    SeedBank *aPlantBank = mApp->mBoard->mSeedBank[0];
+    SeedBank *aZombieBank = mApp->mBoard->mSeedBank[1];
+    const SeedType aSunPlantType = mApp->mBoard->StageIsNight() ? SEED_SUNSHROOM : SEED_SUNFLOWER;
 
-    SeedType aSunPlantType = mApp->mBoard->StageIsNight() ? SeedType::SEED_SUNSHROOM : SeedType::SEED_SUNFLOWER;
+    netplay::MetricsSetBattleType(VSSetupMenu_Random_Battle);
+    Challenge::msVSShuffleMode = !Challenge::msVSLegacyMode;
+    const int aCardCount = Challenge::msVSShuffleMode ? NUM_VS_SHUFFLE_CARDS : aPlantBank->mNumPackets - 1;
+    if (Challenge::msVSShuffleMode) {
+        gFreeForFristShuffle[0] = gFreeForFristShuffle[1] = true;
+        aPlantBank->mNumPackets = aZombieBank->mNumPackets = aCardCount + 2;
+        aPlantBank->mSeedPackets[aCardCount + 1].SetPacketType(SEED_BEGHOULED_BUTTON_SHUFFLE, SEED_NONE);
+        aZombieBank->mSeedPackets[aCardCount + 1].SetPacketType(SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE, SEED_NONE);
+        if (!theRandomPick && Rand(10) == 0) {
+            const auto type = EncounterType(Rand(NUM_ENCOUNTER));
+            StartOpeningEncounter(type);
+            if (IsRemoteServer()) {
+                U16_Event event = {{EVENT_SERVER_ENCOUNTER_PICK}, uint16_t(type)};
+                netplay::PutEvent(event);
+            }
+        }
+    }
+
+    aPlantBank->mSeedPackets[0].SetPacketType(aSunPlantType, SEED_NONE);
+    aZombieBank->mSeedPackets[0].SetPacketType(SEED_ZOMBIE_GRAVESTONE, SEED_NONE);
+    std::vector<SeedType> aPlantSeeds, aZombieSeeds;
+    // Plant counters depend on the cards already dealt to the zombie bank.
+    for (bool isZombie : {true, false}) {
+        if (!theRandomPick) {
+            if (Challenge::msVSShuffleMode) {
+                PickShuffleSeeds(mApp, aPlantSeeds, aZombieSeeds, isZombie, true);
+            } else if (isZombie) {
+                PickRandomZombies(aZombieSeeds);
+            } else {
+                PickRandomPlants(aPlantSeeds, aZombieSeeds);
+            }
+        }
+        SeedBank *aSeedBank = isZombie ? aZombieBank : aPlantBank;
+        const auto &seeds = isZombie ? aZombieSeeds : aPlantSeeds;
+        const int offset = isZombie ? 6 : 0;
+        for (int i = 0; i < aCardCount; ++i) {
+            SeedType aSeedType = theRandomPick ? SeedType(theRandomPick->u16x12_0[offset + i]) : seeds[i];
+            aSeedBank->mSeedPackets[i + 1].SetPacketType(aSeedType, SEED_NONE);
+        }
+    }
+
+    if (IsRemoteServer()) {
+        U16x12_Event event{};
+        event.type = EventType::EVENT_VSSETUPMENU_RANDOM_PICK;
+        std::ranges::copy(aPlantSeeds, event.u16x12_0);
+        std::ranges::copy(aZombieSeeds, event.u16x12_0 + 6);
+        netplay::PutEvent(event);
+    }
+    mSetupMode = VSSetupMode::VS_SETUP_MODE_RANDOM_BATTLE;
+    UpdateSeedPacketPositions();
+    CloseVSSetup(false);
+}
+
+void VSSetupMenu::ButtonDepress_Origin(int theId) {
+    if (theId == VSSetupMenu_Random_Battle) {
+        StartRandomBattle(nullptr);
+        return;
+    }
+    PrepareSeedBanks();
+    SeedBank *aPlantBank = mApp->mBoard->mSeedBank[0];
+    SeedBank *aZombieBank = mApp->mBoard->mSeedBank[1];
+    const SeedType aSunPlantType = mApp->mBoard->StageIsNight() ? SEED_SUNSHROOM : SEED_SUNFLOWER;
 
     if (mState == VSSetupState::VS_SETUP_STATE_SELECT_BATTLE) {
         switch (theId) {
@@ -1322,80 +1387,12 @@ void VSSetupMenu::ButtonDepress_Origin(int theId) {
                 }
             } break;
 
-            case VSSetupMenu_Random_Battle: {
-                netplay::MetricsSetBattleType(VSSetupMenu_Random_Battle);
-                std::vector<SeedType> aZombieSeeds;
-                PickRandomZombies(aZombieSeeds);
-
-                mApp->mBoard->mSeedBank[1]->mSeedPackets[0].SetPacketType(SeedType::SEED_ZOMBIE_GRAVESTONE, SeedType::SEED_NONE);
-
-                if (!aZombieSeeds.empty()) {
-                    for (int aPacketIndex = 1; aPacketIndex <= aZombieSeeds.size(); ++aPacketIndex) {
-                        SeedType aSeedType = aZombieSeeds[aPacketIndex - 1];
-                        mApp->mBoard->mSeedBank[1]->mSeedPackets[aPacketIndex].SetPacketType(aSeedType, SeedType::SEED_NONE);
-                    }
-                }
-
-                std::vector<SeedType> aPlantSeeds;
-                PickRandomPlants(aPlantSeeds, aZombieSeeds);
-
-                mApp->mBoard->mSeedBank[0]->mSeedPackets[0].SetPacketType(aSunPlantType, SeedType::SEED_NONE);
-
-                if (!aPlantSeeds.empty()) {
-                    for (int aPacketIndex = 1; aPacketIndex <= aPlantSeeds.size(); ++aPacketIndex) {
-                        SeedType aSeedType = aPlantSeeds[aPacketIndex - 1];
-                        mApp->mBoard->mSeedBank[0]->mSeedPackets[aPacketIndex].SetPacketType(aSeedType, SeedType::SEED_NONE);
-                    }
-                }
-
-                if (Challenge::msVSShuffleMode) {
-                    gFreeForFristShuffle[0] = gFreeForFristShuffle[1] = true;
-                    aPlantBank->mNumPackets = aZombieBank->mNumPackets = 7;
-                    aZombieSeeds.clear();
-                    aPlantSeeds.clear();
-                    PickShuffleSeeds(mApp, aPlantSeeds, aZombieSeeds, true);
-                    if (!aZombieSeeds.empty()) {
-                        for (int aPacketIndex = 1; aPacketIndex <= aZombieSeeds.size(); ++aPacketIndex) {
-                            SeedType aSeedType = aZombieSeeds[aPacketIndex - 1];
-                            mApp->mBoard->mSeedBank[1]->mSeedPackets[aPacketIndex].SetPacketType(aSeedType, SeedType::SEED_NONE);
-                        }
-                    }
-                    PickShuffleSeeds(mApp, aPlantSeeds, aZombieSeeds, false);
-                    if (!aPlantSeeds.empty()) {
-                        for (int aPacketIndex = 1; aPacketIndex <= aPlantSeeds.size(); ++aPacketIndex) {
-                            SeedType aSeedType = aPlantSeeds[aPacketIndex - 1];
-                            mApp->mBoard->mSeedBank[0]->mSeedPackets[aPacketIndex].SetPacketType(aSeedType, SeedType::SEED_NONE);
-                        }
-                    }
-                    aPlantBank->mSeedPackets[6].SetPacketType(SEED_BEGHOULED_BUTTON_SHUFFLE, SeedType::SEED_NONE);
-                    aZombieBank->mSeedPackets[6].SetPacketType(SEED_ZOMBIE_BEGHOULED_BUTTON_SHUFFLE, SeedType::SEED_NONE);
-                }
-
-                mSetupMode = VSSetupMode::VS_SETUP_MODE_RANDOM_BATTLE;
-                CloseVSSetup(false);
-
-                if (IsRemoteServer()) {
-                    U16x12_Event event{};
-                    event.type = EventType::EVENT_VSSETUPMENU_RANDOM_PICK;
-                    std::ranges::copy(aPlantSeeds, event.u16x12_0);
-                    std::ranges::copy(aZombieSeeds, event.u16x12_0 + 6);
-                    netplay::PutEvent(event);
-                }
-            } break;
-
             default:
                 break;
         }
     }
 
-    // 修复“额外卡槽”开启后卡槽位置不正确
-    for (int i = 0; i < SEEDBANK_MAX; i++) {
-        SeedPacket *aPlantPacket = &aPlantBank->mSeedPackets[i];
-        SeedPacket *aZombiePacket = &aZombieBank->mSeedPackets[i];
-        aPlantPacket->mIndex = i;
-        aPlantPacket->mX = mApp->mBoard->GetSeedPacketPositionX(i, 0, false);
-        aZombiePacket->mX = mApp->mBoard->GetSeedPacketPositionX(i, 1, true);
-    }
+    UpdateSeedPacketPositions();
 
     switch (theId) {
         case VSSetupAddonWidget::VSSetupAddonWidget_Back: // 返回模式选择

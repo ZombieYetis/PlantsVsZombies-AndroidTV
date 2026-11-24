@@ -87,6 +87,7 @@ void Challenge::_constructor() {
     old_Challenge_Challenge(this);
 
     if (mApp->IsVSMode()) {
+        msVSShuffleMode = false;
         ReanimatorEnsureDefinitionLoaded(REANIM_APPLE_CLOCK, true);
         Reanimation *aClockReanim = mApp->AddReanimation(335, 580, 0, REANIM_APPLE_CLOCK);
         aClockReanim->mAnimRate = 0;
@@ -98,12 +99,6 @@ void Challenge::_constructor() {
         mPauseStartTick = -1;
         Zombie::msDeadFollowers.clear();
         mBoard->mJacksonDanceMode = false;
-
-        if (Challenge::msVSShuffleMode) {
-            if (!gOpeningEncounter) {
-                gOpeningEncounter = new OpeningEncounter();
-            }
-        }
     }
 }
 
