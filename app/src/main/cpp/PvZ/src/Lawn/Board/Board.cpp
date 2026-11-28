@@ -3824,7 +3824,7 @@ static void CheatPlaceZombie(Board *theBoard, int theCol, int theRow, ZombieType
         if (aIsAllRow) {
             // Use `MAX_GRID_SIZE_Y` instead of `aRowsCount`, for BACKGROUND_ZOMBIQUARIUM
             for (int row = 0; row < MAX_GRID_SIZE_Y; ++row) {
-                if (theBoard->RowCanHaveZombieType(row, theZombieType)) /* 多行收紧限制 */ {
+                if (theBoard->RowCanHaveZombies(row)) {
                     theBoard->AddZombieInRow(theZombieType, row, theBoard->mCurrentWave, true);
                 }
             }
