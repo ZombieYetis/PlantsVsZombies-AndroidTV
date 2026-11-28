@@ -1084,7 +1084,7 @@ void Zombie::SummonPigeons() {
     int aRows[8], aCount = 0;
     for (int dy = -1; dy <= 1; ++dy) {
         const int aRow = mRow + dy;
-        if (!mBoard->RowCanHaveZombies(aRow)) {
+        if (!mBoard->RowCanHaveZombieType(aRow, ZombieType::ZOMBIE_PIGEON)) {
             continue;
         }
         for (int dx = -1; dx <= 1; ++dx) {
@@ -5950,7 +5950,7 @@ bool Zombie::ZombieTypeCanGoInPool(ZombieType theZombieType) {
     // 修复泳池对战的僵尸走水路时不索敌植物
     if ((gLawnApp)->IsVSMode()) {
         if (gVSBackground == BackgroundType::BACKGROUND_3_POOL || gVSBackground == BackgroundType::BACKGROUND_4_FOG)
-            return theZombieType != ZombieType::ZOMBIE_BUNGEE; // 蹦极不能落水
+            return theZombieType != ZombieType::ZOMBIE_BUNGEE && theZombieType != ZombieType::ZOMBIE_PIGEON; // 蹦极和鸽子不能进入水路
     }
 
     return theZombieType == ZombieType::ZOMBIE_NORMAL        //
