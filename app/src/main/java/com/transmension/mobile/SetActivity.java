@@ -284,6 +284,7 @@ public class SetActivity extends Activity {
 
         setTitle(getString(R.string.addon_title));
         ScrollView scrollView = new ScrollView(this);
+        scrollView.setFitsSystemWindows(true);
         LinearLayout linearLayout = new LinearLayout(this);
         linearLayout.setOrientation(LinearLayout.VERTICAL);
         LayoutTransition transition = new LayoutTransition();
